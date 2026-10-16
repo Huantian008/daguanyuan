@@ -23,16 +23,23 @@ def cn_date(d: date) -> str:
 
 
 def minutes(seconds: int | None) -> int:
-    return round((seconds or 0) / 60)
+    return ((seconds or 0) + 30) // 60  # round half up, unlike round()
 
 
 def stars(n: int) -> str:
     return "★" * n + "☆" * (5 - n)
 
 
+def duration(seconds: int | None) -> str:
+    if not seconds:
+        return ""
+    return f"{seconds} 秒" if seconds < 60 else f"{minutes(seconds)} 分钟"
+
+
 TEMPLATES.env.filters.update(
     cn_date=cn_date,
     minutes=minutes,
+    duration=duration,
     stars=stars,
     grade_label=lambda g: GRADE_LABELS.get(g, "未做"),
 )

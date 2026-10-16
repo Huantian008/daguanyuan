@@ -20,7 +20,7 @@
 
 <article class="sheet">
   {{ qmeta(q) }}
-  <div class="qbody">{{ images([q.img], 'qimg', '题目 #%03d' % q.num, 2) }}</div>
+  <div class="qbody">{{ images([q.img], 'qimg', '题目 #%03d' % q.num, 1.6, lazy=false) }}</div>
 </article>
 <details class="reveal answer">
   <summary>显示答案</summary>
@@ -37,7 +37,7 @@
     {% if history %}
     <ul class="plain">
       {% for r in history|reverse %}
-      <li><span class="muted">{{ r.study_day|cn_date }}</span> <span class="chip chip-{{ r.grade }}">{{ r.grade|grade_label }}</span>{% if r.elapsed_sec %} <span class="muted">{{ r.elapsed_sec|minutes }} 分钟</span>{% endif %}</li>
+      <li><span class="muted">{{ r.study_day|cn_date }}</span> <span class="chip chip-{{ r.grade }}">{{ r.grade|grade_label }}</span>{% if r.elapsed_sec %} <span class="muted">{{ r.elapsed_sec|duration }}</span>{% endif %}</li>
       {% endfor %}
     </ul>
     {% else %}

@@ -15,6 +15,19 @@ _md = (
 
 _HREF = re.compile(r'href="([^"]+)"')
 _CHAPTER_LINK = re.compile(r"^\./(\d\d)_[^/#]+\.md(#.*)?$")
+_QUOTE_MARKERS = re.compile(r"(?m)^[ \t]*(?:>[ \t]?)+")
+
+
+def _strip_quote_markers_in_math(tokens) -> None:
+    """dollarmath keeps the "> " prefixes of $$ blocks written inside a blockquote; drop them."""
+    depth = 0
+    for tok in tokens:
+        if tok.type == "blockquote_open":
+            depth += 1
+        elif tok.type == "blockquote_close":
+            depth -= 1
+        elif depth and tok.type.startswith("math_block"):
+            tok.content = _QUOTE_MARKERS.sub("", tok.content)
 
 
 def _site_link(match: re.Match) -> str:
@@ -31,6 +44,7 @@ def render_markdown(source: str) -> tuple[str, list[tuple[str, str]]]:
     """HTML plus a table of contents of (anchor id, title) for the h2 headings."""
     env: dict = {}
     tokens = _md.parse(source, env)
+    _strip_quote_markers_in_math(tokens)
     toc = [
         (tok.attrs.get("id", ""), tokens[i + 1].content)
         for i, tok in enumerate(tokens)

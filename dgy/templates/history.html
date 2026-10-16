@@ -13,7 +13,7 @@
       <span class="muted time">{{ r.reviewed_at.strftime('%H:%M') }}</span>
       <a href="/q/{{ r.num }}"><span class="qnum">#{{ '%03d' % r.num }}</span> {{ q.kp if q else '' }}</a>
       <span class="chip chip-{{ r.grade }}">{{ r.grade|grade_label }}</span>
-      {% if r.elapsed_sec %}<span class="muted">{{ r.elapsed_sec|minutes }} 分钟</span>{% endif %}
+      {% if r.elapsed_sec %}<span class="muted">{{ r.elapsed_sec|duration }}</span>{% endif %}
     </li>
     {% endfor %}
   </ul>

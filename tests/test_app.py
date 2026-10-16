@@ -168,6 +168,11 @@ def test_content_images_are_served(env):
     assert env.client.get("/content/q/001.webp").content == b"img"
 
 
+def test_webp_images_get_an_image_content_type(env):
+    # Windows' registry often lacks .webp, which made browsers refuse to show the images.
+    assert env.client.get("/content/q/001.webp").headers["content-type"] == "image/webp"
+
+
 def test_daily_backup_is_made_on_first_visit(env):
     env.client.get("/")
     assert (env.settings.data_dir / "backups" / "app-20261016.db").exists()

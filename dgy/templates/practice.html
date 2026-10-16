@@ -15,7 +15,7 @@
 
   <article class="sheet">
     {{ qmeta(q) }}
-    <div class="qbody">{{ images([q.img], 'qimg', '题目 #%03d' % q.num, 2) }}</div>
+    <div class="qbody">{{ images([q.img], 'qimg', '题目 #%03d' % q.num, 1.6, lazy=false) }}</div>
   </article>
 
   <details class="reveal answer">

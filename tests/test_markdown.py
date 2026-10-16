@@ -21,6 +21,14 @@ def test_links_to_other_chapters_point_to_site_pages():
     assert 'href="/knowledge"' in html
 
 
+def test_display_math_inside_a_blockquote_has_no_quote_markers():
+    source = "> 例如\n>\n> $$\n> \\lim_{x\\to\\infty}\\frac{x+\\sin x}{x}=1,\n> $$\n>\n> 不收敛。\n"
+    html, _toc = render_markdown(source)
+    block = html.split('<div class="math block">')[1].split("</div>")[0]
+    assert "\\lim_" in block
+    assert "&gt;" not in block
+
+
 def test_tables_are_rendered():
     html, _toc = render_markdown("| a | b |\n|---|---|\n| $x$ | 2 |\n")
     assert "<table>" in html and '<span class="math inline">x</span>' in html

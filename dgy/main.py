@@ -1,4 +1,5 @@
-"""The web app.  Run with:  uvicorn dgy.main:create_app --factory"""
+"""The web app.  Run with:  python -m dgy  (or uvicorn dgy.main:create_app --factory)"""
+import mimetypes
 from datetime import datetime
 from pathlib import Path
 from typing import Callable
@@ -17,6 +18,10 @@ from .routes import auth, bank, dashboard, history, knowledge, practice, prefere
 
 STATIC_DIR = Path(__file__).parent / "static"
 PUBLIC_PREFIXES = ("/static/", "/login")
+
+# Windows' MIME registry often lacks these; without image/webp browsers refuse to show the question images.
+for _type, _ext in (("image/webp", ".webp"), ("font/woff2", ".woff2"), ("font/woff", ".woff"), ("font/ttf", ".ttf")):
+    mimetypes.add_type(_type, _ext)
 
 
 def create_app(settings: Settings | None = None, clock: Callable[[], datetime] | None = None) -> FastAPI:

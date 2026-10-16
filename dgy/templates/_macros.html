@@ -9,8 +9,8 @@
 </div>
 {%- endmacro %}
 
-{% macro images(list, cls, alt, scale=2) -%}
-{% for img in list %}<img class="{{ cls }}" src="/content/{{ img.src }}" width="{{ (img.w / scale)|round|int }}" height="{{ (img.h / scale)|round|int }}" alt="{{ alt }}" loading="lazy" decoding="async">{% endfor %}
+{% macro images(list, cls, alt, scale=2, lazy=true) -%}
+{% for img in list %}<img class="{{ cls }}" src="/content/{{ img.src }}" width="{{ (img.w / scale)|round|int }}" height="{{ (img.h / scale)|round|int }}" alt="{{ alt }}" {% if lazy %}loading="lazy" decoding="async"{% else %}fetchpriority="high"{% endif %}>{% endfor %}
 {%- endmacro %}
 
 {% macro dist_bar(dist) -%}
