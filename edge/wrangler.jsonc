@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dgy",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  // Every request goes through the Worker first, so question images are only served after login.
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "dgy",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "routes": [
+    { "pattern": "math.leadertestofcn.site", "custom_domain": true }
+  ],
+  "observability": { "enabled": true }
+}

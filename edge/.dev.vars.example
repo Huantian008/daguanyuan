@@ -1,0 +1,2 @@
+APP_PASSWORD=本地开发用的密码
+SECRET_KEY=本地开发用的随机字符串

@@ -11,3 +11,4 @@ edge/public/
 edge/.wrangler/
 edge/src/generated/
 edge/worker-configuration.d.ts
+edge/.dev.vars
