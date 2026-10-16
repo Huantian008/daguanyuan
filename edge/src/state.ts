@@ -1,4 +1,4 @@
-/** The user's current state, loaded from D1 in two queries. */
+/** A user's current state, loaded from D1 in two queries. */
 import type { Content } from "./content";
 import { allCards, exclusionOverrides, getSetting } from "./db";
 import type { CardState } from "./srs";
@@ -15,16 +15,16 @@ export interface UserState {
   status: (num: number) => Status;
 }
 
-export async function loadState(db: D1Database, content: Content): Promise<UserState> {
-  const [cards, overrides] = await Promise.all([allCards(db), exclusionOverrides(db)]);
+export async function loadState(db: D1Database, uid: number, content: Content): Promise<UserState> {
+  const [cards, overrides] = await Promise.all([allCards(db, uid), exclusionOverrides(db, uid)]);
   const excluded = excludedSet(content, overrides);
   const active = new Set(content.all().map((q) => q.num).filter((n) => !excluded.has(n)));
   const status = (num: number): Status => (excluded.has(num) ? "excluded" : cards.get(num)?.lastGrade ?? "new");
   return { cards, excluded, active, status };
 }
 
-export const examDate = (db: D1Database) => getSetting(db, "exam_date", DEFAULT_EXAM_DATE);
+export const examDate = (db: D1Database, uid: number) => getSetting(db, uid, "exam_date", DEFAULT_EXAM_DATE);
 
-export async function warmupDays(db: D1Database): Promise<number> {
-  return Number(await getSetting(db, "warmup_days", String(DEFAULT_WARMUP_DAYS)));
+export async function warmupDays(db: D1Database, uid: number): Promise<number> {
+  return Number(await getSetting(db, uid, "warmup_days", String(DEFAULT_WARMUP_DAYS)));
 }

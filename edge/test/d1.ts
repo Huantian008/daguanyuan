@@ -1,8 +1,13 @@
-// In-memory stand-in for Cloudflare D1 built on node:sqlite, loaded with the real migration file.
-import { readFileSync } from "node:fs";
+// In-memory stand-in for Cloudflare D1 built on node:sqlite, loaded with the real migration files (in name order).
+import { readdirSync, readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 
-const MIGRATION = readFileSync(new URL("../migrations/0001_init.sql", import.meta.url), "utf8");
+const MIGRATIONS = new URL("../migrations/", import.meta.url);
+const SCHEMA = readdirSync(MIGRATIONS)
+  .filter((name) => name.endsWith(".sql"))
+  .sort()
+  .map((name) => readFileSync(new URL(name, MIGRATIONS), "utf8"))
+  .join("\n");
 
 type Row = Record<string, unknown>;
 
@@ -35,7 +40,7 @@ class Statement {
 
 export function memoryD1() {
   const db = new DatabaseSync(":memory:");
-  db.exec(MIGRATION);
+  db.exec(SCHEMA);
   return {
     prepare: (sql: string) => new Statement(db, sql),
     async batch(statements: Statement[]) {

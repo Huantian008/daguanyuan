@@ -34,9 +34,11 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
 
   app.get("/", async (c) => {
     const DB = c.env.DB;
+    const uid = c.get("user").id;
     const day = today();
     const [state, reviews, openSession, exam, warmup] = await Promise.all([
-      loadState(DB, content), db.reviewLog(DB, addDays(day, -400)), db.latestOpenSession(DB), examDate(DB), warmupDays(DB),
+      loadState(DB, uid, content), db.reviewLog(DB, uid, addDays(day, -400)), db.latestOpenSession(DB, uid),
+      examDate(DB, uid), warmupDays(DB, uid),
     ]);
     return c.html(dashboardPage(meta, {
       today: day,
@@ -56,6 +58,7 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
 
   app.post("/practice/start", async (c) => {
     const DB = c.env.DB;
+    const uid = c.get("user").id;
     const form = await c.req.parseBody();
     const mode = str(form.mode) as Mode;
     const only = str(form.only) as Only;
@@ -66,58 +69,64 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
       only: ONLY.includes(only) ? only : "all", nums: numList(form.nums), count: intOrNull(form.count) ?? 10,
     };
     const day = today();
-    const [state, reviews, warmup] = await Promise.all([loadState(DB, content), db.reviewLog(DB, addDays(day, -60)), warmupDays(DB)]);
+    const [state, reviews, warmup] = await Promise.all([
+      loadState(DB, uid, content), db.reviewLog(DB, uid, addDays(day, -60)), warmupDays(DB, uid),
+    ]);
     const { title, nums } = buildQueue(spec, content, state.cards, reviews, state.excluded, day, warmup);
-    const sid = await db.createSession(DB, title, mode, nums, now());
+    const sid = await db.createSession(DB, uid, title, mode, nums, now());
     return c.redirect(`/practice/${sid}`, 303);
   });
 
-  const sessionFrom = async (DB: D1Database, raw: string) => {
+  /** The user's own practice set; someone else's set looks like it does not exist. */
+  const sessionFrom = async (DB: D1Database, uid: number, raw: string) => {
     const sid = intOrNull(raw);
-    return sid === null ? null : db.getSession(DB, sid);
+    return sid === null ? null : db.getSession(DB, uid, sid);
   };
 
   app.get("/practice/:sid", async (c) => {
     const DB = c.env.DB;
-    const session = await sessionFrom(DB, c.req.param("sid"));
+    const uid = c.get("user").id;
+    const session = await sessionFrom(DB, uid, c.req.param("sid"));
     if (!session) return c.notFound();
     const num = db.current(session);
-    if (num === null) return c.html(practiceDonePage(meta, session, await db.sessionGrades(DB, session.id)));
+    if (num === null) return c.html(practiceDonePage(meta, session, await db.sessionGrades(DB, uid, session.id)));
     const q = content.questions.get(num);
     if (!q) return c.notFound();
     const nextNum = session.queue[session.position + 1];
     return c.html(practicePage(meta, {
       session, q,
       next: nextNum ? content.questions.get(nextNum) : undefined,
-      history: (await db.historyFor(DB, num)).slice(-5),
+      history: (await db.historyFor(DB, uid, num)).slice(-5),
       knowledge: content.knowledgeFor(q.chapter),
     }));
   });
 
   app.post("/practice/:sid/grade", async (c) => {
     const DB = c.env.DB;
-    const session = await sessionFrom(DB, c.req.param("sid"));
+    const uid = c.get("user").id;
+    const session = await sessionFrom(DB, uid, c.req.param("sid"));
     if (!session) return c.notFound();
     const form = await c.req.parseBody();
     const num = intOrNull(form.num);
     const grade = str(form.grade);
     if (num !== null && db.current(session) === num && isGrade(grade)) {
-      await db.recordReview(DB, { num, grade, at: now(), elapsedSec: intOrNull(form.elapsed), mode: session.mode, session });
+      await db.recordReview(DB, uid, { num, grade, at: now(), elapsedSec: intOrNull(form.elapsed), mode: session.mode, session });
     }
     return c.redirect(`/practice/${session.id}`, 303);
   });
 
   app.post("/practice/:sid/skip", async (c) => {
     const DB = c.env.DB;
-    const session = await sessionFrom(DB, c.req.param("sid"));
+    const uid = c.get("user").id;
+    const session = await sessionFrom(DB, uid, c.req.param("sid"));
     if (!session) return c.notFound();
     const num = intOrNull((await c.req.parseBody()).num);
-    if (num !== null && db.current(session) === num) await db.advanceSession(DB, session, now());
+    if (num !== null && db.current(session) === num) await db.advanceSession(DB, uid, session, now());
     return c.redirect(`/practice/${session.id}`, 303);
   });
 
   app.get("/bank", async (c) => {
-    const state = await loadState(c.env.DB, content);
+    const state = await loadState(c.env.DB, c.get("user").id, content);
     const rows = stats.chapterProgress(content, state.cards, state.excluded).map((p) => [
       p, stats.masteryDistribution(content.inChapter(p.code).map((q) => q.num).filter((n) => state.active.has(n)), state.cards),
     ] as [stats.ChapterProgress, stats.Distribution]);
@@ -131,13 +140,14 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     const found = term
       ? content.all().filter((x) => x.source_full.includes(term) || x.source.includes(term) || x.kp.includes(term) || x.section.includes(term))
       : [];
-    return c.html(searchPage(meta, q, found, await loadState(c.env.DB, content)));
+    return c.html(searchPage(meta, q, found, await loadState(c.env.DB, c.get("user").id, content)));
   });
 
   app.get("/bank/:code", async (c) => {
     const code = c.req.param("code");
     if (!content.hasChapter(code)) return c.notFound();
-    return c.html(chapterPage(meta, content.chapter(code), content.outline(code), await loadState(c.env.DB, content)));
+    return c.html(chapterPage(meta, content.chapter(code), content.outline(code),
+      await loadState(c.env.DB, c.get("user").id, content)));
   });
 
   app.post("/bank/exclude", async (c) => {
@@ -151,16 +161,17 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
         .filter((q) => q.kp === kp && (!chapter || q.chapter === chapter) && (!section || q.section === section))
         .map((q) => q.num));
     }
-    await db.setExcluded(c.env.DB, targets, str(form.excluded) === "1");
+    await db.setExcluded(c.env.DB, c.get("user").id, targets, str(form.excluded) === "1");
     return c.redirect(safeBack(str(form.back), "/bank"), 303);
   });
 
   app.get("/q/:num", async (c) => {
     const DB = c.env.DB;
+    const uid = c.get("user").id;
     const num = intOrNull(c.req.param("num"));
     const q = num === null ? undefined : content.questions.get(num);
     if (!q) return c.notFound();
-    const [state, history] = await Promise.all([loadState(DB, content), db.historyFor(DB, q.num)]);
+    const [state, history] = await Promise.all([loadState(DB, uid, content), db.historyFor(DB, uid, q.num)]);
     return c.html(questionPage(meta, {
       q, chapter: content.chapter(q.chapter), card: state.cards.get(q.num), status: state.status(q.num), history,
       knowledge: content.knowledgeFor(q.chapter), total: content.all().length,
@@ -186,7 +197,7 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
   });
 
   app.get("/history", async (c) => {
-    const reviews = (await db.reviewLog(c.env.DB, addDays(today(), -60))).reverse();
+    const reviews = (await db.reviewLog(c.env.DB, c.get("user").id, addDays(today(), -60))).reverse();
     const days: HistoryDay[] = [];
     for (const r of reviews) {
       let last = days[days.length - 1];
@@ -205,25 +216,26 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
 
   app.get("/settings", async (c) => {
     const DB = c.env.DB;
-    const [exam, warmup] = await Promise.all([examDate(DB), warmupDays(DB)]);
+    const { id: uid, name } = c.get("user");
+    const [exam, warmup] = await Promise.all([examDate(DB, uid), warmupDays(DB, uid)]);
     return c.html(settingsPage(meta, {
-      examDate: exam, warmupDays: warmup, saved: c.req.query("saved") === "1", builtAt: content.builtAt,
-      userName: c.get("user").name,
+      examDate: exam, warmupDays: warmup, saved: c.req.query("saved") === "1", builtAt: content.builtAt, userName: name,
     }));
   });
 
   app.post("/settings", async (c) => {
     const DB = c.env.DB;
+    const uid = c.get("user").id;
     const form = await c.req.parseBody();
     const exam = str(form.exam_date);
-    if (/^\d{4}-\d{2}-\d{2}$/.test(exam) && !Number.isNaN(Date.parse(exam))) await db.setSetting(DB, "exam_date", exam);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(exam) && !Number.isNaN(Date.parse(exam))) await db.setSetting(DB, uid, "exam_date", exam);
     const warmup = intOrNull(form.warmup_days);
-    if (warmup !== null && warmup >= 1 && warmup <= 7) await db.setSetting(DB, "warmup_days", String(warmup));
+    if (warmup !== null && warmup >= 1 && warmup <= 7) await db.setSetting(DB, uid, "warmup_days", String(warmup));
     return c.redirect("/settings?saved=1", 303);
   });
 
   app.get("/settings/export", async (c) => {
-    const dump = await db.exportAll(c.env.DB, now());
+    const dump = await db.exportAll(c.env.DB, c.get("user").id, now());
     return new Response(JSON.stringify(dump, null, 1), {
       headers: {
         "content-type": "application/json; charset=utf-8",
