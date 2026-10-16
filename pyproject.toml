@@ -10,3 +10,6 @@ pythonpath = ["."]
 markers = [
     "pdf: needs the source PDFs in the parent folder (slow)",
 ]
+filterwarnings = [
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]

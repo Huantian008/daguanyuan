@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "_macros.html" import dist_bar %}
+{% block title %}题库{% endblock %}
+{% block content %}
+<header class="page-head">
+  <h1>题库</h1>
+  <form class="search" action="/bank/search" method="get" role="search">
+    <label class="visually-hidden" for="q">搜索题目</label>
+    <input id="q" name="q" type="search" placeholder="题号、年份或考点，如 123、2019数二、拐点">
+    <button class="btn">搜索</button>
+  </form>
+</header>
+<ul class="chapters">
+  {% for p, dist in rows %}
+  <li class="card chapter-card">
+    <a class="chapter-link" href="/bank/{{ p.code }}">
+      <span class="chapter-name">{{ p.name }}</span>
+      <span class="muted">做过 {{ p.done }} / {{ p.total }} 题</span>
+    </a>
+    {{ dist_bar(dist) }}
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}

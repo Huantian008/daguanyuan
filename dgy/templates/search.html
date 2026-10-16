@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_label %}
+{% block title %}搜索 {{ q }}{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <p class="eyebrow"><a href="/bank">题库</a></p>
+    <h1>搜索“{{ q }}”</h1>
+  </div>
+  <form class="search" action="/bank/search" method="get" role="search">
+    <label class="visually-hidden" for="q">搜索题目</label>
+    <input id="q" name="q" type="search" value="{{ q }}">
+    <button class="btn">搜索</button>
+  </form>
+</header>
+{% if found %}
+<p class="muted">找到 {{ found|length }} 题</p>
+<ul class="card result-list">
+  {% for item in found %}
+  <li>
+    <a href="/q/{{ item.num }}"><span class="qnum">#{{ '%03d' % item.num }}</span> {{ item.section }} / {{ item.kp }}</a>
+    <span class="muted">{{ item.source_full }}</span>
+    <span class="chip chip-{{ state.status(item.num) }}">{{ status_label(state.status(item.num)) }}</span>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="empty">没有找到。可以输入题号（如 123）、年份和卷别（如 2019数二），或考点名称（如 拐点）。</p>
+{% endif %}
+{% endblock %}

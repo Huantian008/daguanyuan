@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% from "_macros.html" import qmeta, images %}
+{% block title %}#{{ '%03d' % q.num }} {{ q.kp }}{% endblock %}
+{% block page_class %}page-practice{% endblock %}
+{% block content %}
+<div class="practice" data-practice>
+  <header class="practice-head">
+    <div>
+      <p class="eyebrow">{{ session.title }}</p>
+      <p class="muted">第 {{ session.position + 1 }} / {{ session.queue|length }} 题</p>
+    </div>
+    <span class="timer js-timer" title="这道题已用时间">00:00</span>
+  </header>
+  <div class="track" aria-hidden="true"><span style="width: {{ (100 * session.position / session.queue|length)|round|int }}%"></span></div>
+
+  <article class="sheet">
+    {{ qmeta(q) }}
+    <div class="qbody">{{ images([q.img], 'qimg', '题目 #%03d' % q.num, 2) }}</div>
+  </article>
+
+  <details class="reveal answer">
+    <summary>显示答案 <kbd>空格</kbd></summary>
+    <div class="reveal-body">{{ images([q.answer], 'aimg', '答案', 2.2) }}</div>
+  </details>
+  <details class="reveal solution">
+    <summary>看解析 <kbd>S</kbd> <span class="muted">{{ q.solution|length }} 张图</span></summary>
+    <div class="reveal-body">{{ images(q.solution, 'simg', '解析', 2) }}</div>
+  </details>
+
+  <p class="side-info">
+    {% if history %}上次自评：{{ history[-1].grade|grade_label }}（{{ history[-1].study_day.month }}月{{ history[-1].study_day.day }}日）{% else %}第一次做这道题{% endif %}
+    {% for k in knowledge if k %} · <a href="/knowledge/{{ k.slug }}" target="_blank" rel="noopener">知识点：{{ k.title }}</a>{% endfor %}
+    · <a href="/q/{{ q.num }}" target="_blank" rel="noopener">题目详情</a>
+  </p>
+</div>
+
+<div class="gradebar">
+  <div class="gradebar-inner">
+    <form method="post" action="/practice/{{ session.id }}/grade" class="grades">
+      <input type="hidden" name="num" value="{{ q.num }}">
+      <input type="hidden" name="elapsed" value="" class="js-elapsed">
+      <button name="grade" value="mastered" class="grade grade-mastered" data-key="1"><kbd>1</kbd>完全掌握</button>
+      <button name="grade" value="shaky" class="grade grade-shaky" data-key="2"><kbd>2</kbd>不熟练/错误</button>
+      <button name="grade" value="unknown" class="grade grade-unknown" data-key="3"><kbd>3</kbd>完全不会</button>
+    </form>
+    <form method="post" action="/practice/{{ session.id }}/skip" class="skip">
+      <input type="hidden" name="num" value="{{ q.num }}">
+      <button class="btn-quiet js-skip">跳过 <kbd>→</kbd></button>
+    </form>
+  </div>
+</div>
+{% endblock %}

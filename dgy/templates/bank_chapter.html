@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "_macros.html" import start, exclude_toggle %}
+{% block title %}{{ chapter.name }}{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <p class="eyebrow"><a href="/bank">题库</a></p>
+    <h1>{{ chapter.name }}</h1>
+  </div>
+  <div class="head-actions">
+    {{ start('只练这章没做过的', 'group', cls='btn btn-primary', chapter=chapter.code, only='new') }}
+    {{ start('练这章的薄弱题', 'group', cls='btn', chapter=chapter.code, only='weak') }}
+  </div>
+</header>
+<p class="legend-inline">
+  <span class="chip chip-new">未做</span><span class="chip chip-mastered">完全掌握</span><span class="chip chip-shaky">不熟练/错误</span><span class="chip chip-unknown">完全不会</span><span class="chip chip-excluded">不做</span>
+</p>
+{% for section, kps in outline %}
+<section class="card section" id="sec-{{ loop.index }}">
+  <h2>{{ section }}</h2>
+  {% for kp, qs in kps %}
+  {% set nums = qs|map(attribute='num')|list %}
+  {% set open_nums = nums|reject('in', state.excluded)|list %}
+  <div class="kp-row{% if not open_nums %} is-excluded{% endif %}">
+    <div class="kp-name">{{ kp }} <span class="muted">{{ qs|length }} 题</span></div>
+    <div class="chips">
+      {% for q in qs %}<a class="chip chip-{{ state.status(q.num) }}" href="/q/{{ q.num }}" title="#{{ '%03d' % q.num }} {{ q.source_full }}">{{ '%03d' % q.num }}</a>{% endfor %}
+    </div>
+    <div class="kp-actions">
+      {% if open_nums %}
+      {{ start('练这个考点', 'group', cls='btn btn-small', chapter=chapter.code, section=section, kp=kp) }}
+      {{ start('只练没做过的', 'group', cls='btn btn-small btn-ghost', chapter=chapter.code, section=section, kp=kp, only='new') }}
+      {% endif %}
+      {{ exclude_toggle(not open_nums, '/bank/' ~ chapter.code ~ '#sec-' ~ loop.index, chapter=chapter.code, section=section, kp=kp, on_label='整个考点不做了') }}
+    </div>
+  </div>
+  {% endfor %}
+</section>
+{% endfor %}
+{% endblock %}

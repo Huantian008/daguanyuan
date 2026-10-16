@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}{{ entry.title }}{% endblock %}
+{% block head %}{% if tab == 'text' %}<link rel="stylesheet" href="/static/vendor/katex/katex.min.css">{% endif %}{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <p class="eyebrow"><a href="/knowledge">知识点</a> / {{ entry.group }}</p>
+    <h1>{{ entry.title }}</h1>
+  </div>
+  <div class="head-actions">
+    {% for c in chapters %}<a class="btn btn-small" href="/bank/{{ c.code }}">刷{{ c.name }}的题</a>{% endfor %}
+  </div>
+</header>
+<nav class="tabs" aria-label="版本">
+  <a href="/knowledge/{{ entry.slug }}" {% if tab == 'original' %}aria-current="page"{% endif %}>原版</a>
+  {% if has_text %}<a href="/knowledge/{{ entry.slug }}?tab=text" {% if tab == 'text' %}aria-current="page"{% endif %}>文字版</a>{% endif %}
+</nav>
+{% if tab == 'text' %}
+<p class="note">文字版由原版压缩改写，部分手写技巧没有收录；公式有疑问时以原版为准。</p>
+<div class="kn-text">
+  {% if toc %}
+  <nav class="toc" aria-label="本章目录">
+    <ul>{% for anchor, title in toc %}<li><a href="#{{ anchor }}">{{ title }}</a></li>{% endfor %}</ul>
+  </nav>
+  {% endif %}
+  <article class="prose">{{ html|safe }}</article>
+</div>
+{% else %}
+{% if entry.toc %}
+<nav class="toc toc-inline" aria-label="本章目录">
+  <ul>{% for t in entry.toc %}<li><a href="#p{{ t.page }}">{{ t.title }}</a></li>{% endfor %}</ul>
+</nav>
+{% endif %}
+<div class="kn-pages">
+  {% for p in entry.pages %}
+  <a class="kn-page" id="p{{ loop.index }}" href="/content/{{ p.src }}" target="_blank" rel="noopener" title="在新标签页放大">
+    <img src="/content/{{ p.src }}" width="{{ p.w }}" height="{{ p.h }}" alt="{{ entry.title }} 第 {{ loop.index }} 页" loading="lazy" decoding="async">
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}{% if tab == 'text' %}<script src="/static/vendor/katex/katex.min.js" defer></script>{% endif %}{% endblock %}

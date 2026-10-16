@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}学习记录{% endblock %}
+{% block content %}
+<header class="page-head"><h1>学习记录</h1><span class="muted">最近 60 天，凌晨 4 点前做的题算前一天</span></header>
+{% if days %}
+{% for day, items, count, seconds in days %}
+<section class="card day">
+  <header class="card-head"><h2>{{ day|cn_date }}</h2><span class="muted">{{ count }} 题 · {{ seconds|minutes }} 分钟</span></header>
+  <ul class="history">
+    {% for r in items %}
+    {% set q = questions.get(r.num) %}
+    <li>
+      <span class="muted time">{{ r.reviewed_at.strftime('%H:%M') }}</span>
+      <a href="/q/{{ r.num }}"><span class="qnum">#{{ '%03d' % r.num }}</span> {{ q.kp if q else '' }}</a>
+      <span class="chip chip-{{ r.grade }}">{{ r.grade|grade_label }}</span>
+      {% if r.elapsed_sec %}<span class="muted">{{ r.elapsed_sec|minutes }} 分钟</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endfor %}
+{% else %}
+<p class="empty">还没有做题记录。去<a href="/bank">题库</a>选一个考点开始吧。</p>
+{% endif %}
+{% endblock %}

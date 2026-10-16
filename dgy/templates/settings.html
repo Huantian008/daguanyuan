@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}设置{% endblock %}
+{% block content %}
+<header class="page-head"><h1>设置</h1></header>
+{% if saved %}<p class="note note-ok" role="status">已保存。</p>{% endif %}
+<form class="card form" method="post" action="/settings">
+  <label for="exam_date">考研初试日期</label>
+  <input id="exam_date" name="exam_date" type="date" value="{{ exam_date.isoformat() }}" required>
+  <label for="warmup_days">热身取最近几个学习日的题</label>
+  <select id="warmup_days" name="warmup_days">
+    {% for n in range(1, 8) %}<option value="{{ n }}" {% if n == warmup_days %}selected{% endif %}>{{ n }} 天</option>{% endfor %}
+  </select>
+  <button class="btn btn-primary">保存设置</button>
+</form>
+<section class="card">
+  <h2>数据</h2>
+  <ul class="plain">
+    <li>学习数据：<code>{{ data_dir }}\app.db</code></li>
+    <li>自动备份：{% if latest_backup %}最近一次 <code>{{ latest_backup }}</code>，保留 14 份{% else %}还没有备份{% endif %}</li>
+    <li>题库生成时间：{{ built_at }}</li>
+    <li>登录密码：{% if password_on %}已开启{% else %}未开启（只在本机用不需要；放到服务器前要设置环境变量 APP_PASSWORD）{% endif %}</li>
+  </ul>
+  {% if password_on %}<form method="post" action="/logout"><button class="btn">退出登录</button></form>{% endif %}
+</section>
+{% endblock %}

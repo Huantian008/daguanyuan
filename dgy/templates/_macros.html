@@ -1,0 +1,57 @@
+{% macro qmeta(q) -%}
+<div class="qmeta">
+  <span class="qnum">#{{ '%03d' % q.num }}</span>
+  <span class="qkp">{{ q.kp }}</span>
+  <span class="qsrc">{{ q.source_full }}</span>
+  <span class="qdiff" title="原书得分率 {{ q.difficulty }}">{{ q.stars|stars }}</span>
+  <span class="qmins">建议 {{ q.minutes }} 分钟</span>
+  {% for flag in q.flags %}<span class="flag">{{ flag }}</span>{% endfor %}
+</div>
+{%- endmacro %}
+
+{% macro images(list, cls, alt, scale=2) -%}
+{% for img in list %}<img class="{{ cls }}" src="/content/{{ img.src }}" width="{{ (img.w / scale)|round|int }}" height="{{ (img.h / scale)|round|int }}" alt="{{ alt }}" loading="lazy" decoding="async">{% endfor %}
+{%- endmacro %}
+
+{% macro dist_bar(dist) -%}
+<div class="dist" role="img" aria-label="完全掌握 {{ dist.mastered }}，不熟练或错误 {{ dist.shaky }}，完全不会 {{ dist.unknown }}，未做 {{ dist.new }}">
+  {%- for key in ['mastered', 'shaky', 'unknown', 'new'] if dist[key] %}<span class="seg seg-{{ key }}" style="flex-grow: {{ dist[key] }}"></span>{% endfor -%}
+</div>
+{%- endmacro %}
+
+{% macro legend(dist) -%}
+<ul class="legend" data-dist-mastered="{{ dist.mastered }}" data-dist-shaky="{{ dist.shaky }}" data-dist-unknown="{{ dist.unknown }}" data-dist-new="{{ dist.new }}">
+  <li><i class="dot dot-mastered"></i>完全掌握<b>{{ dist.mastered }}</b></li>
+  <li><i class="dot dot-shaky"></i>不熟练/错误<b>{{ dist.shaky }}</b></li>
+  <li><i class="dot dot-unknown"></i>完全不会<b>{{ dist.unknown }}</b></li>
+  <li><i class="dot dot-new"></i>未做<b>{{ dist.new }}</b></li>
+</ul>
+{%- endmacro %}
+
+{% macro start(label, mode, cls='btn', chapter='', section='', kp='', only='all', nums='', disabled=false) -%}
+<form method="post" action="/practice/start" class="inline">
+  <input type="hidden" name="mode" value="{{ mode }}">
+  {%- if chapter %}<input type="hidden" name="chapter" value="{{ chapter }}">{% endif %}
+  {%- if section %}<input type="hidden" name="section" value="{{ section }}">{% endif %}
+  {%- if kp %}<input type="hidden" name="kp" value="{{ kp }}">{% endif %}
+  {%- if only != 'all' %}<input type="hidden" name="only" value="{{ only }}">{% endif %}
+  {%- if nums %}<input type="hidden" name="nums" value="{{ nums }}">{% endif %}
+  <button class="{{ cls }}"{% if disabled %} disabled{% endif %}>{{ label }}</button>
+</form>
+{%- endmacro %}
+
+{% macro exclude_toggle(excluded, back, nums='', chapter='', section='', kp='', on_label='不做了') -%}
+<form method="post" action="/bank/exclude" class="inline">
+  <input type="hidden" name="excluded" value="{{ '0' if excluded else '1' }}">
+  <input type="hidden" name="back" value="{{ back }}">
+  {%- if nums %}<input type="hidden" name="nums" value="{{ nums }}">{% endif %}
+  {%- if chapter %}<input type="hidden" name="chapter" value="{{ chapter }}">{% endif %}
+  {%- if section %}<input type="hidden" name="section" value="{{ section }}">{% endif %}
+  {%- if kp %}<input type="hidden" name="kp" value="{{ kp }}">{% endif %}
+  <button class="btn-quiet">{{ '恢复，要做' if excluded else on_label }}</button>
+</form>
+{%- endmacro %}
+
+{% macro status_label(status) -%}
+{{ {'excluded': '不做', 'new': '未做', 'mastered': '完全掌握', 'shaky': '不熟练/错误', 'unknown': '完全不会'}[status] }}
+{%- endmacro %}

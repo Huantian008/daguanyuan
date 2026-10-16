@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS reviews (
     reviewed_at TEXT NOT NULL,
     study_day TEXT NOT NULL,
     elapsed_sec INTEGER,
-    mode TEXT NOT NULL
+    mode TEXT NOT NULL,
+    session_id INTEGER
 );
 CREATE INDEX IF NOT EXISTS reviews_by_day ON reviews (study_day);
 CREATE INDEX IF NOT EXISTS reviews_by_num ON reviews (num);
@@ -113,14 +114,15 @@ def all_cards(conn: sqlite3.Connection) -> dict[int, CardState]:
 
 
 def record_review(conn: sqlite3.Connection, num: int, grade: str, at: datetime,
-                  elapsed_sec: int | None, mode: str) -> CardState:
+                  elapsed_sec: int | None, mode: str, session_id: int | None = None) -> CardState:
     at = at.astimezone(TZ)
     day = study_day(at)
     card = schedule(get_card(conn, num), grade, day)
     with conn:
         conn.execute(
-            "INSERT INTO reviews (num, grade, reviewed_at, study_day, elapsed_sec, mode) VALUES (?, ?, ?, ?, ?, ?)",
-            (num, grade, at.isoformat(), day.isoformat(), elapsed_sec, mode),
+            "INSERT INTO reviews (num, grade, reviewed_at, study_day, elapsed_sec, mode, session_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (num, grade, at.isoformat(), day.isoformat(), elapsed_sec, mode, session_id),
         )
         conn.execute(
             "INSERT INTO cards (num, level, due, last_grade, reps, lapses) VALUES (?, ?, ?, ?, ?, ?) "
@@ -141,6 +143,15 @@ def review_log(conn: sqlite3.Connection, since: date | None = None) -> list[Revi
                date.fromisoformat(row["study_day"]), row["elapsed_sec"], row["mode"])
         for row in rows
     ]
+
+
+def session_grades(conn: sqlite3.Connection, sid: int) -> dict[str, int]:
+    rows = conn.execute("SELECT grade, COUNT(*) AS n FROM reviews WHERE session_id = ? GROUP BY grade", (sid,))
+    return {row["grade"]: row["n"] for row in rows}
+
+
+def history_for(conn: sqlite3.Connection, num: int) -> list[Review]:
+    return [r for r in review_log(conn) if r.num == num]
 
 
 def set_excluded(conn: sqlite3.Connection, nums, excluded: bool) -> None:

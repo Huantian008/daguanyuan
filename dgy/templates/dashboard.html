@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% from "_macros.html" import dist_bar, legend, start %}
+{% block title %}今天{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <h1>今天的数学</h1>
+    <p class="hero-date">{{ today|cn_date }}</p>
+  </div>
+  <p class="countdown">考研初试 · 还有 <strong>{{ days_left }}</strong> 天</p>
+</section>
+
+<ol class="tonight" aria-label="今晚的顺序">
+  <li class="step" data-warmup-count="{{ warmup|length }}">
+    <span class="step-no" aria-hidden="true">1</span>
+    <h2>热身</h2>
+    <p class="step-count"><b>{{ warmup|length }}</b> 题</p>
+    <p class="step-note">把前几天做过的题再做一遍</p>
+    {{ start('开始热身', 'warmup', cls='btn btn-primary', disabled=not warmup) }}
+  </li>
+  <li class="step" data-due-count="{{ due|length }}">
+    <span class="step-no" aria-hidden="true">2</span>
+    <h2>到期复习</h2>
+    <p class="step-count"><b>{{ due|length }}</b> 题</p>
+    <p class="step-note">按复习间隔排到今天的题</p>
+    {{ start('开始复习', 'due', cls='btn btn-primary', disabled=not due) }}
+  </li>
+  <li class="step">
+    <span class="step-no" aria-hidden="true">3</span>
+    <h2>继续往下做</h2>
+    {% if open_session %}
+      <p class="step-title">{{ open_session.title }}</p>
+      <p class="step-note">做到第 {{ open_session.position + 1 }} / {{ open_session.queue|length }} 题</p>
+      <div class="step-actions">
+        <a class="btn btn-primary" href="/practice/{{ open_session.id }}">继续上次</a>
+        <a class="btn" href="/bank">换个考点</a>
+      </div>
+    {% else %}
+      <p class="step-title">按课程进度选考点</p>
+      <p class="step-note">在题库里点开章节，选“只练没做过的”</p>
+      <a class="btn btn-primary" href="/bank">去题库选题</a>
+    {% endif %}
+  </li>
+</ol>
+
+<div class="grid">
+  <section class="card">
+    <header class="card-head"><h2>进度</h2><span class="muted">做过的题 / 要做的题</span></header>
+    <ul class="progress">
+      {% for p in progress %}
+      <li>
+        <a class="progress-name" href="/bank/{{ p.code }}">{{ p.name }}</a>
+        <span class="bar" aria-hidden="true"><span style="width: {{ p.percent }}%"></span></span>
+        <span class="progress-num">{{ p.done }}/{{ p.total }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="card">
+    <header class="card-head"><h2>掌握情况</h2><span class="muted">共 {{ active_total }} 题</span></header>
+    {{ dist_bar(dist) }}
+    {{ legend(dist) }}
+    <h3 class="minor">优先巩固</h3>
+    {% if weak %}
+    <ul class="weak">
+      {% for s in weak %}
+      <li>
+        <div>
+          <b>{{ s.section }} / {{ s.kp }}</b>
+          <span class="muted">{{ chapter_names[s.chapter] }} · {{ s.nums|length }} 题待巩固</span>
+        </div>
+        {{ start('去巩固', 'group', cls='btn btn-small', chapter=s.chapter, section=s.section, kp=s.kp, only='weak') }}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty">还没有自评为“不熟练”或“完全不会”的题，做题后这里会列出最该补的考点。</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <header class="card-head"><h2>学习趋势</h2><a href="/history">学习记录</a></header>
+    <div class="kpis">
+      <div><b>{{ today_total.count }}</b><span>今日题数</span></div>
+      <div><b>{{ today_total.seconds|minutes }}</b><span>今日分钟</span></div>
+      <div><b>{{ streak }}</b><span>连续学习天数</span></div>
+    </div>
+    <div class="spark" role="img" aria-label="近 30 天每天做的题数">
+      {% for t in totals %}<span title="{{ t.day|cn_date }}：{{ t.count }} 题" style="height: {{ (100 * t.count / max_count)|round|int }}%"></span>{% endfor %}
+    </div>
+    <p class="spark-axis"><span>30 天前</span><span>今天</span></p>
+  </section>
+</div>
+{% endblock %}

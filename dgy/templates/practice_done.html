@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}这组做完了{% endblock %}
+{% block content %}
+<section class="card done">
+  <h1>这组做完了</h1>
+  <p class="muted">{{ session.title }} · 共 {{ session.queue|length }} 题</p>
+  {% if session.queue %}
+  <ul class="legend legend-big">
+    <li><i class="dot dot-mastered"></i>完全掌握 {{ grades.get('mastered', 0) }}</li>
+    <li><i class="dot dot-shaky"></i>不熟练/错误 {{ grades.get('shaky', 0) }}</li>
+    <li><i class="dot dot-unknown"></i>完全不会 {{ grades.get('unknown', 0) }}</li>
+  </ul>
+  {% else %}
+  <p class="empty">这一组没有需要做的题。</p>
+  {% endif %}
+  <div class="done-actions">
+    <a class="btn btn-primary" href="/">回首页</a>
+    <a class="btn" href="/bank">去题库</a>
+  </div>
+</section>
+{% endblock %}

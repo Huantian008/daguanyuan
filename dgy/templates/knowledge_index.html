@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}知识点{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/vendor/katex/katex.min.css">{% endblock %}
+{% block content %}
+<header class="page-head"><h1>知识点</h1></header>
+{% for group, entries in groups.items() %}
+<section class="card">
+  <h2>{{ group }}</h2>
+  <ul class="kn-list">
+    {% for e in entries %}
+    <li>
+      <a href="/knowledge/{{ e.slug }}">{{ e.title }}</a>
+      <span class="muted">{{ e.pages|length }} 页原版{% if e.md %} · 有文字版{% endif %}</span>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endfor %}
+{% if overview %}
+<details class="card prose-card">
+  <summary>文字版说明与核对记录</summary>
+  <div class="prose">{{ overview|safe }}</div>
+</details>
+{% endif %}
+{% endblock %}
+{% block scripts %}<script src="/static/vendor/katex/katex.min.js" defer></script>{% endblock %}

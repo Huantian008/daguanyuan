@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% from "_macros.html" import qmeta, images, start, exclude_toggle, status_label %}
+{% block title %}#{{ '%03d' % q.num }} {{ q.kp }}{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <p class="eyebrow"><a href="/bank/{{ chapter.code }}">{{ chapter.name }}</a> / {{ q.path|join(' / ') }}</p>
+    <h1>#{{ '%03d' % q.num }} {{ q.kp }}</h1>
+  </div>
+  <div class="head-actions">
+    {{ start('练这道题', 'single', cls='btn btn-primary', nums=q.num) }}
+    {{ exclude_toggle(status == 'excluded', '/q/' ~ q.num, nums=q.num) }}
+  </div>
+</header>
+
+<p class="status-line">
+  <span class="chip chip-{{ status }}">{{ status_label(status) }}</span>
+  {% if card and card.due %}下次复习：{{ card.due|cn_date }} · 已做 {{ card.reps }} 次{% endif %}
+</p>
+
+<article class="sheet">
+  {{ qmeta(q) }}
+  <div class="qbody">{{ images([q.img], 'qimg', '题目 #%03d' % q.num, 2) }}</div>
+</article>
+<details class="reveal answer">
+  <summary>显示答案</summary>
+  <div class="reveal-body">{{ images([q.answer], 'aimg', '答案', 2.2) }}</div>
+</details>
+<details class="reveal solution">
+  <summary>看解析 <span class="muted">{{ q.solution|length }} 张图</span></summary>
+  <div class="reveal-body">{{ images(q.solution, 'simg', '解析', 2) }}</div>
+</details>
+
+<div class="grid grid-2">
+  <section class="card">
+    <h2>做题记录</h2>
+    {% if history %}
+    <ul class="plain">
+      {% for r in history|reverse %}
+      <li><span class="muted">{{ r.study_day|cn_date }}</span> <span class="chip chip-{{ r.grade }}">{{ r.grade|grade_label }}</span>{% if r.elapsed_sec %} <span class="muted">{{ r.elapsed_sec|minutes }} 分钟</span>{% endif %}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty">还没做过这道题。</p>
+    {% endif %}
+  </section>
+  <section class="card">
+    <h2>相关</h2>
+    <ul class="plain">
+      {% for k in knowledge if k %}<li><a href="/knowledge/{{ k.slug }}">知识点：{{ k.title }}</a></li>{% endfor %}
+      <li>答案速查编号 {{ q.quick_id }} · 原稿第 {{ q.orig_page }} 页</li>
+      <li class="pager">
+        {% if q.num > 1 %}<a href="/q/{{ q.num - 1 }}">← #{{ '%03d' % (q.num - 1) }}</a>{% endif %}
+        {% if q.num < 613 %}<a href="/q/{{ q.num + 1 }}">#{{ '%03d' % (q.num + 1) }} →</a>{% endif %}
+      </li>
+    </ul>
+  </section>
+</div>
+{% endblock %}
