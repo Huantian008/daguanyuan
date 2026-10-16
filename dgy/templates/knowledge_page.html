@@ -16,7 +16,7 @@
   {% if has_text %}<a href="/knowledge/{{ entry.slug }}?tab=text" {% if tab == 'text' %}aria-current="page"{% endif %}>文字版</a>{% endif %}
 </nav>
 {% if tab == 'text' %}
-<p class="note">文字版由原版压缩改写，部分手写技巧没有收录；公式有疑问时以原版为准。</p>
+<p class="note">文字版已按原版逐页转写，包含手写公式和提示；原文疑点另附“核对批注”，额外内容标为“整理补充”。公式或图形有疑问时，请对照原版与核对批注。</p>
 <div class="kn-text">
   {% if toc %}
   <nav class="toc" aria-label="本章目录">

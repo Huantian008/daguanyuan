@@ -49,7 +49,7 @@ export function knowledgePage(meta: Meta, d: KnowledgePageData) {
     <img src="${contentUrl(meta, p.src)}" width="${p.w}" height="${p.h}" alt="${entry.title} 第 ${i + 1} 页" ${i === 0 ? raw('fetchpriority="high"') : raw('loading="lazy" decoding="async"')}>
   </a>`)}
 </div>`;
-  const text = d.text ? html`<p class="note">文字版由原版压缩改写，部分手写技巧没有收录；公式有疑问时以原版为准。</p>
+  const text = d.text ? html`<p class="note">文字版已按原版逐页转写，包含手写公式和提示；原文疑点另附“核对批注”，额外内容标为“整理补充”。公式或图形有疑问时，请对照原版与核对批注。</p>
 <div class="kn-text">
   ${d.text.toc.length ? html`<nav class="toc" aria-label="本章目录">
     <ul>${d.text.toc.map(([anchor, title]) => html`<li><a href="#${anchor}">${title}</a></li>`)}</ul>
