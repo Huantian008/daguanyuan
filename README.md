@@ -34,13 +34,24 @@ python -m venv --system-site-packages .venv
 
 ## 线上版（Cloudflare）
 
-**地址**：<https://math.leadertestofcn.site>。登录密码是你用 `npx wrangler secret put APP_PASSWORD` 设的那个。
+**地址**：<https://math.leadertestofcn.site>。用自己的用户名和密码登录，账号见下面“账号”。
 
 **组成**
 
 - `edge\` 是 Cloudflare Worker：网页由 TypeScript 生成，题库图片作为静态资源，登录后才能看。
 - 学习进度存在 D1 数据库 `dgy` 里，位置在亚太区域。
-- 本机的 Python 版保留作断网时的备用，两边进度**不会自动同步**，平时以线上版为主。
+- 本机的 Python 版保留作断网时的备用，两边进度**不会自动同步**，平时以线上版为主。本机版只有一个人用，没有账号。
+
+**账号**
+
+- 账号写在 `edge\wrangler.jsonc` 的 `vars.USERS` 里，每个账号三项：
+  - `id`：一个数字，学习数据按它存，**建好后不要改**。你自己是 `1`。
+  - `name`：登录用的用户名，不分大小写。
+  - `password_secret`：存这个人密码的 secret 的名字。密码本身不写在文件里。
+- 每个人的做题记录、复习进度、“不做”标记、设置和导出的数据都是分开的，互相看不到；题库、图片和知识点是共用的。
+- 加一个人：在 `USERS` 里加一项（`id` 用一个没用过的数字，`password_secret` 起一个新名字，例如 `FRIEND2_PASSWORD`），再运行 `npx wrangler secret put FRIEND2_PASSWORD`，输入密码，最后 `npx wrangler deploy`。
+- 改某个人的密码：重新运行 `npx wrangler secret put <他的 secret 名>`。只有他已登录的设备会退出，别人不受影响。
+- 想让所有人马上退出：换一个 `SECRET_KEY`。
 
 **改了题库、知识点或代码之后，重新部署**
 
@@ -50,17 +61,24 @@ cd edge
 npx wrangler deploy
 ```
 
+**数据库结构改了之后**（`edge\migrations\` 里多了新文件）要先改数据库、紧接着部署，两条命令连着跑。新旧代码和新旧结构互相对不上，两条命令之间打分会失败，所以挑不刷题的时候做：
+
+```bash
+cd edge
+npx wrangler d1 migrations apply dgy --remote
+npx wrangler deploy
+```
+
 **常用操作**
 
 | 想做什么 | 命令 |
 |---|---|
-| 退回上一个版本 | `npx wrangler rollback` |
-| 改登录密码 | `npx wrangler secret put APP_PASSWORD`（已登录的设备 30 天内保持登录；想让它们马上退出，就再换一个 `SECRET_KEY`） |
-| 备份 | 在网站“设置”页下载全部学习数据（JSON）。D1 自己还保留 7 天历史，可以用 `npx wrangler d1 time-travel` 回溯 |
-| 跑测试 | `cd edge`，然后 `npm test` |
-| 本地调试线上版 | `cd edge`，然后 `npm run dev`。需要先照 `.dev.vars.example` 建好 `.dev.vars`，并运行一次 `npx wrangler d1 migrations apply dgy --local` |
+| 退回上一个版本 | `npx wrangler rollback`（只退回代码。数据库结构改过之后，旧代码和新结构对不上，要连数据库一起退回，见下一行“备份”） |
+| 备份 | 在网站“设置”页下载自己的全部学习数据（JSON）。D1 自己还保留 7 天历史，可以用 `npx wrangler d1 time-travel` 回溯 |
+| 跑测试 | `cd edge`，然后 `npm test`；类型检查用 `npm run check` |
+| 本地调试线上版 | `cd edge`，然后 `npm run dev`。需要先照 `.dev.vars.example` 建好 `.dev.vars`（里面是各账号的密码和 `SECRET_KEY`），并运行一次 `npx wrangler d1 migrations apply dgy --local` |
 
-**把本机进度搬到线上**（只在开始用线上版之前做一次）
+**把本机进度搬到线上**（只在开始用线上版之前做一次；进度进的是你自己的账号，也就是 `id` 为 `1` 的那个）
 
 ```bash
 .venv\Scripts\python -m pipeline.export_progress

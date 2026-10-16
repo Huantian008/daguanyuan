@@ -1,2 +1,7 @@
+# 各账号的密码：名字要和 wrangler.jsonc 里 USERS 的 password_secret 对上
 APP_PASSWORD=本地开发用的密码
+FRIEND_PASSWORD=本地开发用的另一个密码
+# 给登录 cookie 签名用
 SECRET_KEY=本地开发用的随机字符串
+# 账号默认读 wrangler.jsonc 的 vars.USERS。本地想用别的账号时，取消下面一行的注释（JSON 要写在一行里）
+# USERS='[{"id":1,"name":"me","password_secret":"APP_PASSWORD"},{"id":2,"name":"pal","password_secret":"FRIEND_PASSWORD"}]'
