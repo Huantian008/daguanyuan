@@ -88,6 +88,14 @@ def test_practice_by_chapter_grades_and_moves_to_next_question(env):
     assert 'data-dist-unknown="1"' in env.client.get("/").text
 
 
+def test_practice_timer_is_hidden_without_javascript_and_controls_do_not_submit(env):
+    page = env.client.get(start(env, mode="group", chapter="A")).text
+    assert 'class="timer-controls js-timer-controls" hidden' in page
+    assert re.search(r'id="practice-time"[^>]*hidden', page)
+    assert re.search(r'type="button"[^>]*js-timer-toggle[^>]*aria-expanded="false"', page)
+    assert re.search(r'type="button"[^>]*js-timer-pause', page)
+
+
 def test_grading_a_question_that_is_not_current_is_ignored(env):
     url = start(env, mode="group", chapter="A")
     grade(env, url, 3, "mastered")

@@ -31,7 +31,13 @@ export function practicePage(meta: Meta, d: PracticeData) {
       <p class="eyebrow">${session.title}</p>
       <p class="muted">第 ${session.position + 1} / ${session.queue.length} 题</p>
     </div>
-    <span class="timer js-timer" title="这道题已用时间">00:00</span>
+    <div class="timer-controls js-timer-controls" hidden>
+      <span id="practice-time" class="timer js-timer-display" hidden>用时 <span class="js-timer">00:00</span></span>
+      <button type="button" class="timer-action js-timer-toggle" aria-expanded="false" aria-controls="practice-time">查看用时</button>
+      <span aria-hidden="true">·</span>
+      <span class="timer-status js-timer-status" role="status" hidden></span>
+      <button type="button" class="timer-action js-timer-pause" aria-label="暂停计时">暂停</button>
+    </div>
   </header>
   <div class="track" aria-hidden="true"><span style="width: ${Math.round((100 * session.position) / session.queue.length)}%"></span></div>
 

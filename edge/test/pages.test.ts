@@ -32,6 +32,15 @@ describe("dashboard", () => {
 });
 
 describe("practice", () => {
+  it("keeps the timer controls hidden without JavaScript and uses non-submit buttons", async () => {
+    const { client } = await loggedIn();
+    const page = await text(client, await start(client, { mode: "group", chapter: "A" }));
+    expect(page).toMatch(/class="timer-controls js-timer-controls" hidden/);
+    expect(page).toMatch(/id="practice-time"[^>]*hidden/);
+    expect(page).toMatch(/type="button"[^>]*js-timer-toggle[^>]*aria-expanded="false"/);
+    expect(page).toMatch(/type="button"[^>]*js-timer-pause/);
+  });
+
   it("grades a question and moves to the next one", async () => {
     const { client } = await loggedIn();
     const url = await start(client, { mode: "group", chapter: "A" });

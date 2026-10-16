@@ -188,10 +188,16 @@ form.inline { display: inline; margin: 0; }
 /* ---------- practice ---------- */
 
 .page-practice { max-width: 920px; padding-bottom: 120px; }
-.practice-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+.practice-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px 12px; }
+.practice-head > :first-child { flex: 1 1 180px; min-width: 0; }
 .practice-head .eyebrow { color: var(--ink); font-weight: 650; font-size: 15px; }
 .practice-head .muted { margin: 0; }
-.timer { font: 600 20px var(--mono); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.timer-controls { margin-left: auto; max-width: 100%; color: #687284; font: 400 13px/1.5 var(--sans); }
+.timer-controls:not([hidden]) { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 2px 6px; }
+.timer, .timer-status { white-space: nowrap; }
+.timer { font: inherit; font-variant-numeric: tabular-nums; }
+.timer-action { min-height: 44px; min-width: 44px; padding: 6px 4px; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.timer-action:hover { text-decoration: underline; }
 .track { height: 3px; background: var(--line); border-radius: 99px; margin: 12px 0 18px; overflow: hidden; }
 .track span { display: block; height: 100%; background: var(--blue); }
 
@@ -357,7 +363,7 @@ a.chip:hover { text-decoration: none; border-color: var(--blue); color: var(--bl
 }
 
 @media print {
-  .topbar, .gradebar, .side-info { display: none; }
+  .topbar, .gradebar, .side-info, .timer-controls { display: none !important; }
 }
 
 .bank-actions { margin: -6px 0 18px; }
