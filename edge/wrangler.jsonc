@@ -17,6 +17,16 @@
       "migrations_dir": "migrations"
     }
   ],
+  // Accounts (see src/users.ts).
+  //   id: never change it - each person's progress is stored under it, and 1 is where the existing progress went.
+  //   name: the login user name.
+  //   password_secret: name of the secret that holds the password, set with `npx wrangler secret put <name>`.
+  "vars": {
+    "USERS": [
+      { "id": 1, "name": "ywt", "password_secret": "APP_PASSWORD" },
+      { "id": 2, "name": "ssm", "password_secret": "FRIEND_PASSWORD" }
+    ]
+  },
   "routes": [
     { "pattern": "math.leadertestofcn.site", "custom_domain": true }
   ],
