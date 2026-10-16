@@ -6,3 +6,8 @@ content/
 data/
 *.pdf
 .claude/
+edge/node_modules/
+edge/public/
+edge/.wrangler/
+edge/src/generated/
+edge/worker-configuration.d.ts
