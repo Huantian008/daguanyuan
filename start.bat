@@ -20,5 +20,5 @@ if not exist "content\manifest.json" (
 
 echo [大观园] 正在启动：http://127.0.0.1:8000/  （关掉这个窗口就停止）
 start "" cmd /c "timeout /t 2 >nul & start http://127.0.0.1:8000/"
-".venv\Scripts\python.exe" -m uvicorn dgy.main:create_app --factory --host 127.0.0.1 --port 8000
+".venv\Scripts\python.exe" -m dgy
 pause

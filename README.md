@@ -37,7 +37,8 @@ python -m venv --system-site-packages .venv
 ```bash
 .venv\Scripts\python -m pytest            # 全部测试
 .venv\Scripts\python -m pytest -m "not pdf"  # 跳过需要读 PDF 的慢测试
-.venv\Scripts\python -m uvicorn dgy.main:create_app --factory --reload
+.venv\Scripts\python -m dgy --reload     # 开发时：改代码后自动重启
+.venv\Scripts\python -m dgy --data-dir D:\临时数据  # 用另一份学习数据试用，不碰 data\
 ```
 
 目录：`pipeline\` 内容提取，`dgy\` 网站，`tests\` 测试，`docs\` 设计与计划。
