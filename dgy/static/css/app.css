@@ -74,12 +74,13 @@ kbd {
 
 .topbar { border-bottom: 1px solid var(--line); background: var(--bg); position: sticky; top: 0; z-index: 10; }
 .topbar-inner { max-width: 1120px; margin: 0 auto; padding: 0 20px; height: 58px; display: flex; align-items: center; gap: 28px; }
-.brand { display: flex; align-items: center; gap: 9px; color: var(--ink); font-size: 19px; font-weight: 750; letter-spacing: .04em; }
+.brand { display: flex; flex: none; align-items: center; gap: 9px; color: var(--ink); font-size: 19px; font-weight: 750; letter-spacing: .04em; white-space: nowrap; }
 .brand:hover { color: var(--ink); text-decoration: none; }
 .brand-mark { width: 22px; height: 22px; border-radius: 6px; background: var(--blue);
   background-image: linear-gradient(var(--bg), var(--bg)), linear-gradient(var(--bg), var(--bg)), linear-gradient(var(--bg), var(--bg));
   background-size: 12px 2.5px, 12px 2.5px, 8px 2.5px; background-position: 5px 6px, 5px 10.5px, 5px 15px; background-repeat: no-repeat; }
-.nav { display: flex; gap: 4px; overflow-x: auto; }
+.nav { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.nav::-webkit-scrollbar { display: none; }
 .nav a { color: var(--ink-2); padding: 17px 10px 15px; border-bottom: 2px solid transparent; white-space: nowrap; }
 .nav a:hover { color: var(--ink); text-decoration: none; }
 .nav a[aria-current="page"] { color: var(--ink); font-weight: 650; border-bottom-color: var(--ink); }
@@ -343,9 +344,11 @@ a.chip:hover { text-decoration: none; border-color: var(--blue); color: var(--bl
   .grid, .grid-2, .chapters { grid-template-columns: 1fr; }
   .kp-row { grid-template-columns: 1fr; }
   .kp-actions { justify-content: flex-start; }
-  .gradebar-inner { flex-wrap: wrap; padding: 10px 12px; }
-  .grade { font-size: 14px; padding: 10px 4px; }
+  .gradebar-inner { padding: 10px 12px; gap: 8px; }
+  .grades { gap: 6px; }
+  .grade { font-size: 13px; padding: 10px 2px; white-space: nowrap; }
   .grade kbd { display: none; }
+  .nav a { padding-left: 7px; padding-right: 7px; }
   .sheet { padding: 14px; }
 }
 

@@ -33,8 +33,8 @@
 {% endif %}
 <div class="kn-pages">
   {% for p in entry.pages %}
-  <a class="kn-page" id="p{{ loop.index }}" href="/content/{{ p.src }}" target="_blank" rel="noopener" title="在新标签页放大">
-    <img src="/content/{{ p.src }}" width="{{ p.w }}" height="{{ p.h }}" alt="{{ entry.title }} 第 {{ loop.index }} 页" {% if loop.first %}fetchpriority="high"{% else %}loading="lazy" decoding="async"{% endif %}>
+  <a class="kn-page" id="p{{ loop.index }}" href="/content/{{ p.src }}?v={{ content_v }}" target="_blank" rel="noopener" title="在新标签页放大">
+    <img src="/content/{{ p.src }}?v={{ content_v }}" width="{{ p.w }}" height="{{ p.h }}" alt="{{ entry.title }} 第 {{ loop.index }} 页" {% if loop.first %}fetchpriority="high"{% else %}loading="lazy" decoding="async"{% endif %}>
   </a>
   {% endfor %}
 </div>

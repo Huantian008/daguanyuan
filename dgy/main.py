@@ -15,6 +15,7 @@ from .backup import backup_daily
 from .config import Settings, load_settings
 from .content import load_content
 from .routes import auth, bank, dashboard, history, knowledge, practice, preferences
+from .web import TEMPLATES
 
 STATIC_DIR = Path(__file__).parent / "static"
 PUBLIC_PREFIXES = ("/static/", "/login")
@@ -31,6 +32,9 @@ def create_app(settings: Settings | None = None, clock: Callable[[], datetime] |
     app.state.clock = clock or studyday.now
     app.state.content = load_content(settings.content_dir)
     app.state.backup_day = None
+    # Version stamps in asset URLs so browsers never show stale CSS/JS or old images after a rebuild.
+    TEMPLATES.env.globals["asset_v"] = max(int(p.stat().st_mtime) for p in STATIC_DIR.rglob("*.*"))
+    TEMPLATES.env.globals["content_v"] = "".join(ch for ch in app.state.content.built_at if ch.isdigit())
 
     conn = db.connect(settings.db_path)
     db.init_db(conn)
