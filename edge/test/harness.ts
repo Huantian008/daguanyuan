@@ -66,13 +66,21 @@ export class Client {
     return this.request(path, { method: "POST", body: new URLSearchParams(form) });
   }
 
-  async login(password = "pw") {
-    const res = await this.post("/login", { password, next: "/" });
+  async login(username = "me", password = "pw") {
+    const res = await this.post("/login", { username, password, next: "/" });
     if (res.status !== 303) throw new Error(`login failed: ${res.status}`);
   }
 }
 
-export function setup(options: { password?: string; secret?: string; bank?: Manifest } = {}) {
+/** Two accounts, like the real site: the owner ("me", password in APP_PASSWORD) and a friend ("pal", FRIEND_PASSWORD). */
+export const ACCOUNTS = [
+  { id: 1, name: "me", password_secret: "APP_PASSWORD" },
+  { id: 2, name: "pal", password_secret: "FRIEND_PASSWORD" },
+];
+
+export function setup(options: {
+  password?: string; friendPassword?: string; secret?: string; users?: unknown; bank?: Manifest;
+} = {}) {
   const bank = options.bank ?? smallBank();
   const clock = new Clock(new Date("2026-10-16T21:00:00+08:00"));
   const app = createApp({
@@ -84,7 +92,9 @@ export function setup(options: { password?: string; secret?: string; bank?: Mani
   const env: Env = {
     DB: memoryD1(),
     ASSETS: fakeAssets(assetFiles(bank)),
+    USERS: "users" in options ? options.users : ACCOUNTS,
     APP_PASSWORD: options.password ?? "pw",
+    FRIEND_PASSWORD: options.friendPassword ?? "pw2",
     SECRET_KEY: options.secret ?? "test-secret",
   };
   return { app, env, clock, client: new Client(app, env) };

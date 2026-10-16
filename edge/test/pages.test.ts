@@ -1,6 +1,6 @@
 // Port of tests/test_app.py: the same user-visible behaviour, now against the Worker and D1.
 import { describe, expect, it } from "vitest";
-import { setup, visible, type Client } from "./harness";
+import { Client, setup, visible } from "./harness";
 
 async function loggedIn() {
   const ctx = setup();
@@ -153,6 +153,14 @@ describe("history and settings", () => {
     expect(page).toContain("10月16日");
     expect(page).toContain("#001");
     expect(page).toContain("2 分钟"); // 90 s rounds half up to 2 minutes, like the Python version
+  });
+
+  it("shows who is logged in on the settings page", async () => {
+    const { app, env, client } = await loggedIn();
+    expect(visible(await text(client, "/settings"))).toContain("当前登录：me");
+    const pal = new Client(app, env);
+    await pal.login("pal", "pw2");
+    expect(visible(await text(pal, "/settings"))).toContain("当前登录：pal");
   });
 
   it("changes the exam date", async () => {

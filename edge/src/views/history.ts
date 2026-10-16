@@ -41,6 +41,7 @@ export interface SettingsData {
   warmupDays: number;
   saved: boolean;
   builtAt: string;
+  userName: string;
 }
 
 export function settingsPage(meta: Meta, d: SettingsData) {
@@ -65,6 +66,7 @@ ${d.saved ? html`<p class="note note-ok" role="status">已保存。</p>` : ""}
     <li><a href="/settings/export">下载全部学习数据（JSON）</a>，建议每周存一份。</li>
     <li>题库生成时间：${d.builtAt}</li>
   </ul>
+  <p class="muted">当前登录：${d.userName}</p>
   <form method="post" action="/logout"><button class="btn">退出登录</button></form>
 </section>`,
   });

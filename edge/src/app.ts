@@ -4,8 +4,9 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { html } from "hono/html";
 import { passwordMatches, signSession, verifySession } from "./auth";
 import type { Content } from "./content";
-import type { Env, KnowledgeData, Meta } from "./env";
+import type { AppEnv, KnowledgeData, Meta } from "./env";
 import { registerPages } from "./routes";
+import { accountsOf, findAccount, passwordOf, toUser } from "./users";
 import { layout } from "./views/layout";
 import { loginPage } from "./views/login";
 import { speedTestPage } from "./views/speedtest";
@@ -23,7 +24,7 @@ const SESSION_DAYS = 30;
 const PUBLIC_PREFIXES = ["/static/"];
 const PUBLIC_PATHS = new Set(["/login", "/favicon.ico"]);
 
-type C = Context<{ Bindings: Env }>;
+type C = Context<AppEnv>;
 
 async function serveAsset(c: C, scope: "public" | "private") {
   const res = await c.env.ASSETS.fetch(c.req.raw);
@@ -37,15 +38,24 @@ async function serveAsset(c: C, scope: "public" | "private") {
 export function createApp(deps: AppDeps) {
   const { content, meta } = deps;
   const now = deps.now ?? (() => new Date());
-  const app = new Hono<{ Bindings: Env }>();
+  const app = new Hono<AppEnv>();
 
   app.use("*", async (c, next) => {
-    if (!c.env.APP_PASSWORD || !c.env.SECRET_KEY) {
-      return c.text("网站还没有设置 APP_PASSWORD 和 SECRET_KEY，暂时不能访问。", 503);
+    const accounts = accountsOf(c.env);
+    if (!c.env.SECRET_KEY || accounts.length === 0) {
+      return c.text("网站还没有配置好 SECRET_KEY 和账号（USERS），暂时不能访问。", 503);
     }
     const url = new URL(c.req.url);
     if (PUBLIC_PATHS.has(url.pathname) || PUBLIC_PREFIXES.some((p) => url.pathname.startsWith(p))) return next();
-    if (await verifySession(c.env.SECRET_KEY, getCookie(c, COOKIE), now().getTime())) return next();
+    const userId = await verifySession(c.env.SECRET_KEY, getCookie(c, COOKIE), now().getTime(), (id) => {
+      const account = accounts.find((a) => a.id === id);
+      return account ? passwordOf(c.env, account) : "";
+    });
+    const account = accounts.find((a) => a.id === userId);
+    if (account) {
+      c.set("user", toUser(account));
+      return next();
+    }
     return c.redirect(`/login?next=${encodeURIComponent(url.pathname + url.search)}`, 303);
   });
 
@@ -58,10 +68,14 @@ export function createApp(deps: AppDeps) {
   app.post("/login", async (c) => {
     const form = await c.req.parseBody();
     const next = safeBack(String(form.next ?? "/"));
-    if (!passwordMatches(String(form.password ?? ""), c.env.APP_PASSWORD!)) {
-      return c.html(loginPage(meta, next, "密码不对，请重新输入。"));
+    const username = String(form.username ?? "");
+    const account = findAccount(accountsOf(c.env), username);
+    // An unknown user is compared against an empty password too, so the answer does not tell which names exist.
+    const password = account ? passwordOf(c.env, account) : "";
+    if (!account || !passwordMatches(String(form.password ?? ""), password)) {
+      return c.html(loginPage(meta, next, "用户名或密码不对，请重新输入。", username));
     }
-    const token = await signSession(c.env.SECRET_KEY!, now().getTime() + SESSION_DAYS * 24 * 3600 * 1000);
+    const token = await signSession(c.env.SECRET_KEY!, account.id, password, now().getTime() + SESSION_DAYS * 24 * 3600 * 1000);
     setCookie(c, COOKIE, token, { httpOnly: true, secure: true, sameSite: "Lax", path: "/", maxAge: SESSION_DAYS * 24 * 3600 });
     return c.redirect(next, 303);
   });

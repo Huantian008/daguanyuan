@@ -1,4 +1,4 @@
-/** Password login with a signed, expiring session cookie (HMAC-SHA256 via Web Crypto). */
+/** Login with a signed, expiring session cookie that names the user (HMAC-SHA256 via Web Crypto). */
 const encoder = new TextEncoder();
 
 const hmacKey = (secret: string) =>
@@ -15,21 +15,31 @@ function fromBase64Url(text: string): Uint8Array {
   return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
 }
 
-/** Token "<expiresAt>.<signature>", where expiresAt is a millisecond timestamp. */
-export async function signSession(secret: string, expiresAt: number): Promise<string> {
-  const signature = await crypto.subtle.sign("HMAC", await hmacKey(secret), encoder.encode(`dgy:${expiresAt}`));
-  return `${expiresAt}.${toBase64Url(signature)}`;
+/**
+ * Token "<userId>.<expiresAt>.<signature>", where expiresAt is a millisecond timestamp.
+ * The signature covers the user's current password, so changing a password logs that user out everywhere.
+ */
+export async function signSession(secret: string, userId: number, password: string, expiresAt: number): Promise<string> {
+  const signature = await crypto.subtle.sign("HMAC", await hmacKey(secret),
+    encoder.encode(`dgy:${userId}:${expiresAt}:${password}`));
+  return `${userId}.${expiresAt}.${toBase64Url(signature)}`;
 }
 
-export async function verifySession(secret: string, token: string | undefined, now: number): Promise<boolean> {
-  if (!token) return false;
+/** The id of the user the token belongs to, or null if it is forged, expired, in the old format, or its owner's password changed. */
+export async function verifySession(secret: string, token: string | undefined, now: number,
+  passwordOf: (userId: number) => string): Promise<number | null> {
+  if (!token) return null;
   const parts = token.split(".");
-  if (parts.length !== 2 || !/^\d+$/.test(parts[0]) || Number(parts[0]) <= now) return false;
+  if (parts.length !== 3 || !/^\d+$/.test(parts[0]) || !/^\d+$/.test(parts[1]) || Number(parts[1]) <= now) return null;
+  const userId = Number(parts[0]);
+  const password = passwordOf(userId);
+  if (!password) return null;
   try {
-    return await crypto.subtle.verify("HMAC", await hmacKey(secret), fromBase64Url(parts[1]),
-      encoder.encode(`dgy:${parts[0]}`));
+    const valid = await crypto.subtle.verify("HMAC", await hmacKey(secret), fromBase64Url(parts[2]),
+      encoder.encode(`dgy:${parts[0]}:${parts[1]}:${password}`));
+    return valid ? userId : null;
   } catch {
-    return false;
+    return null;
   }
 }
 

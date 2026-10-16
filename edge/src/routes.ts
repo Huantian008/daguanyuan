@@ -2,7 +2,7 @@
 import type { Hono } from "hono";
 import type { Content, KnowledgeEntry } from "./content";
 import * as db from "./db";
-import type { Env, KnowledgeData, Meta } from "./env";
+import type { AppEnv, KnowledgeData, Meta } from "./env";
 import { buildQueue, type Mode, type Only, type QueueSpec } from "./queues";
 import { isGrade } from "./srs";
 import { examDate, loadState, warmupDays } from "./state";
@@ -29,7 +29,7 @@ export interface PageDeps {
   now: () => Date;
 }
 
-export function registerPages(app: Hono<{ Bindings: Env }>, { content, knowledge, meta, now }: PageDeps) {
+export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now }: PageDeps) {
   const today = () => studyDay(now());
 
   app.get("/", async (c) => {
@@ -206,7 +206,10 @@ export function registerPages(app: Hono<{ Bindings: Env }>, { content, knowledge
   app.get("/settings", async (c) => {
     const DB = c.env.DB;
     const [exam, warmup] = await Promise.all([examDate(DB), warmupDays(DB)]);
-    return c.html(settingsPage(meta, { examDate: exam, warmupDays: warmup, saved: c.req.query("saved") === "1", builtAt: content.builtAt }));
+    return c.html(settingsPage(meta, {
+      examDate: exam, warmupDays: warmup, saved: c.req.query("saved") === "1", builtAt: content.builtAt,
+      userName: c.get("user").name,
+    }));
   });
 
   app.post("/settings", async (c) => {
