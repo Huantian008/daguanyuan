@@ -1,0 +1,16 @@
+# 在服务器上：把 content/ 一起传上去，在 .env 里写好 APP_PASSWORD 和 SECRET_KEY，然后
+#   docker compose up -d
+services:
+  dgy:
+    build: .
+    restart: unless-stopped
+    ports:
+      # 只监听本机；外面通过 HTTPS 反向代理或 Tailscale 访问，不要直接暴露到公网
+      - "127.0.0.1:8000:8000"
+    environment:
+      APP_PASSWORD: ${APP_PASSWORD:?请在 .env 里设置 APP_PASSWORD（上云必须有密码）}
+      SECRET_KEY: ${SECRET_KEY:?请在 .env 里设置 SECRET_KEY（一串随机字符）}
+      HTTPS_ONLY: ${HTTPS_ONLY:-0}
+    volumes:
+      - ./content:/app/content:ro
+      - ./data:/app/data

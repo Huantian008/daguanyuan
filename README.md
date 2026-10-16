@@ -32,6 +32,25 @@ python -m venv --system-site-packages .venv
 
 本机使用默认不需要密码。放到服务器上之前，必须设置环境变量 `APP_PASSWORD`（和 `SECRET_KEY`），设置后所有页面和图片都需要登录。
 
+## 以后放到服务器上
+
+1. 在本机运行 `pipeline.build`，确认 `content\` 已经生成。
+2. 把整个 `daguanyuan` 文件夹传到服务器。要带上 `content\`，不要带 `.venv\`。
+3. 在服务器的项目目录里新建 `.env` 文件，写入下面两行：
+
+   ```
+   APP_PASSWORD=你的登录密码
+   SECRET_KEY=一长串随机字符
+   ```
+
+4. 运行 `docker compose up -d`。网站只监听服务器本机的 8000 端口。
+5. 从外面访问有两种方式，选一种：
+   - 用 Tailscale 组私网，用 `tailscale serve` 转发本机 8000 端口。不需要域名，也不需要备案。
+   - 用域名加 HTTPS 反向代理，并在 `.env` 里加一行 `HTTPS_ONLY=1`。大陆机房的域名要先做 ICP 备案。
+6. 想把本机进度带过去：先停掉本机网站，再把 `data\app.db` 复制到服务器项目的 `data/` 目录里。
+
+题目、答案、解析都是第三方资料，服务器上一定要开密码，不要公开分享网址。
+
 ## 开发
 
 ```bash
