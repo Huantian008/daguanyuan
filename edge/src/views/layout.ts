@@ -17,8 +17,8 @@ export interface PageOptions {
   body: Html;
   nav?: string;
   pageClass?: string;
-  head?: Html;
-  scripts?: Html;
+  head?: Html | string;
+  scripts?: Html | string;
 }
 
 /** Port of dgy/templates/base.html: same markup and classes, so dgy/static/css/app.css applies unchanged. */

@@ -5,6 +5,7 @@ import { html } from "hono/html";
 import { passwordMatches, signSession, verifySession } from "./auth";
 import type { Content } from "./content";
 import type { Env, KnowledgeData, Meta } from "./env";
+import { registerPages } from "./routes";
 import { layout } from "./views/layout";
 import { loginPage } from "./views/login";
 import { speedTestPage } from "./views/speedtest";
@@ -73,12 +74,12 @@ export function createApp(deps: AppDeps) {
   app.get("/ping", (c) => c.body(null, 204));
   app.get("/speedtest", (c) => c.html(speedTestPage(content, meta)));
 
-  app.get("/", (c) => c.html(layout(meta, {
-    title: "迁移中",
-    nav: "home",
-    body: html`<section class="card"><h1>网站正在搬到 Cloudflare</h1>
-<p>刷题页面还在移植中。现在可以先打开 <a href="/speedtest">测速页</a>，看看晚上的访问速度。</p></section>`,
-  })));
+  registerPages(app, { content, knowledge: deps.knowledge, meta, now });
+
+  app.notFound((c) => c.html(layout(meta, {
+    title: "没有这个页面",
+    body: html`<section class="card"><h1>没有这个页面</h1><p><a href="/">回首页</a></p></section>`,
+  }), 404));
 
   return app;
 }
