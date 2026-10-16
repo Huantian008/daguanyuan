@@ -13,7 +13,7 @@
     {
       "binding": "DB",
       "database_name": "dgy",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "20658b7d-a615-49ec-8f89-6b22dda68392",
       "migrations_dir": "migrations"
     }
   ],
