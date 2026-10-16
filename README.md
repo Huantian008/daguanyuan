@@ -32,6 +32,48 @@ python -m venv --system-site-packages .venv
 
 本机使用默认不需要密码。放到服务器上之前，必须设置环境变量 `APP_PASSWORD`（和 `SECRET_KEY`），设置后所有页面和图片都需要登录。
 
+## 线上版（Cloudflare）
+
+**地址**：<https://math.leadertestofcn.site>。登录密码是你用 `npx wrangler secret put APP_PASSWORD` 设的那个。
+
+**组成**
+
+- `edge\` 是 Cloudflare Worker：网页由 TypeScript 生成，题库图片作为静态资源，登录后才能看。
+- 学习进度存在 D1 数据库 `dgy` 里，位置在亚太区域。
+- 本机的 Python 版保留作断网时的备用，两边进度**不会自动同步**，平时以线上版为主。
+
+**改了题库、知识点或代码之后，重新部署**
+
+```bash
+.venv\Scripts\python -m pipeline.export_edge
+cd edge
+npx wrangler deploy
+```
+
+**常用操作**
+
+| 想做什么 | 命令 |
+|---|---|
+| 退回上一个版本 | `npx wrangler rollback` |
+| 改登录密码 | `npx wrangler secret put APP_PASSWORD`（已登录的设备 30 天内保持登录；想让它们马上退出，就再换一个 `SECRET_KEY`） |
+| 备份 | 在网站“设置”页下载全部学习数据（JSON）。D1 自己还保留 7 天历史，可以用 `npx wrangler d1 time-travel` 回溯 |
+| 跑测试 | `cd edge`，然后 `npm test` |
+| 本地调试线上版 | `cd edge`，然后 `npm run dev`。需要先照 `.dev.vars.example` 建好 `.dev.vars`，并运行一次 `npx wrangler d1 migrations apply dgy --local` |
+
+**把本机进度搬到线上**（只在开始用线上版之前做一次）
+
+```bash
+.venv\Scripts\python -m pipeline.export_progress
+cd edge
+npx wrangler d1 execute dgy --remote --file=..\data\progress.sql
+```
+
+**连不上 Cloudflare 时**：如果 wrangler 报 `ECONNRESET`，可以先在当前终端里临时清空代理变量再试：
+
+```
+$env:HTTPS_PROXY=''; $env:HTTP_PROXY=''
+```
+
 ## 以后放到服务器上
 
 1. 在本机运行 `pipeline.build`，确认 `content\` 已经生成。
