@@ -135,6 +135,13 @@ def test_question_page_and_search(env):
     assert env.client.get("/q/999").status_code == 404
 
 
+def test_random_practice_can_be_started_from_the_bank(env):
+    page = env.client.get("/bank").text
+    assert 'name="mode" value="random"' in page
+    first = env.client.get(start(env, mode="random", only="new")).text
+    assert "随机" in first and "#00" in first
+
+
 def test_bank_pages(env):
     assert "函数极限连续" in env.client.get("/bank").text
     chapter = env.client.get("/bank/B").text

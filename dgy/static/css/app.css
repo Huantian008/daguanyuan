@@ -359,3 +359,5 @@ a.chip:hover { text-decoration: none; border-color: var(--blue); color: var(--bl
 @media print {
   .topbar, .gradebar, .side-info { display: none; }
 }
+
+.bank-actions { margin: -6px 0 18px; }
