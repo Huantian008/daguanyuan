@@ -716,7 +716,8 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
 .js .qc-panel:not(.is-open) { display: none; }
 .qc-panel.is-open { animation: panel-in .22s ease-out; }
 .qc-panel[data-panel="answer"] .panel-label { display: none; }
-.js .qcard[data-choice] .qanswer { display: none; }
+/* in text view the right option turns green, so the answer line would only repeat it; in image view it stays */
+.js .qcard[data-choice]:has(.qview[data-view="text"]) .qanswer { display: none; }
 .qc-panel[data-panel="solution"] .panel-label { color: var(--accent); font-size: 15px; }
 
 @media (max-width: 960px) {

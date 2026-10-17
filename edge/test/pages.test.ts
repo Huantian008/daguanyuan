@@ -230,6 +230,7 @@ describe("bank", () => {
     expect(page).not.toContain('id="q-1"');
     expect(await text(client, "/bank/A?kp=3")).toContain('id="q-3"');
     expect(await text(client, "/bank/A?kp=99")).toContain('id="q-2"');
+    expect(await text(client, "/bank/A?kp=abc")).toContain('id="q-2"');
   });
 
   it("steps between 考点 and chapters", async () => {

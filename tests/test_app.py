@@ -278,6 +278,7 @@ def test_chapter_page_opens_on_the_first_kp_with_work_left(env):
     assert 'id="q-2"' in page and 'id="q-1"' not in page
     assert 'id="q-3"' in env.client.get("/bank/A", params={"kp": "3"}).text
     assert 'id="q-2"' in env.client.get("/bank/A", params={"kp": "99"}).text  # out of range: the default one
+    assert 'id="q-2"' in env.client.get("/bank/A", params={"kp": "abc"}).text
 
 
 def test_chapter_page_steps_between_kps_and_chapters(env):

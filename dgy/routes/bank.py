@@ -36,13 +36,14 @@ def search(request: Request, q: str = "", conn=Depends(get_conn)):
 
 
 @router.get("/bank/{code}")
-def chapter(request: Request, code: str, kp: int = 0, conn=Depends(get_conn)):
+def chapter(request: Request, code: str, kp: str = "", conn=Depends(get_conn)):
     content = bank(request)
     if code not in {c.code for c in content.chapters}:
         raise HTTPException(404, "没有这一章")
     state = user_state(conn, content)
     kps = drill_kps(content, code, state.status)
-    current = kps[(kp if 1 <= kp <= len(kps) else default_kp(kps)) - 1]
+    asked = int(kp) if kp.isdigit() else 0
+    current = kps[(asked if 1 <= asked <= len(kps) else default_kp(kps)) - 1]
     codes = [c.code for c in content.chapters]
     at = codes.index(code)
     if current.index > 1:
