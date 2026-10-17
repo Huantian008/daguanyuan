@@ -10,7 +10,7 @@
       <p class="muted">第 {{ session.position + 1 }} / {{ session.queue|length }} 题</p>
     </div>
     <div class="timer-controls js-timer-controls" hidden>
-      <span id="practice-time" class="timer js-timer-display" hidden>用时 <span class="js-timer">00:00</span></span>
+      <span id="practice-time" class="timer js-timer-display" hidden>用时 <span class="js-timer">00:00</span> <span aria-hidden="true">·</span></span>
       <button type="button" class="timer-action js-timer-toggle" aria-expanded="false" aria-controls="practice-time">查看用时</button>
       <span aria-hidden="true">·</span>
       <span class="timer-status js-timer-status" role="status" hidden></span>
