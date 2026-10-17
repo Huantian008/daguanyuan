@@ -40,7 +40,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **题目文字版**（网站尚未接入）：题干和答案速查由能看图的模型从图片转成 Markdown + LaTeX，任务说明在
 `docs/deepseek/题目转LaTeX.md`。`python -m pipeline.transcribe_questions check --write` 校验通过后写入
 `bank-md/questions.json`（进 git，一题一行）；校验会用 Node 跑 `pipeline/katex_check.mjs`，拿仓库自带的 KaTeX 编译每一段公式。
-解析仍是图片。
+解析仍是图片。原书或答案速查印错的题，`answer` 存验算过的正确答案，`erratum` 写明原来印的是什么（审核时人工加，目前 21 题）。
 
 **Python 与 Worker 的对应关系**（行为改动两边都改、都测）：
 

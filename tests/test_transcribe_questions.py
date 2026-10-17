@@ -32,6 +32,13 @@ def test_plain_chars_keep_function_names_even_after_another_command():
     assert tq.plain_chars("$\\displaystyle\\lim_{x\\to0}\\mathrm{e}^x$") == {"l": 1, "i": 1, "m": 1, "x": 2, "0": 1, "e": 1}
 
 
+def test_labels_at_the_start_are_ignored_and_reported():
+    assert tq.strip_labels("【例 6.12】(2018, 数二) 计算积分") == " 计算积分"
+    assert tq.coverage("【例 6.4】(2022, 数二) 求 x2", {"stem": "求 $x^2$"}) == 1.0
+    _errors, warnings = errors_and_warnings(dict(GOOD_CHOICE, stem="(2018, 数二) 求极限（　　）"))
+    assert "出处" in warnings
+
+
 def test_coverage_finds_the_pdf_text_again():
     assert tq.coverage(PDF_TEXT_1, GOOD_CHOICE) == 1.0
     assert tq.coverage(PDF_TEXT_1, dict(GOOD_CHOICE, stem="函数在下列哪个区间内有界（　　）.")) < tq.COVERAGE_MIN
@@ -97,6 +104,14 @@ def test_write_bank_one_question_per_line(tmp_path):
     data = json.loads(path.read_text(encoding="utf-8"))
     assert [q["num"] for q in data["questions"]] == [1, 2]
     assert list(data["questions"][1]) == list(tq.FIELDS)  # confidence and note stay out
+
+
+def test_write_bank_keeps_an_erratum(tmp_path):
+    fixed = dict(GOOD_CHOICE, answer="C", erratum="速查原印 D")
+    data = json.loads(tq.write_bank({1: fixed}, tmp_path).read_text(encoding="utf-8"))
+    assert data["questions"][0]["erratum"] == "速查原印 D"
+    assert errors_and_warnings(fixed) == ("", "")
+    assert "erratum" in errors_and_warnings(dict(GOOD_CHOICE, erratum=" "))[0]
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="needs node")

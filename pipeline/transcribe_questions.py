@@ -33,14 +33,18 @@ TYPES = ("choice", "fill", "solve")
 OPTION_KEYS = ("A", "B", "C", "D")
 CONFIDENCE = ("high", "low")
 FIELDS = ("num", "type", "stem", "options", "figure", "answer")
+# Added in review when the book or its 答案速查 is wrong: the answer holds the correct value, this says what was printed.
+OPTIONAL_FIELDS = ("erratum",)
 MAX_PIXELS = 640_000  # what the vision model sees without shrinking (about 800 x 800)
 COVERAGE_MIN = 0.8
 SAMPLE_SIZE = 40
 PROBE_FILE = "probe.json"
 FULL_WIDTH_IN_MATH = re.compile(r"[，；。：、]")
 
-# Book numbering left at the start of a stem: (5)  （5）  【11】  4.  4、
-BOOK_LABEL = re.compile(r"^\s*(\(\s*\d+\s*\)|（\s*\d+\s*）|【\s*\d+\s*】|\d+\s*[.．、])")
+# Book numbering left at the start of a stem: (5)  （5）  【11】  【例 6.12】  4.  4、
+BOOK_LABEL = re.compile(r"^\s*(\(\s*\d+\s*\)|（\s*\d+\s*）|【[^】]{0,12}】|\d+\s*[.．、])")
+# The exam a question comes from, which the site already shows: (2018, 数二)  （2009，数二、数三）
+SOURCE_LABEL = re.compile(r"^\s*[（(]\s*(?:19|20)\d\d\s*[,，][^)）]{0,20}[)）]")
 _DISPLAY = re.compile(r"\$\$(.+?)\$\$", re.S)
 _INLINE = re.compile(r"\$(.+?)\$")
 _TEXT_COMMANDS = re.compile(r"\\(arcsin|arccos|arctan|sinh|cosh|sin|cos|tan|cot|sec|csc|ln|log|lim|max|min|exp)(?![a-zA-Z])")
@@ -167,9 +171,16 @@ def plain_chars(markdown: str) -> Counter:
     return Counter(_ALNUM.findall(_COMMAND.sub(" ", text)))
 
 
+def strip_labels(text: str) -> str:
+    """The text without the book's numbering and exam source at its start, in either order."""
+    while (m := BOOK_LABEL.match(text) or SOURCE_LABEL.match(text)):
+        text = text[m.end():]
+    return text
+
+
 def coverage(pdf_text: str, entry: dict) -> float:
     """Share of the PDF text's digits and letters found again in the transcription (1.0 when the PDF has none)."""
-    expected = plain_chars(BOOK_LABEL.sub("", pdf_text, count=1))
+    expected = plain_chars(strip_labels(pdf_text))
     if not expected:
         return 1.0
     written = plain_chars(entry.get("stem") or "")
@@ -179,7 +190,7 @@ def coverage(pdf_text: str, entry: dict) -> float:
 
 
 def _texts(entry: dict) -> list[tuple[str, str]]:
-    parts = [("stem", entry.get("stem") or ""), ("answer", entry.get("answer") or "")]
+    parts = [("stem", entry.get("stem") or ""), ("answer", entry.get("answer") or ""), ("erratum", entry.get("erratum") or "")]
     parts += [(f"options.{k}", v) for k, v in (entry.get("options") or {}).items() if isinstance(v, str)]
     return parts
 
@@ -203,6 +214,8 @@ def check_entry(where: str, entry: dict, report: Report) -> None:
         report.errors.append(f"{where}：低把握必须写 note")
     if not isinstance(entry.get("figure"), bool):
         report.errors.append(f"{where}：figure 只能是 true 或 false")
+    if "erratum" in entry and not (isinstance(entry["erratum"], str) and entry["erratum"].strip()):
+        report.errors.append(f"{where}：erratum 有就必须是非空文字")
     if kind == "choice":
         if options is None and not entry.get("figure"):
             report.errors.append(f"{where}：选择题要有 A–D 选项（选项是图形时才可以为 null，并设 figure: true）")
@@ -216,8 +229,8 @@ def check_entry(where: str, entry: dict, report: Report) -> None:
     for part, text in _texts(entry):
         if unbalanced_dollars(text):
             report.errors.append(f"{where} {part}：$ 没有成对")
-    if BOOK_LABEL.match(stem):
-        report.warnings.append(f"{where}：开头疑似残留书上的题号「{BOOK_LABEL.match(stem).group(0).strip()}」")
+    if label := BOOK_LABEL.match(stem) or SOURCE_LABEL.match(stem):
+        report.warnings.append(f"{where}：开头疑似残留书上的题号或出处「{label.group(0).strip()}」")
 
 
 def katex_errors(formulas: list[dict]) -> list[dict] | None:
@@ -340,7 +353,8 @@ def write_bank(entries: dict[int, dict], bank_dir: Path = BANK_DIR) -> Path:
     bank_dir.mkdir(parents=True, exist_ok=True)
     path = bank_dir / BANK_FILE
     # One question per line, so correcting one question is a one-line diff.
-    rows = ",\n".join("  " + json.dumps({k: entries[n][k] for k in FIELDS}, ensure_ascii=False) for n in sorted(entries))
+    keep = lambda e: {k: e[k] for k in FIELDS + OPTIONAL_FIELDS if k in e}  # noqa: E731
+    rows = ",\n".join("  " + json.dumps(keep(entries[n]), ensure_ascii=False) for n in sorted(entries))
     path.write_text(f'{{\n "version": 1,\n "questions": [\n{rows}\n ]\n}}\n', encoding="utf-8")
     return path
 
@@ -376,7 +390,7 @@ def review_page(nums: list[int], entries: dict[int, dict], questions: dict[int, 
         rows.append(f"""<section class="row" id="q{n}">
   <h2>#{n:03d}<small>{html.escape(q['chapter_name'])} / {html.escape(' / '.join(q['path']))} · {e.get('type')} · {e.get('confidence')}{' · 带图' if e.get('figure') else ''}</small></h2>
   <div>{imgs}</div>
-  <div>{md(e.get('stem'))}{f'<div class="opts">{opts}</div>' if opts else ''}<div class="ans">答案：{md(e.get('answer'))}</div>
+  <div>{md(e.get('stem'))}{f'<div class="opts">{opts}</div>' if opts else ''}<div class="ans">答案：{md(e.get('answer'))}{f'<p class="note">勘误：{md(e["erratum"])}</p>' if e.get('erratum') else ''}</div>
   {f'<p class="note">{html.escape(e["note"])}</p>' if e.get('note') else ''}</div>
 </section>""")
     return f"""<!doctype html>
