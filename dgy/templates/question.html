@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import qmeta, question_body, answer_body, start, exclude_toggle, status_label, reveal_toggle, related_knowledge, review_history, katex_head, katex_script %}
+{% from "_macros.html" import qmeta, question_body, answer_body, exclude_toggle, status_label, reveal_toggle, related_knowledge, review_history, katex_head, katex_script %}
 {% block title %}#{{ '%03d' % q.num }} {{ q.kp }}{% endblock %}
 {% block head %}{% if text %}{{ katex_head() }}{% endif %}{% endblock %}
 {% block scripts %}{% if text %}{{ katex_script() }}{% endif %}{% endblock %}
@@ -7,11 +7,10 @@
 <div data-shortcuts>
 <header class="page-head">
   <div>
-    <p class="eyebrow"><a href="/bank/{{ chapter.code }}">{{ chapter.name }}</a> / {{ q.path|join(' / ') }}</p>
+    <p class="eyebrow"><a href="/bank/{{ chapter.code }}?kp={{ kp_index }}#q-{{ q.num }}">{{ chapter.name }}</a> / {{ q.path|join(' / ') }}</p>
     <h1>#{{ '%03d' % q.num }} {{ q.kp }}</h1>
   </div>
   <div class="head-actions">
-    {{ start('练这道题', 'single', cls='btn btn-primary', nums=q.num) }}
     {{ exclude_toggle(status == 'excluded', '/q/' ~ q.num, nums=q.num) }}
   </div>
 </header>

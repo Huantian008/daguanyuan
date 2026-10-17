@@ -499,7 +499,6 @@ html:has(.drawer[open]) { overflow: hidden; }
 .search input:focus, .form input:focus, .form select:focus { border-color: var(--accent); outline: none; box-shadow: var(--focus); }
 .search input::placeholder { color: var(--muted); }
 
-.bank-actions { margin: -8px 0 20px; }
 .chapters { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .chapters .card + .card { margin-top: 0; }
 .chapter-card { transition: box-shadow .2s, border-color .2s, transform .2s; }
@@ -509,14 +508,6 @@ html:has(.drawer[open]) { overflow: hidden; }
 .chapter-name { font-size: 18px; font-weight: 700; color: var(--ink); }
 .chapter-link:hover .chapter-name { color: var(--accent); }
 
-.legend-inline { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
-.section h2 { margin-bottom: 6px; }
-.kp-row { display: grid; grid-template-columns: 11em 1fr auto; gap: 8px 16px; align-items: center; padding: 13px 0; border-top: 1px solid var(--line); }
-.section h2 + .kp-row { border-top: 0; }
-.kp-name { font-weight: 600; font-size: 14px; }
-.kp-name .muted { font-weight: 400; margin-left: 4px; }
-.kp-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-.is-excluded .kp-name, .is-excluded .chips { opacity: .45; }
 .chips { display: flex; flex-wrap: wrap; gap: 5px; }
 
 .chip {
@@ -630,8 +621,6 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
   .card { padding: 18px 16px; }
   .tonight { grid-template-columns: 1fr; }
   .grid, .grid-2, .chapters { grid-template-columns: 1fr; }
-  .kp-row { grid-template-columns: 1fr; }
-  .kp-actions { justify-content: flex-start; }
   .sheet, .reveal-panel { padding: 14px 14px 16px; }
   .reveal-toggle { font-size: 14px; padding: 8px 10px; }
   .reveal-toggle kbd { display: none; }

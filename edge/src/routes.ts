@@ -213,6 +213,7 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
       knowledge: content.knowledgeFor(q.chapter), sections: content.sectionsFor(q.num), titles: content.knowledgeTitles(),
       text: content.text(q.num),
       total: content.all().length,
+      kpIndex: drillKps(content, q.chapter, state.status).find((k) => k.questions.includes(q))!.index,
     }));
   });
 

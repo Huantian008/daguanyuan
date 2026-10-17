@@ -8,7 +8,7 @@ import type { UserState } from "../state";
 import type { ChapterProgress, Distribution, Review } from "../stats";
 import { cnDate } from "../studyday";
 import { layout } from "./layout";
-import { STATUS_LABELS, answerBody, distBar, excludeToggle, katexCss, katexJs, qmeta, questionBody, questionCard, relatedKnowledge, revealToggle, reviewHistory, startForm, type Status } from "./parts";
+import { STATUS_LABELS, answerBody, distBar, excludeToggle, katexCss, katexJs, qmeta, questionBody, questionCard, relatedKnowledge, revealToggle, reviewHistory, type Status } from "./parts";
 import { pad3 } from "./util";
 
 const searchForm = (q = "", placeholder = "题号、年份、考点或题干文字，如 123、2019数二、拐点") => html`<form class="search" action="/bank/search" method="get" role="search">
@@ -25,10 +25,6 @@ export function bankPage(meta: Meta, rows: [ChapterProgress, Distribution][]) {
   <h1>题库</h1>
   ${searchForm()}
 </header>
-<div class="head-actions bank-actions">
-  ${startForm("随机 10 题", "random", { cls: "btn" })}
-  ${startForm("随机 10 道没做过的", "random", { cls: "btn", only: "new" })}
-</div>
 <ul class="chapters">
   ${rows.map(([p, dist]) => html`<li class="card chapter-card">
     <a class="chapter-link" href="/bank/${p.code}">
@@ -93,7 +89,6 @@ export function chapterPage(meta: Meta, d: ChapterPageData) {
         <p class="muted">${current.section} · 做过 ${current.done} / ${current.total} 题</p>
       </div>
       <div class="drill-actions">
-        ${current.total ? startForm("练这个考点", "group", { cls: "btn btn-small", chapter: chapter.code, section: current.section, kp: current.kp }) : ""}
         ${excludeToggle(!current.total, here, { chapter: chapter.code, section: current.section, kp: current.kp, onLabel: "整个考点不做了" })}
         ${prev ? html`<a class="btn btn-small" href="${prev[1]}">${prev[0]}</a>` : ""}
         ${following ? html`<a class="btn btn-small btn-primary" href="${following[1]}">${following[0]}</a>` : ""}
@@ -155,6 +150,8 @@ export interface QuestionData {
   titles: Record<string, string>;
   text: QuestionText | undefined;
   total: number;
+  /** The 考点 of the chapter page that has this question, for the link back to its card. */
+  kpIndex: number;
 }
 
 export function questionPage(meta: Meta, d: QuestionData) {
@@ -167,11 +164,10 @@ export function questionPage(meta: Meta, d: QuestionData) {
     body: html`<div data-shortcuts>
 <header class="page-head">
   <div>
-    <p class="eyebrow"><a href="/bank/${d.chapter.code}">${d.chapter.name}</a> / ${q.path.join(" / ")}</p>
+    <p class="eyebrow"><a href="/bank/${d.chapter.code}?kp=${d.kpIndex}#q-${q.num}">${d.chapter.name}</a> / ${q.path.join(" / ")}</p>
     <h1>#${pad3(q.num)} ${q.kp}</h1>
   </div>
   <div class="head-actions">
-    ${startForm("练这道题", "single", { cls: "btn btn-primary", nums: String(q.num) })}
     ${excludeToggle(d.status === "excluded", `/q/${q.num}`, { nums: String(q.num) })}
   </div>
 </header>

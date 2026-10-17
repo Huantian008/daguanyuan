@@ -163,12 +163,26 @@ describe("practice", () => {
     expect(await text(client, url)).toContain("#002");
   });
 
-  it("starts random practice from the bank", async () => {
+  it("still runs random practice, but the bank page no longer offers it", async () => {
     const { client } = await loggedIn();
-    expect(await text(client, "/bank")).toContain('name="mode" value="random"');
+    expect(await text(client, "/bank")).not.toContain('name="mode" value="random"');
     const first = await text(client, await start(client, { mode: "random", only: "new" }));
     expect(first).toContain("随机");
     expect(first).toContain("#00");
+  });
+
+  it("does not offer one-by-one practice where the chapter page replaces it", async () => {
+    const { client } = await loggedIn();
+    const chapter = await text(client, "/bank/A?kp=1");
+    expect(chapter).not.toContain("练这个考点");
+    expect(chapter).not.toContain('action="/practice/start"');
+    const question = await text(client, "/q/4");
+    expect(question).not.toContain("练这道题");
+    expect(question).not.toContain('action="/practice/start"');
+    // the question page leads back to the card on the chapter page (#4 is in 考点 1 of chapter B)
+    expect(question).toContain('href="/bank/B?kp=1#q-4"');
+    expect(await text(client, "/q/6")).toContain('href="/bank/B?kp=2#q-6"');
+    expect(await text(client, "/")).toContain("按考点往下刷");
   });
 });
 

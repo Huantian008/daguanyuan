@@ -251,11 +251,21 @@ def test_question_page_and_search(env):
     assert env.client.get("/q/999").status_code == 404
 
 
-def test_random_practice_can_be_started_from_the_bank(env):
-    page = env.client.get("/bank").text
-    assert 'name="mode" value="random"' in page
+def test_random_practice_still_works_but_the_bank_page_no_longer_offers_it(env):
+    assert 'name="mode" value="random"' not in env.client.get("/bank").text
     first = env.client.get(start(env, mode="random", only="new")).text
     assert "随机" in first and "#00" in first
+
+
+def test_one_by_one_practice_is_not_offered_where_the_chapter_page_replaces_it(env):
+    chapter = env.client.get("/bank/A", params={"kp": "1"}).text
+    assert "练这个考点" not in chapter and 'action="/practice/start"' not in chapter
+    question = env.client.get("/q/4").text
+    assert "练这道题" not in question and 'action="/practice/start"' not in question
+    # the question page leads back to the card on the chapter page (#4 is in 考点 1 of chapter B)
+    assert 'href="/bank/B?kp=1#q-4"' in question
+    assert 'href="/bank/B?kp=2#q-6"' in env.client.get("/q/6").text
+    assert "按考点往下刷" in env.client.get("/").text
 
 
 def test_bank_pages(env):

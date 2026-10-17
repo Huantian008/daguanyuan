@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import qcard, start, exclude_toggle, katex_head, katex_script %}
+{% from "_macros.html" import qcard, exclude_toggle, katex_head, katex_script %}
 {% block title %}{{ chapter.name }} · {{ current.kp }}{% endblock %}
 {% block page_class %}page-drill{% endblock %}
 {% block head %}{{ katex_head() }}{% endblock %}
@@ -35,7 +35,6 @@
         <p class="muted">{{ current.section }} · 做过 {{ current.done }} / {{ current.total }} 题</p>
       </div>
       <div class="drill-actions">
-        {% if current.total %}{{ start('练这个考点', 'group', cls='btn btn-small', chapter=chapter.code, section=current.section, kp=current.kp) }}{% endif %}
         {{ exclude_toggle(not current.total, here, chapter=chapter.code, section=current.section, kp=current.kp, on_label='整个考点不做了') }}
         {% if prev %}<a class="btn btn-small" href="{{ prev[1] }}">{{ prev[0] }}</a>{% endif %}
         {% if following %}<a class="btn btn-small btn-primary" href="{{ following[1] }}">{{ following[0] }}</a>{% endif %}

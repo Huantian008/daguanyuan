@@ -98,10 +98,12 @@ def question(request: Request, num: int, conn=Depends(get_conn)):
     if q is None:
         raise HTTPException(404, "没有这道题")
     state = user_state(conn, content)
+    kp_index = next(k.index for k in drill_kps(content, q.chapter, state.status) if q in k.questions)
     return render(
         request, "question.html",
         nav="bank",
         q=q,
+        kp_index=kp_index,
         chapter=content.chapter(q.chapter),
         card=state.cards.get(num),
         status=state.status(num),
