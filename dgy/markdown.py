@@ -40,6 +40,15 @@ def _site_link(match: re.Match) -> str:
     return f'href="/knowledge/{slug}?tab=text{anchor}"'
 
 
+def heading_ids(source: str) -> dict[int, str]:
+    """Anchor id of each h2/h3, keyed by its 0-based source line: the same ids render_markdown puts on the page."""
+    return {
+        tok.map[0]: tok.attrs["id"]
+        for tok in _md.parse(source, {})
+        if tok.type == "heading_open" and tok.tag in ("h2", "h3") and tok.map and "id" in tok.attrs
+    }
+
+
 def render_markdown(source: str) -> tuple[str, list[tuple[str, str]]]:
     """HTML plus a table of contents of (anchor id, title) for the h2 headings."""
     env: dict = {}
