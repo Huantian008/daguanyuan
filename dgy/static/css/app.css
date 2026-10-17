@@ -570,7 +570,7 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
   .grid { grid-template-columns: 1fr 1fr; }
   .grid > .card:first-child { grid-column: 1 / -1; }
   .chapters { grid-template-columns: 1fr 1fr; }
-  .kn-text { grid-template-columns: 1fr; }
+  .kn-text { grid-template-columns: minmax(0, 1fr); }  /* 1fr would let a wide formula stretch the page */
   .kn-text .toc { position: static; max-height: none; }
 }
 
