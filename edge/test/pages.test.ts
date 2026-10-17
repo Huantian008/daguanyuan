@@ -287,6 +287,24 @@ describe("bank", () => {
     expect(evil.headers.get("location")).toBe("/bank/B#q-4");
   });
 
+  it("folds knowledge and history away on each card instead of a 详情 link", async () => {
+    const { client } = await loggedIn({ linking: LINKING });
+    const page = await text(client, "/bank/A?kp=1");
+    expect(page).not.toContain(">详情</a>");
+    expect(page).toContain('aria-controls="qk-1"');
+    expect(page).toContain('aria-controls="qh-1"');
+    expect(page).toContain('id="qk-1"');
+    expect(page).toContain('data-anchor="1-函数基础"');
+    expect(page).toContain("还没做过这道题");
+    const untagged = await text(client, "/bank/A?kp=2");
+    expect(untagged).toContain("这道题还没有逐题标注");
+    expect(untagged).toContain('href="/knowledge/01?tab=text"');
+    await client.post("/q/1/grade", { grade: "shaky" });
+    const graded = await text(client, "/bank/A?kp=1");
+    expect(graded).toMatch(/id="qh-1"[\s\S]*?chip chip-shaky">不熟练\/错误/);
+    expect(graded).toContain("下次复习");
+  });
+
   it("keeps excluded questions on the chapter page as a header only", async () => {
     const { client } = await loggedIn();
     const page = await text(client, "/bank/B?kp=2");

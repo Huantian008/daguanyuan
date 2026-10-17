@@ -97,6 +97,16 @@ export async function historyFor(db: D1Database, uid: number, num: number): Prom
   return results.map(toReview);
 }
 
+/** Each question's reviews, oldest first, in one query. */
+export async function historiesFor(db: D1Database, uid: number, nums: number[]): Promise<Map<number, Review[]>> {
+  const found = new Map<number, Review[]>(nums.map((n) => [n, []]));
+  if (!nums.length) return found;
+  const { results } = await db.prepare(`SELECT * FROM reviews WHERE user_id = ? AND num IN (${nums.map(() => "?").join(",")}) ORDER BY reviewed_at, id`)
+    .bind(uid, ...nums).all<ReviewRow>();
+  for (const r of results) found.get(r.num)?.push(toReview(r));
+  return found;
+}
+
 export async function sessionGrades(db: D1Database, uid: number, sid: number): Promise<Record<string, number>> {
   const { results } = await db.prepare("SELECT grade, COUNT(*) AS n FROM reviews WHERE user_id = ? AND session_id = ? GROUP BY grade")
     .bind(uid, sid).all<{ grade: string; n: number }>();

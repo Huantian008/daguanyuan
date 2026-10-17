@@ -152,6 +152,18 @@ def history_for(conn: sqlite3.Connection, num: int) -> list[Review]:
     return [r for r in review_log(conn) if r.num == num]
 
 
+def histories_for(conn: sqlite3.Connection, nums: list[int]) -> dict[int, list[Review]]:
+    """Each question's reviews, oldest first, in one query."""
+    found: dict[int, list[Review]] = {num: [] for num in nums}
+    if not nums:
+        return found
+    rows = conn.execute(f"SELECT * FROM reviews WHERE num IN ({','.join('?' * len(nums))}) ORDER BY reviewed_at, id", nums)
+    for row in rows:
+        found[row["num"]].append(Review(row["num"], row["grade"], datetime.fromisoformat(row["reviewed_at"]),
+                                        date.fromisoformat(row["study_day"]), row["mode"]))
+    return found
+
+
 def graded_on(conn: sqlite3.Connection, day: date) -> dict[int, str]:
     """The grade each question got on a study day (the last one, if it was graded more than once)."""
     rows = conn.execute("SELECT num, grade FROM reviews WHERE study_day = ? ORDER BY reviewed_at, id", (day.isoformat(),))

@@ -3,12 +3,12 @@ import { html, raw } from "hono/html";
 import type { ChapterInfo, KnowledgeEntry, Question, QuestionText, Section } from "../content";
 import type { DrillKp } from "../drill";
 import type { Meta } from "../env";
-import { GRADE_LABELS, type CardState, type Grade } from "../srs";
+import type { CardState, Grade } from "../srs";
 import type { UserState } from "../state";
 import type { ChapterProgress, Distribution, Review } from "../stats";
 import { cnDate } from "../studyday";
 import { layout } from "./layout";
-import { STATUS_LABELS, answerBody, distBar, excludeToggle, katexCss, katexJs, qmeta, questionBody, questionCard, relatedKnowledge, revealToggle, startForm, type Status } from "./parts";
+import { STATUS_LABELS, answerBody, distBar, excludeToggle, katexCss, katexJs, qmeta, questionBody, questionCard, relatedKnowledge, revealToggle, reviewHistory, startForm, type Status } from "./parts";
 import { pad3 } from "./util";
 
 const searchForm = (q = "", placeholder = "题号、年份、考点或题干文字，如 123、2019数二、拐点") => html`<form class="search" action="/bank/search" method="get" role="search">
@@ -51,6 +51,10 @@ export interface ChapterPageData {
   state: UserState;
   texts: Map<number, QuestionText>;
   gradedToday: Map<number, Grade>;
+  sections: Map<number, Section[]>;
+  knowledge: KnowledgeEntry[];
+  titles: Record<string, string>;
+  histories: Map<number, Review[]>;
 }
 
 const percent = (done: number, total: number) => (total ? Math.round((100 * done) / total) : 0);
@@ -98,7 +102,9 @@ export function chapterPage(meta: Meta, d: ChapterPageData) {
     </header>
 
     <div class="qcards">
-      ${current.questions.map((q, i) => questionCard(meta, q, d.texts.get(q.num), d.state.status(q.num), i + 1, d.gradedToday.get(q.num), `${here}#q-${q.num}`))}
+      ${current.questions.map((q, i) => questionCard(meta, q, d.texts.get(q.num), d.state.status(q.num), i + 1, d.gradedToday.get(q.num), `${here}#q-${q.num}`, {
+        sections: d.sections.get(q.num) ?? [], knowledge: d.knowledge, titles: d.titles, history: d.histories.get(q.num) ?? [], card: d.state.cards.get(q.num),
+      }))}
     </div>
 
     <nav class="drill-foot" aria-label="翻节">
@@ -193,9 +199,7 @@ export function questionPage(meta: Meta, d: QuestionData) {
   </section>
   <section class="card">
     <h2 class="card-title">做题记录</h2>
-    ${d.history.length
-      ? html`<ul class="plain">${[...d.history].reverse().map((r) => html`<li><span class="muted">${cnDate(r.studyDay)}</span> <span class="chip chip-${r.grade}">${GRADE_LABELS[r.grade]}</span></li>`)}</ul>`
-      : html`<p class="empty">还没做过这道题。</p>`}
+    ${reviewHistory(d.history)}
   </section>
 </div>
 

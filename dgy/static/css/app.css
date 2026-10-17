@@ -708,7 +708,7 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
 .qcard.show-answer .qopts li[data-correct] b { color: inherit; }
 
 .qc-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
-.qc-toggles { display: flex; gap: 8px; }
+.qc-toggles { display: flex; flex-wrap: wrap; gap: 6px; }
 .qc-btn { min-height: 40px; padding: 6px 16px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--ink-2); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
 .qc-btn:hover { background: var(--surface-2); color: var(--ink); }
 .qc-btn[aria-expanded="true"] { background: var(--accent-soft); color: var(--accent); }
@@ -731,6 +731,8 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
 /* in text view the right option turns green, so the answer line would only repeat it; in image view it stays */
 .js .qcard[data-choice]:has(.qview[data-view="text"]) .qanswer { display: none; }
 .qc-panel[data-panel="solution"] .panel-label { color: var(--accent); font-size: 15px; }
+.qc-panel[data-panel="knowledge"], .qc-panel[data-panel="history"] { padding-top: 14px; border-top: 1px solid var(--line); }
+.qc-panel .panel-label .muted { font-weight: 400; letter-spacing: 0; }
 
 @media (max-width: 960px) {
   .drill { grid-template-columns: minmax(0, 1fr); }
@@ -749,7 +751,7 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
   .page-drill { padding-left: 12px; padding-right: 12px; }
   .qcard { padding: 14px 14px 16px; }
   .qc-actions { flex-direction: column; align-items: stretch; }
-  .qc-toggles .qc-btn { flex: 1; }
+  .qc-toggles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .qc-grades { display: grid; grid-template-columns: repeat(3, 1fr); }
   .qc-graded { grid-column: 1 / -1; }
   .qc-grade { min-width: 0; padding: 6px 4px; }

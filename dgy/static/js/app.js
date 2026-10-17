@@ -152,7 +152,7 @@
       const open = button.getAttribute("aria-expanded") !== "true";
       const panel = document.getElementById(button.getAttribute("aria-controls"));
       button.setAttribute("aria-expanded", String(open));
-      button.textContent = `${open ? "隐藏" : "查看"}${button.dataset.label}`;
+      if (button.dataset.label) button.textContent = `${open ? "隐藏" : "查看"}${button.dataset.label}`;
       panel.classList.toggle("is-open", open);
       if (open) renderMath(panel);
       if (panel.dataset.panel === "answer") button.closest(".qcard").classList.toggle("show-answer", open);

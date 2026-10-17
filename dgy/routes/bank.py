@@ -58,9 +58,13 @@ def chapter(request: Request, code: str, kp: str = "", conn=Depends(get_conn)):
         following = ("下一章", f"/bank/{codes[at + 1]}?kp=1")
     else:
         following = None
+    nums = [q.num for q in current.questions]
     return render(request, "bank_chapter.html", nav="bank", chapter=content.chapter(code), chapters=content.chapters,
                   tree=kp_tree(kps), current=current, prev=prev, following=following, state=state,
-                  texts=content.texts, graded_today=db.graded_on(conn, today(request)))
+                  texts=content.texts, graded_today=db.graded_on(conn, today(request)),
+                  sections={num: content.sections_for(num) for num in nums}, titles=content.knowledge_titles(),
+                  knowledge=[content.knowledge_entry(s) for s in content.chapter_links.get(code, [])],
+                  histories=db.histories_for(conn, nums))
 
 
 @router.post("/bank/exclude")

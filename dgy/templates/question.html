@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import qmeta, question_body, answer_body, start, exclude_toggle, status_label, reveal_toggle, kn_links, katex_head, katex_script %}
+{% from "_macros.html" import qmeta, question_body, answer_body, start, exclude_toggle, status_label, reveal_toggle, related_knowledge, review_history, katex_head, katex_script %}
 {% block title %}#{{ '%03d' % q.num }} {{ q.kp }}{% endblock %}
 {% block head %}{% if text %}{{ katex_head() }}{% endif %}{% endblock %}
 {% block scripts %}{% if text %}{{ katex_script() }}{% endif %}{% endblock %}
@@ -35,23 +35,11 @@
 <div class="grid grid-2">
   <section class="card">
     <h2 class="card-title">相关知识点</h2>
-    {% if sections %}
-    {{ kn_links(sections, titles) }}
-    {% else %}
-    <p class="muted">这道题还没有逐题标注，先看整章：{% for k in knowledge if k %}{% if not loop.first %}、{% endif %}<a href="/knowledge/{{ k.slug }}?tab=text">{{ k.title }}</a>{% endfor %}</p>
-    {% endif %}
+    {{ related_knowledge(sections, knowledge, titles) }}
   </section>
   <section class="card">
     <h2 class="card-title">做题记录</h2>
-    {% if history %}
-    <ul class="plain">
-      {% for r in history|reverse %}
-      <li><span class="muted">{{ r.study_day|cn_date }}</span> <span class="chip chip-{{ r.grade }}">{{ r.grade|grade_label }}</span></li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    <p class="empty">还没做过这道题。</p>
-    {% endif %}
+    {{ review_history(history) }}
   </section>
 </div>
 

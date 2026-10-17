@@ -47,7 +47,7 @@
 {%- endmacro %}
 
 {# One question on the chapter page: header, the question, a bar of buttons, and the answer and solution folded away. #}
-{% macro qcard(q, text, status, index, graded, back) -%}
+{% macro qcard(q, text, status, index, graded, back, sections, knowledge, titles, history, card) -%}
 <article class="qcard{% if status == 'excluded' %} is-excluded{% endif %}" id="q-{{ q.num }}"{% if text and text.answer_key %} data-choice{% endif %}>
   <header class="qc-head">
     <strong class="qc-num" title="#{{ '%03d' % q.num }}">{{ index }}</strong>
@@ -55,7 +55,7 @@
     <span class="qc-path">{{ q.path|join(' / ') }}</span>
     <span class="qc-meta"><span class="qdiff" title="原书得分率 {{ q.difficulty }}">{{ q.stars|stars }}</span> 建议 {{ q.minutes }} 分钟{% for flag in q.flags %} <span class="flag">{{ flag }}</span>{% endfor %}</span>
     {% if text and status != 'excluded' %}<button type="button" class="qview-toggle js-qview" aria-pressed="false" title="在文字和原图之间切换" hidden>原图</button>{% endif %}
-    <span class="qc-tools"><a class="btn-quiet" href="/q/{{ q.num }}">详情</a>{{ exclude_toggle(status == 'excluded', back, nums=q.num) }}</span>
+    <span class="qc-tools">{{ exclude_toggle(status == 'excluded', back, nums=q.num) }}</span>
   </header>
   {% if status != 'excluded' %}
   {{ question_body(q, text, force_lazy=true, data_correct=true) }}
@@ -63,6 +63,8 @@
     <div class="qc-toggles">
       <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qa-{{ q.num }}" data-label="答案" hidden>查看答案</button>
       <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qs-{{ q.num }}" data-label="解析" hidden>查看解析</button>
+      <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qk-{{ q.num }}" hidden>相关知识点</button>
+      <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qh-{{ q.num }}" hidden>做题记录</button>
     </div>
     <form method="post" action="/q/{{ q.num }}/grade" class="qc-grades">
       <input type="hidden" name="back" value="{{ back }}">
@@ -74,6 +76,14 @@
   </div>
   <section class="qc-panel" id="qa-{{ q.num }}" data-panel="answer" aria-label="答案">{{ answer_part(q, text) }}</section>
   <section class="qc-panel" id="qs-{{ q.num }}" data-panel="solution" aria-label="解析">{{ solution_part(q) }}</section>
+  <section class="qc-panel" id="qk-{{ q.num }}" data-panel="knowledge" aria-label="相关知识点">
+    <h2 class="panel-label">相关知识点</h2>
+    {{ related_knowledge(sections, knowledge, titles) }}
+  </section>
+  <section class="qc-panel" id="qh-{{ q.num }}" data-panel="history" aria-label="做题记录">
+    <h2 class="panel-label">做题记录{% if card and card.due %} <span class="muted">下次复习：{{ card.due|cn_date }} · 已做 {{ card.reps }} 次</span>{% endif %}</h2>
+    {{ review_history(history) }}
+  </section>
   {% endif %}
 </article>
 {%- endmacro %}
@@ -145,6 +155,27 @@
   </li>
   {% endfor %}
 </ul>
+{%- endmacro %}
+
+{# A question's tagged knowledge sections; questions not tagged yet fall back to their chapter's whole knowledge chapters. #}
+{% macro related_knowledge(sections, knowledge, titles) -%}
+{% if sections %}
+{{ kn_links(sections, titles) }}
+{% else %}
+<p class="muted">这道题还没有逐题标注，先看整章：{% for k in knowledge if k %}{% if not loop.first %}、{% endif %}<a href="/knowledge/{{ k.slug }}?tab=text">{{ k.title }}</a>{% endfor %}</p>
+{% endif %}
+{%- endmacro %}
+
+{% macro review_history(history) -%}
+{% if history %}
+<ul class="plain">
+  {% for r in history|reverse %}
+  <li><span class="muted">{{ r.study_day|cn_date }}</span> <span class="chip chip-{{ r.grade }}">{{ r.grade|grade_label }}</span></li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="empty">还没做过这道题。</p>
+{% endif %}
 {%- endmacro %}
 
 {% macro knowledge_panel(q, sections, knowledge, titles) -%}

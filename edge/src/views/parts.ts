@@ -2,9 +2,10 @@
 import { html, raw } from "hono/html";
 import { sectionLabel, type Img, type KnowledgeEntry, type Question, type QuestionText, type Section } from "../content";
 import type { Meta } from "../env";
-import type { Grade } from "../srs";
+import { GRADE_LABELS, type CardState, type Grade } from "../srs";
 import type { UserState } from "../state";
-import type { Distribution } from "../stats";
+import type { Distribution, Review } from "../stats";
+import { cnDate } from "../studyday";
 import { contentUrl, pad3, staticUrl, stars, type Html } from "./util";
 
 export function qmeta(q: Question, text?: QuestionText): Html {
@@ -50,8 +51,17 @@ export const answerBody = (meta: Meta, q: Question, text?: QuestionText): Html =
 ${solutionPart(meta, q)}`;
 
 /** One question on the chapter page: header, the question, a bar of buttons, and the answer and solution folded away. */
+export interface CardExtras {
+  sections: Section[];
+  knowledge: KnowledgeEntry[];
+  titles: Record<string, string>;
+  history: Review[];
+  card?: CardState;
+}
+
 export function questionCard(
   meta: Meta, q: Question, text: QuestionText | undefined, status: Status, index: number, graded: Grade | undefined, back: string,
+  x: CardExtras,
 ): Html {
   const excluded = status === "excluded";
   const gradeButton = (grade: Grade, label: string) =>
@@ -63,13 +73,15 @@ export function questionCard(
     <span class="qc-path">${q.path.join(" / ")}</span>
     <span class="qc-meta"><span class="qdiff" title="原书得分率 ${q.difficulty}">${stars(q.stars)}</span> 建议 ${q.minutes} 分钟${q.flags.map((flag) => html` <span class="flag">${flag}</span>`)}</span>
     ${text && !excluded ? html`<button type="button" class="qview-toggle js-qview" aria-pressed="false" title="在文字和原图之间切换" hidden>原图</button>` : ""}
-    <span class="qc-tools"><a class="btn-quiet" href="/q/${q.num}">详情</a>${excludeToggle(excluded, back, { nums: String(q.num) })}</span>
+    <span class="qc-tools">${excludeToggle(excluded, back, { nums: String(q.num) })}</span>
   </header>
   ${excluded ? "" : html`${questionBody(meta, q, text, { forceLazy: true, dataCorrect: true })}
   <div class="qc-actions">
     <div class="qc-toggles">
       <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qa-${q.num}" data-label="答案" hidden>查看答案</button>
       <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qs-${q.num}" data-label="解析" hidden>查看解析</button>
+      <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qk-${q.num}" hidden>相关知识点</button>
+      <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qh-${q.num}" hidden>做题记录</button>
     </div>
     <form method="post" action="/q/${q.num}/grade" class="qc-grades">
       <input type="hidden" name="back" value="${back}">
@@ -80,7 +92,15 @@ export function questionCard(
     </form>
   </div>
   <section class="qc-panel" id="qa-${q.num}" data-panel="answer" aria-label="答案">${answerPart(meta, q, text)}</section>
-  <section class="qc-panel" id="qs-${q.num}" data-panel="solution" aria-label="解析">${solutionPart(meta, q)}</section>`}
+  <section class="qc-panel" id="qs-${q.num}" data-panel="solution" aria-label="解析">${solutionPart(meta, q)}</section>
+  <section class="qc-panel" id="qk-${q.num}" data-panel="knowledge" aria-label="相关知识点">
+    <h2 class="panel-label">相关知识点</h2>
+    ${relatedKnowledge(x.sections, x.knowledge, x.titles)}
+  </section>
+  <section class="qc-panel" id="qh-${q.num}" data-panel="history" aria-label="做题记录">
+    <h2 class="panel-label">做题记录${x.card?.due ? html` <span class="muted">下次复习：${cnDate(x.card.due)} · 已做 ${x.card.reps} 次</span>` : ""}</h2>
+    ${reviewHistory(x.history)}
+  </section>`}
 </article>`;
 }
 
@@ -163,6 +183,10 @@ ${sections.length ? knLinks(sections, titles) : chapterFallback(knowledge)}`;
 
 export const relatedKnowledge = (sections: Section[], knowledge: KnowledgeEntry[], titles: Record<string, string>): Html =>
   sections.length ? knLinks(sections, titles) : chapterFallback(knowledge);
+
+export const reviewHistory = (history: Review[]): Html => history.length
+  ? html`<ul class="plain">${[...history].reverse().map((r) => html`<li><span class="muted">${cnDate(r.studyDay)}</span> <span class="chip chip-${r.grade}">${GRADE_LABELS[r.grade]}</span></li>`)}</ul>`
+  : html`<p class="empty">还没做过这道题。</p>`;
 
 /** The questions tagged with a knowledge section (or an original page), with a button to practise the ones still to do. */
 export function sectionQuestions(nums: number[], state: UserState, label = "本节题目"): Html {

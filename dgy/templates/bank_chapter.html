@@ -45,7 +45,8 @@
 
     <div class="qcards">
       {% for q in current.questions %}
-      {{ qcard(q, texts.get(q.num), state.status(q.num), loop.index, graded_today.get(q.num), here ~ '#q-' ~ q.num) }}
+      {{ qcard(q, texts.get(q.num), state.status(q.num), loop.index, graded_today.get(q.num), here ~ '#q-' ~ q.num,
+               sections[q.num], knowledge, titles, histories[q.num], state.cards.get(q.num)) }}
       {% endfor %}
     </div>
 

@@ -156,6 +156,7 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     const kps = drillKps(content, code, state.status);
     const asked = intOrNull(c.req.query("kp"));
     const current = kps[(asked !== null && asked >= 1 && asked <= kps.length ? asked : defaultKp(kps)) - 1];
+    const nums = current.questions.map((q) => q.num);
     const codes = content.chapters.map((ch) => ch.code);
     const at = codes.indexOf(code);
     const prev: [string, string] | null = current.index > 1 ? ["上一节", `/bank/${code}?kp=${current.index - 1}`]
@@ -165,6 +166,8 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     return c.html(chapterPage(meta, {
       chapter: content.chapter(code), chapters: content.chapters, tree: kpTree(kps), current, prev, following, state,
       texts: content.texts, gradedToday,
+      sections: new Map(nums.map((n) => [n, content.sectionsFor(n)])), knowledge: content.knowledgeFor(code), titles: content.knowledgeTitles(),
+      histories: await db.historiesFor(c.env.DB, uid, nums),
     }));
   });
 

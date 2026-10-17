@@ -322,6 +322,19 @@ def test_chapter_grade_ignores_bad_input(env):
     assert r.headers["location"] == "/bank/B#q-4"
 
 
+def test_chapter_cards_fold_away_knowledge_and_history_instead_of_a_details_link(tagged):
+    page = tagged.client.get("/bank/A", params={"kp": "1"}).text
+    assert ">详情</a>" not in page
+    assert 'aria-controls="qk-1"' in page and 'aria-controls="qh-1"' in page
+    assert 'id="qk-1"' in page and 'data-anchor="1-函数基础"' in page  # opens in the knowledge drawer
+    assert "还没做过这道题" in page
+    untagged = tagged.client.get("/bank/A", params={"kp": "2"}).text
+    assert "这道题还没有逐题标注" in untagged and 'href="/knowledge/01?tab=text"' in untagged
+    tagged.client.post("/q/1/grade", data={"grade": "shaky"})
+    graded = tagged.client.get("/bank/A", params={"kp": "1"}).text
+    assert re.search(r'id="qh-1"[\s\S]*?chip chip-shaky">不熟练/错误', graded) and "下次复习" in graded
+
+
 def test_excluded_questions_stay_on_the_chapter_page_as_a_header_only(env):
     page = env.client.get("/bank/B", params={"kp": "2"}).text
     assert 'id="q-6"' in page and 'class="qcard is-excluded"' in page
