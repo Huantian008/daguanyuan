@@ -10,35 +10,35 @@
   <p class="countdown">考研初试 · 还有 <strong>{{ days_left }}</strong> 天</p>
 </section>
 
+{# only the first step that has questions today gets the primary button #}
+{% set due_cls = 'btn' if warmup else 'btn btn-primary' %}
+{% set onwards_cls = 'btn' if warmup or due else 'btn btn-primary' %}
 <ol class="tonight" aria-label="今晚的顺序">
-  <li class="step" data-warmup-count="{{ warmup|length }}">
-    <span class="step-no" aria-hidden="true">1</span>
-    <h2>热身</h2>
+  <li class="step{% if not warmup %} is-clear{% endif %}" data-warmup-count="{{ warmup|length }}">
+    <div class="step-head"><span class="step-no" aria-hidden="true">1</span><h2>热身</h2></div>
     <p class="step-count"><b>{{ warmup|length }}</b> 题</p>
     <p class="step-note">把前几天做过的题再做一遍</p>
-    {{ start('开始热身', 'warmup', cls='btn btn-primary', disabled=not warmup) }}
+    {% if warmup %}{{ start('开始热身', 'warmup', cls='btn btn-primary') }}{% else %}<p class="step-clear">今天不用热身</p>{% endif %}
   </li>
-  <li class="step" data-due-count="{{ due|length }}">
-    <span class="step-no" aria-hidden="true">2</span>
-    <h2>到期复习</h2>
+  <li class="step{% if not due %} is-clear{% endif %}" data-due-count="{{ due|length }}">
+    <div class="step-head"><span class="step-no" aria-hidden="true">2</span><h2>到期复习</h2></div>
     <p class="step-count"><b>{{ due|length }}</b> 题</p>
     <p class="step-note">按复习间隔排到今天的题</p>
-    {{ start('开始复习', 'due', cls='btn btn-primary', disabled=not due) }}
+    {% if due %}{{ start('开始复习', 'due', cls=due_cls) }}{% else %}<p class="step-clear">今天没有到期的题</p>{% endif %}
   </li>
   <li class="step">
-    <span class="step-no" aria-hidden="true">3</span>
-    <h2>继续往下做</h2>
+    <div class="step-head"><span class="step-no" aria-hidden="true">3</span><h2>继续往下做</h2></div>
     {% if open_session %}
-      <p class="step-title">{{ open_session.title }}</p>
-      <p class="step-note">做到第 {{ open_session.position + 1 }} / {{ open_session.queue|length }} 题</p>
-      <div class="step-actions">
-        <a class="btn btn-primary" href="/practice/{{ open_session.id }}">继续上次</a>
-        <a class="btn" href="/bank">换个考点</a>
-      </div>
+    <p class="step-count"><b>{{ open_session.queue|length - open_session.position }}</b> 题没做完</p>
+    <p class="step-note">{{ open_session.title }}</p>
+    <div class="step-actions">
+      <a class="{{ onwards_cls }}" href="/practice/{{ open_session.id }}">继续上次</a>
+      <a class="btn" href="/bank">换个考点</a>
+    </div>
     {% else %}
-      <p class="step-title">按课程进度选考点</p>
-      <p class="step-note">在题库里点开章节，按考点往下刷</p>
-      <a class="btn btn-primary" href="/bank">去题库选题</a>
+    <p class="step-count"><b>{{ progress|sum(attribute='total') - progress|sum(attribute='done') }}</b> 题没做过</p>
+    <p class="step-note">去题库点开章节，按考点往下刷</p>
+    <a class="{{ onwards_cls }}" href="/bank">去题库选题</a>
     {% endif %}
   </li>
 </ol>

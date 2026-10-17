@@ -254,7 +254,7 @@ form.inline { display: inline; margin: 0; }
 .card + .card { margin-top: 16px; }
 .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
 .minor { margin: 22px 0 10px; color: var(--ink-2); }
-.grid { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 16px; margin-top: 16px; }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
 .grid > .card + .card { margin-top: 0; }
 .grid-2 { grid-template-columns: 1fr 1fr; }
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
@@ -275,28 +275,34 @@ form.inline { display: inline; margin: 0; }
 }
 .countdown strong { font-size: 26px; font-weight: 750; color: var(--accent); line-height: 1; margin: 0 2px; }
 
-/* tonight's order — warm-up, due review, then onwards */
-.tonight { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; position: relative; counter-reset: step; }
+/* tonight's order — warm-up, due review, then onwards; the cards below share the same three columns.
+   Every card reads the same way: how many questions, what they are, one action. Only the next step to do
+   gets the primary button; a step with nothing today swaps its number for a check and says so in plain text. */
+.tonight { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .step {
-  position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
-  padding: 20px 22px 22px; display: flex; flex-direction: column; gap: 4px; box-shadow: var(--shadow-sm);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 20px 22px 22px; display: flex; flex-direction: column; box-shadow: var(--shadow-sm);
 }
-.step::before { content: ""; position: absolute; inset: 0 0 auto; height: 3px; border-radius: var(--radius) var(--radius) 0 0; background: var(--accent); opacity: .85; }
-.step:nth-child(2)::before { opacity: .55; }
-.step:nth-child(3)::before { opacity: .3; }
+.step-head { display: flex; align-items: center; gap: 10px; }
+.step-head h2 { font-size: 16px; }
 .step-no {
-  position: absolute; top: 18px; right: 18px; width: 26px; height: 26px; border-radius: 50%;
-  background: var(--accent-soft); color: var(--accent); font: 700 13px/26px var(--sans); text-align: center;
+  flex: none; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--accent-soft); color: var(--accent); font: 700 12px/24px var(--sans); text-align: center;
 }
-.step h2 { font-size: 16px; }
-.step-count { margin: 8px 0 0; color: var(--muted); }
-.step-count b { font-size: 38px; font-weight: 750; line-height: 1; color: var(--ink); margin-right: 4px; letter-spacing: -.01em; }
-.step-title { margin: 10px 0 0; font-weight: 650; }
-.step-note { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
-.step form, .step > .btn, .step-actions { margin-top: auto; }
-.step-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.step .btn { width: 100%; }
+.step.is-clear .step-no { background: var(--mastered-soft); font-size: 0; }
+.step.is-clear .step-no::before { content: "✓"; font-size: 13px; color: var(--mastered); }
+.step-count { margin: 18px 0 0; color: var(--muted); font-size: 14px; }
+.step-count b { font-size: 36px; font-weight: 750; line-height: 1; color: var(--ink); margin-right: 4px; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.step.is-clear .step-count b { color: var(--muted); }
+.step-note {
+  margin: 8px 0 18px; color: var(--muted); font-size: 13px;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
+.step form, .step > .btn, .step-actions, .step-clear { margin-top: auto; }
+.step .btn { width: 100%; min-height: 40px; }
+.step-actions { display: flex; gap: 8px; }
 .step-actions .btn { width: auto; flex: 1; }
+.step-clear { margin-bottom: 0; display: flex; align-items: center; min-height: 40px; color: var(--muted); font-size: 14px; }
 
 .progress { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
 .progress li { display: grid; grid-template-columns: 6.5em 1fr 4.5em; align-items: center; gap: 12px; }
@@ -596,8 +602,6 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
 /* ---------- responsive ---------- */
 
 @media (max-width: 960px) {
-  .grid { grid-template-columns: 1fr 1fr; }
-  .grid > .card:first-child { grid-column: 1 / -1; }
   .chapters { grid-template-columns: 1fr 1fr; }
   .kn-text { grid-template-columns: minmax(0, 1fr); }  /* 1fr would let a wide formula stretch the page */
   .kn-text .toc { position: static; max-height: none; }

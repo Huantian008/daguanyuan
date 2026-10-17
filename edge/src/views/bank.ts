@@ -89,7 +89,6 @@ export function chapterPage(meta: Meta, d: ChapterPageData) {
         <p class="muted">${current.section} · 做过 ${current.done} / ${current.total} 题</p>
       </div>
       <div class="drill-actions">
-        ${excludeToggle(!current.total, here, { chapter: chapter.code, section: current.section, kp: current.kp, onLabel: "整个考点不做了" })}
         ${prev ? html`<a class="btn btn-small" href="${prev[1]}">${prev[0]}</a>` : ""}
         ${following ? html`<a class="btn btn-small btn-primary" href="${following[1]}">${following[0]}</a>` : ""}
       </div>

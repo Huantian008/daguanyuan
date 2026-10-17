@@ -85,6 +85,10 @@ def test_dashboard_shows_exam_countdown_and_empty_queues(env):
     page = env.client.get("/").text
     assert "还有 64 天" in visible(page)
     assert 'data-due-count="0"' in page and 'data-warmup-count="0"' in page
+    # nothing to warm up or review: a calm note instead of a disabled button
+    assert "今天不用热身" in page and "今天没有到期的题" in page and "disabled" not in page
+    # no open session: what is left over the whole bank (#6 is excluded), and the only primary button
+    assert "<b>5</b> 题没做过" in page and '<a class="btn btn-primary" href="/bank">去题库选题</a>' in page
 
 
 def test_practice_by_chapter_grades_and_moves_to_next_question(env):
@@ -217,6 +221,11 @@ def test_next_day_offers_warmup_and_due_review(env):
     env.clock.at += timedelta(days=1)
     page = env.client.get("/").text
     assert 'data-warmup-count="1"' in page and 'data-due-count="1"' in page
+    assert "开始热身" in page and "开始复习" in page and "今天不用热身" not in page
+    # warm-up comes first tonight, so it alone gets the primary button
+    assert '<button class="btn btn-primary">开始热身</button>' in page
+    assert '<button class="btn">开始复习</button>' in page
+    assert re.search(r'<a class="btn" href="/practice/[^"]+">继续上次</a>', page) and "换个考点" in page
     assert "#001" in env.client.get(start(env, mode="due")).text
 
 
@@ -260,6 +269,7 @@ def test_random_practice_still_works_but_the_bank_page_no_longer_offers_it(env):
 def test_one_by_one_practice_is_not_offered_where_the_chapter_page_replaces_it(env):
     chapter = env.client.get("/bank/A", params={"kp": "1"}).text
     assert "练这个考点" not in chapter and 'action="/practice/start"' not in chapter
+    assert "整个考点不做了" not in chapter
     question = env.client.get("/q/4").text
     assert "练这道题" not in question and 'action="/practice/start"' not in question
     # the question page leads back to the card on the chapter page (#4 is in 考点 1 of chapter B)

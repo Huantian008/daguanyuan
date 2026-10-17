@@ -46,6 +46,13 @@ describe("dashboard", () => {
     expect(visible(page)).toContain("还有 64 天");
     expect(page).toContain('data-due-count="0"');
     expect(page).toContain('data-warmup-count="0"');
+    // nothing to warm up or review: a calm note instead of a disabled button
+    expect(page).toContain("今天不用热身");
+    expect(page).toContain("今天没有到期的题");
+    expect(page).not.toContain("disabled");
+    // no open session: what is left over the whole bank (#6 is excluded), and the only primary button
+    expect(page).toContain("<b>5</b> 题没做过");
+    expect(page).toContain('<a class="btn btn-primary" href="/bank">去题库选题</a>');
   });
 });
 
@@ -144,6 +151,14 @@ describe("practice", () => {
     const page = await text(client, "/");
     expect(page).toContain('data-warmup-count="1"');
     expect(page).toContain('data-due-count="1"');
+    expect(page).toContain("开始热身");
+    expect(page).toContain("开始复习");
+    expect(page).not.toContain("今天不用热身");
+    // warm-up comes first tonight, so it alone gets the primary button
+    expect(page).toContain('<button class="btn btn-primary">开始热身</button>');
+    expect(page).toContain('<button class="btn">开始复习</button>');
+    expect(page).toMatch(/<a class="btn" href="\/practice\/[^"]+">继续上次<\/a>/);
+    expect(page).toContain("换个考点");
     expect(await text(client, await start(client, { mode: "due" }))).toContain("#001");
   });
 
@@ -176,6 +191,7 @@ describe("practice", () => {
     const chapter = await text(client, "/bank/A?kp=1");
     expect(chapter).not.toContain("练这个考点");
     expect(chapter).not.toContain('action="/practice/start"');
+    expect(chapter).not.toContain("整个考点不做了");
     const question = await text(client, "/q/4");
     expect(question).not.toContain("练这道题");
     expect(question).not.toContain('action="/practice/start"');

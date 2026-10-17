@@ -26,6 +26,9 @@ export function dashboardPage(meta: Meta, d: DashboardData) {
   const today = d.totals[d.totals.length - 1];
   const maxCount = Math.max(1, ...d.totals.map((t) => t.count));
   const s = d.openSession;
+  // only the first step that has questions today gets the primary button
+  const dueCls = d.warmup.length ? "btn" : "btn btn-primary";
+  const onwardsCls = d.warmup.length || d.due.length ? "btn" : "btn btn-primary";
   return layout(meta, {
     title: "今天",
     nav: "home",
@@ -38,33 +41,30 @@ export function dashboardPage(meta: Meta, d: DashboardData) {
 </section>
 
 <ol class="tonight" aria-label="今晚的顺序">
-  <li class="step" data-warmup-count="${d.warmup.length}">
-    <span class="step-no" aria-hidden="true">1</span>
-    <h2>热身</h2>
+  <li class="step${d.warmup.length ? "" : " is-clear"}" data-warmup-count="${d.warmup.length}">
+    <div class="step-head"><span class="step-no" aria-hidden="true">1</span><h2>热身</h2></div>
     <p class="step-count"><b>${d.warmup.length}</b> 题</p>
     <p class="step-note">把前几天做过的题再做一遍</p>
-    ${startForm("开始热身", "warmup", { cls: "btn btn-primary", disabled: !d.warmup.length })}
+    ${d.warmup.length ? startForm("开始热身", "warmup", { cls: "btn btn-primary" }) : html`<p class="step-clear">今天不用热身</p>`}
   </li>
-  <li class="step" data-due-count="${d.due.length}">
-    <span class="step-no" aria-hidden="true">2</span>
-    <h2>到期复习</h2>
+  <li class="step${d.due.length ? "" : " is-clear"}" data-due-count="${d.due.length}">
+    <div class="step-head"><span class="step-no" aria-hidden="true">2</span><h2>到期复习</h2></div>
     <p class="step-count"><b>${d.due.length}</b> 题</p>
     <p class="step-note">按复习间隔排到今天的题</p>
-    ${startForm("开始复习", "due", { cls: "btn btn-primary", disabled: !d.due.length })}
+    ${d.due.length ? startForm("开始复习", "due", { cls: dueCls }) : html`<p class="step-clear">今天没有到期的题</p>`}
   </li>
   <li class="step">
-    <span class="step-no" aria-hidden="true">3</span>
-    <h2>继续往下做</h2>
+    <div class="step-head"><span class="step-no" aria-hidden="true">3</span><h2>继续往下做</h2></div>
     ${s
-      ? html`<p class="step-title">${s.title}</p>
-      <p class="step-note">做到第 ${s.position + 1} / ${s.queue.length} 题</p>
-      <div class="step-actions">
-        <a class="btn btn-primary" href="/practice/${s.id}">继续上次</a>
-        <a class="btn" href="/bank">换个考点</a>
-      </div>`
-      : html`<p class="step-title">按课程进度选考点</p>
-      <p class="step-note">在题库里点开章节，按考点往下刷</p>
-      <a class="btn btn-primary" href="/bank">去题库选题</a>`}
+      ? html`<p class="step-count"><b>${s.queue.length - s.position}</b> 题没做完</p>
+    <p class="step-note">${s.title}</p>
+    <div class="step-actions">
+      <a class="${onwardsCls}" href="/practice/${s.id}">继续上次</a>
+      <a class="btn" href="/bank">换个考点</a>
+    </div>`
+      : html`<p class="step-count"><b>${d.progress.reduce((n, p) => n + p.total - p.done, 0)}</b> 题没做过</p>
+    <p class="step-note">去题库点开章节，按考点往下刷</p>
+    <a class="${onwardsCls}" href="/bank">去题库选题</a>`}
   </li>
 </ol>
 
