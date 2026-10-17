@@ -1,5 +1,5 @@
 // Tiny fake question bank mirroring tests/factories.py, so tests run without the real content.
-import type { Manifest, ManifestQuestion } from "../src/content";
+import type { Manifest, ManifestQuestion, QuestionText } from "../src/content";
 
 const CHAPTERS = [
   { code: "A", name: "函数极限连续", first: 1, last: 117 },
@@ -22,6 +22,27 @@ export function question(num: number, chapter = "A", section = "函数性质", k
     solution: [{ src: `s/${pad(num)}-1.webp`, w: 100, h: 50 }],
   };
 }
+
+/** The text version of #001–#003 as dgy/bank.py renders it (the same as tests/test_app.py's BANK). */
+export const TEXTS: Record<string, QuestionText> = {
+  "1": {
+    type: "choice", figure: false,
+    stem: '<p>函数 <span class="math inline">f(x)=\\dfrac{1}{x}</span> 在 <span class="math inline">(0,1)</span> 内（　　）.</p>\n',
+    options: [["A", "有界"], ["B", "无界"], ["C", '<span class="math inline">x&gt;\\dfrac12</span> 时有界'], ["D", "4."]],
+    options_wide: false, answer: "<p>C</p>\n", answer_key: "C", erratum: "速查原印 B",
+    search: "函数 f(x)= 1 x 在 (0,1) 内（ ）. 有界 无界 x> 12 时有界 4.",
+  },
+  "2": {
+    type: "fill", figure: false,
+    stem: '<p>求 <span class="math inline">x</span> 的值 <span class="math inline">\\underline{\\qquad}</span>.</p>\n<p>(2) 再求拐点</p>\n',
+    options: [], options_wide: false, answer: '<p><span class="math inline">\\dfrac12</span></p>\n', answer_key: null, erratum: null,
+    search: "求 x 的值 . (2) 再求拐点",
+  },
+  "3": {
+    type: "choice", figure: true, stem: "<p>如图所示（　　）</p>\n", options: [], options_wide: false,
+    answer: "<p>A</p>\n", answer_key: null, erratum: null, search: "如图所示（ ）",
+  },
+};
 
 export function smallBank(): Manifest {
   return {

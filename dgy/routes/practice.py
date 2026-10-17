@@ -61,6 +61,7 @@ def show(request: Request, sid: int, conn=Depends(get_conn)):
         knowledge=[content.knowledge_entry(s) for s in content.chapter_links.get(q.chapter, [])],
         sections=content.sections_for(q.num),
         titles=content.knowledge_titles(),
+        text=content.text(q.num),
     )
 
 

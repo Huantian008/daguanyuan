@@ -38,6 +38,10 @@ def dirs(tmp_path):
     (md / "01_x.md").write_text("# 函数\n\n## 1. 函数基础\n\n<!-- p.10 -->\n若 $f'(x)$ 有界\n", encoding="utf-8")
     (md / "question_links.json").write_text(json.dumps({"version": 1, "links": {"3": ["01/1"], "4": ["99/9"]}}),
                                             encoding="utf-8")
+    bank = tmp_path / "bank"
+    bank.mkdir()
+    (bank / "questions.json").write_text(json.dumps({"version": 1, "questions": [
+        {"num": 3, "type": "fill", "stem": "求 $x$", "options": None, "figure": False, "answer": "$1$"}]}), encoding="utf-8")
     return content, static, md, tmp_path / "edge"
 
 
@@ -72,6 +76,15 @@ def test_writes_sections_and_question_links(dirs):
     assert data["sections"] == [{"key": "01/1", "slug": "01", "number": "1", "level": 2, "title": "函数基础",
                                  "anchor": "1-函数基础", "pdf_page": 10, "page_index": None, "parent": None}]
     assert data["links"] == {"3": ["01/1"]}  # unknown sections are dropped
+
+
+def test_writes_the_rendered_question_text(dirs, tmp_path):
+    content, static, md, edge = dirs
+    export_edge(content, static, md, edge, bank_dir=tmp_path / "bank")
+    bank = json.loads((edge / "src" / "generated" / "bank.json").read_text(encoding="utf-8"))
+    assert list(bank) == ["3"]
+    assert bank["3"]["stem"] == '<p>求 <span class="math inline">x</span></p>\n'
+    assert bank["3"]["search"] == "求 x" and bank["3"]["answer_key"] is None
 
 
 def test_report_counts_files_and_versions(dirs):

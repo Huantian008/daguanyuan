@@ -1,7 +1,9 @@
 {% extends "base.html" %}
-{% from "_macros.html" import qmeta, images, reveal_toggle, knowledge_panel %}
+{% from "_macros.html" import qmeta, question_body, answer_body, reveal_toggle, knowledge_panel, katex_head, katex_script %}
 {% block title %}#{{ '%03d' % q.num }} {{ q.kp }}{% endblock %}
 {% block page_class %}page-practice{% endblock %}
+{% block head %}{% if text %}{{ katex_head() }}{% endif %}{% endblock %}
+{% block scripts %}{% if text %}{{ katex_script() }}{% endif %}{% endblock %}
 {% block content %}
 <div class="practice" data-practice data-shortcuts>
   <header class="practice-head">
@@ -11,8 +13,8 @@
   <div class="track" aria-hidden="true"><span style="width: {{ (100 * session.position / session.queue|length)|round|int }}%"></span></div>
 
   <article class="sheet">
-    {{ qmeta(q) }}
-    <div class="qbody paper">{{ images([q.img], 'qimg', '题目 #%03d' % q.num, 1.6, lazy=false) }}</div>
+    {{ qmeta(q, text) }}
+    {{ question_body(q, text) }}
   </article>
 
   <div class="reveal-bar">
@@ -20,10 +22,7 @@
     {{ reveal_toggle('knowledge', '知识点', 'K') }}
   </div>
   <section id="answer" class="reveal-panel" aria-label="答案与解析">
-    <h2 class="panel-label">答案</h2>
-    <div class="paper">{{ images([q.answer], 'aimg', '答案', 2.2) }}</div>
-    <h2 class="panel-label">解析 <span class="muted">{{ q.solution|length }} 张图</span></h2>
-    <div class="paper">{{ images(q.solution, 'simg', '解析', 2) }}</div>
+    {{ answer_body(q, text) }}
   </section>
   <section id="knowledge" class="reveal-panel" aria-label="知识点">
     {{ knowledge_panel(q, sections, knowledge, titles) }}

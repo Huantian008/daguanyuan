@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Content, sectionLabel, type Linking } from "../src/content";
-import { smallBank } from "./fixtures";
+import { TEXTS, smallBank } from "./fixtures";
 import { setup } from "./harness";
 
 const LINKING: Linking = {
@@ -28,6 +28,15 @@ describe("knowledge sections", () => {
 
   it("label a section without the math dollars", () => {
     expect(sectionLabel(LINKING.sections[1])).toBe("1.1 有界与 n 次根式");
+  });
+});
+
+describe("question text", () => {
+  it("is looked up by number and dropped for questions not in the bank", () => {
+    const content = new Content(smallBank(), undefined, { ...TEXTS, "999": TEXTS["1"] });
+    expect(content.text(1)?.answer_key).toBe("C");
+    expect(content.text(4)).toBeUndefined();
+    expect(content.texts.has(999)).toBe(false);
   });
 });
 

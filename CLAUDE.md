@@ -37,10 +37,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 标注本身交给 DeepSeek，任务说明在 `docs/deepseek/题目知识点标注.md`；`python -m pipeline.link_questions check --write`
 校验通过才写入。文件缺失时页面退回整章链接。
 
-**题目文字版**（网站尚未接入）：题干和答案速查由能看图的模型从图片转成 Markdown + LaTeX，任务说明在
+**题目文字版**：题干和答案速查由能看图的模型从图片转成 Markdown + LaTeX，任务说明在
 `docs/deepseek/题目转LaTeX.md`。`python -m pipeline.transcribe_questions check --write` 校验通过后写入
 `bank-md/questions.json`（进 git，一题一行）；校验会用 Node 跑 `pipeline/katex_check.mjs`，拿仓库自带的 KaTeX 编译每一段公式。
 解析仍是图片。原书或答案速查印错的题，`answer` 存验算过的正确答案，`erratum` 写明原来印的是什么（审核时人工加，目前 21 题）。
+网站用 `dgy/bank.py` 读它：Python 版启动时渲染成 HTML（`DGY_BANK_DIR` 可改位置），Worker 版由 `export_edge` 写进
+`generated/bank.json`；公式在浏览器里用 KaTeX 渲染。练习页和题目页默认显示文字（带图的题默认原图，可切换，偏好存本机），
+文件缺失时退回纯图片。
 
 **Python 与 Worker 的对应关系**（行为改动两边都改、都测）：
 

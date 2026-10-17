@@ -66,12 +66,52 @@
         toggleReveal("answer");
       } else if (key === "k") {
         toggleReveal("knowledge");
+      } else if (key === "v" && sheets.length) {
+        toggleView(sheets[0]);
       } else if (["1", "2", "3"].includes(key)) {
         document.querySelector(`button[data-key="${key}"]`)?.click();
       } else if (event.key === "ArrowRight") {
         document.querySelector(".js-skip")?.click();
       }
     });
+  }
+
+  // ---------- question as text or as the original image ----------
+
+  const QVIEW_KEY = "dgy-qview";
+  const setView = (sheet, mode) => {
+    const view = sheet.querySelector(".qview");
+    const button = sheet.querySelector(".js-qview");
+    view.dataset.view = mode;
+    button.textContent = mode === "text" ? "原图" : "文字";
+    button.setAttribute("aria-pressed", String(mode === "image"));
+  };
+  const toggleView = (sheet) => {
+    const view = sheet.querySelector(".qview");
+    const next = view.dataset.view === "text" ? "image" : "text";
+    setView(sheet, next);
+    // A question with a figure always opens on its image, so switching it says nothing about the reader's preference.
+    if (!("figure" in view.dataset)) {
+      try {
+        localStorage.setItem(QVIEW_KEY, next);
+      } catch {
+        // storage blocked: the choice lasts for this page only
+      }
+    }
+  };
+  const sheets = [...document.querySelectorAll(".sheet")].filter((s) => s.querySelector(".qview") && s.querySelector(".js-qview"));
+  for (const sheet of sheets) {
+    const view = sheet.querySelector(".qview");
+    let preferred = null;
+    try {
+      preferred = localStorage.getItem(QVIEW_KEY);
+    } catch {
+      // no stored preference
+    }
+    setView(sheet, !("figure" in view.dataset) && (preferred === "image" || preferred === "text") ? preferred : view.dataset.view);
+    const button = sheet.querySelector(".js-qview");
+    button.addEventListener("click", () => toggleView(sheet));
+    button.hidden = false;
   }
 
   // ---------- formulas ----------

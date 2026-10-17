@@ -1,7 +1,7 @@
 // Test helpers: a fake static-assets binding, an env with an in-memory D1, a cookie-keeping client, a settable clock.
 import type { Hono } from "hono";
 import { createApp } from "../src/app";
-import { Content, type Linking, type Manifest } from "../src/content";
+import { Content, type Linking, type Manifest, type QuestionText } from "../src/content";
 import type { Env } from "../src/env";
 import { memoryD1 } from "./d1";
 import { smallBank } from "./fixtures";
@@ -86,11 +86,12 @@ export const LINKING: Linking = {
 
 export function setup(options: {
   password?: string; friendPassword?: string; secret?: string; users?: unknown; bank?: Manifest; linking?: Linking;
+  texts?: Record<string, QuestionText>;
 } = {}) {
   const bank = options.bank ?? smallBank();
   const clock = new Clock(new Date("2026-10-16T21:00:00+08:00"));
   const app = createApp({
-    content: new Content(bank, options.linking),
+    content: new Content(bank, options.linking, options.texts),
     knowledge: KNOWLEDGE,
     meta: { content_v: "20261016120000", asset_v: "1760000000" },
     now: clock.now,

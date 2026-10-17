@@ -1,16 +1,16 @@
 // Port of dgy/templates/bank.html, bank_chapter.html, search.html and question.html.
 import { html } from "hono/html";
-import type { ChapterInfo, KnowledgeEntry, Outline, Question, Section } from "../content";
+import type { ChapterInfo, KnowledgeEntry, Outline, Question, QuestionText, Section } from "../content";
 import type { Meta } from "../env";
 import { GRADE_LABELS, type CardState } from "../srs";
 import type { UserState } from "../state";
 import type { ChapterProgress, Distribution, Review } from "../stats";
 import { cnDate } from "../studyday";
 import { layout } from "./layout";
-import { STATUS_LABELS, distBar, excludeToggle, images, qmeta, relatedKnowledge, revealToggle, startForm, type Status } from "./parts";
+import { STATUS_LABELS, answerBody, distBar, excludeToggle, katexCss, katexJs, qmeta, questionBody, relatedKnowledge, revealToggle, startForm, type Status } from "./parts";
 import { pad3 } from "./util";
 
-const searchForm = (q = "", placeholder = "题号、年份或考点，如 123、2019数二、拐点") => html`<form class="search" action="/bank/search" method="get" role="search">
+const searchForm = (q = "", placeholder = "题号、年份、考点或题干文字，如 123、2019数二、拐点") => html`<form class="search" action="/bank/search" method="get" role="search">
     <label class="visually-hidden" for="q">搜索题目</label>
     <input id="q" name="q" type="search" value="${q}" placeholder="${placeholder}">
     <button class="btn">搜索</button>
@@ -81,7 +81,10 @@ ${sections}`,
   });
 }
 
-export function searchPage(meta: Meta, q: string, found: Question[], state: UserState) {
+/** Like Jinja's truncate(60, true, "…", 0) in search.html. */
+const snippet = (text: string, length = 60) => (text.length <= length ? text : `${text.slice(0, length - 1)}…`);
+
+export function searchPage(meta: Meta, q: string, found: Question[], state: UserState, texts: Map<number, QuestionText>) {
   return layout(meta, {
     title: `搜索 ${q}`,
     nav: "bank",
@@ -99,9 +102,10 @@ ${found.length
     <a href="/q/${item.num}"><span class="qnum">#${pad3(item.num)}</span> ${item.section} / ${item.kp}</a>
     <span class="muted">${item.source_full}</span>
     <span class="chip chip-${state.status(item.num)}">${STATUS_LABELS[state.status(item.num)]}</span>
+    ${texts.has(item.num) ? html`<p class="snippet">${snippet(texts.get(item.num)!.search)}</p>` : ""}
   </li>`)}
 </ul>`
-    : html`<p class="empty">没有找到。可以输入题号（如 123）、年份和卷别（如 2019数二），或考点名称（如 拐点）。</p>`}`,
+    : html`<p class="empty">没有找到。可以输入题号（如 123）、年份和卷别（如 2019数二）、考点名称（如 拐点），或题干里的文字。</p>`}`,
   });
 }
 
@@ -114,6 +118,7 @@ export interface QuestionData {
   knowledge: KnowledgeEntry[];
   sections: Section[];
   titles: Record<string, string>;
+  text: QuestionText | undefined;
   total: number;
 }
 
@@ -122,6 +127,8 @@ export function questionPage(meta: Meta, d: QuestionData) {
   return layout(meta, {
     title: `#${pad3(q.num)} ${q.kp}`,
     nav: "bank",
+    head: d.text ? katexCss(meta) : "",
+    scripts: d.text ? katexJs(meta) : "",
     body: html`<div data-shortcuts>
 <header class="page-head">
   <div>
@@ -140,17 +147,14 @@ export function questionPage(meta: Meta, d: QuestionData) {
 </p>
 
 <article class="sheet">
-  ${qmeta(q)}
-  <div class="qbody paper">${images(meta, [q.img], "qimg", `题目 #${pad3(q.num)}`, 1.6, false)}</div>
+  ${qmeta(q, d.text)}
+  ${questionBody(meta, q, d.text)}
 </article>
 <div class="reveal-bar reveal-bar-single">
   ${revealToggle("answer", "答案与解析", "空格")}
 </div>
 <section id="answer" class="reveal-panel" aria-label="答案与解析">
-  <h2 class="panel-label">答案</h2>
-  <div class="paper">${images(meta, [q.answer], "aimg", "答案", 2.2)}</div>
-  <h2 class="panel-label">解析 <span class="muted">${q.solution.length} 张图</span></h2>
-  <div class="paper">${images(meta, q.solution, "simg", "解析", 2)}</div>
+  ${answerBody(meta, q, d.text)}
 </section>
 
 <div class="grid grid-2">

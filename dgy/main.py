@@ -30,7 +30,7 @@ def create_app(settings: Settings | None = None, clock: Callable[[], datetime] |
     app = FastAPI(title="大观园", docs_url=None, redoc_url=None, openapi_url=None)
     app.state.settings = settings
     app.state.clock = clock or studyday.now
-    app.state.content = load_content(settings.content_dir, settings.knowledge_md_dir)
+    app.state.content = load_content(settings.content_dir, settings.knowledge_md_dir, settings.bank_dir)
     app.state.backup_day = None
     # Version stamps in asset URLs so browsers never show stale CSS/JS or old images after a rebuild.
     TEMPLATES.env.globals["asset_v"] = max(int(p.stat().st_mtime) for p in STATIC_DIR.rglob("*.*"))

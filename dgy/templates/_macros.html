@@ -1,4 +1,4 @@
-{% macro qmeta(q) -%}
+{% macro qmeta(q, text=none) -%}
 <div class="qmeta">
   <span class="qnum">#{{ '%03d' % q.num }}</span>
   <span class="qkp">{{ q.kp }}</span>
@@ -6,8 +6,40 @@
   <span class="qdiff" title="原书得分率 {{ q.difficulty }}">{{ q.stars|stars }}</span>
   <span class="qmins">建议 {{ q.minutes }} 分钟</span>
   {% for flag in q.flags %}<span class="flag">{{ flag }}</span>{% endfor %}
+  {% if text %}<button type="button" class="qview-toggle js-qview" aria-pressed="false" title="在文字和原图之间切换（V）" hidden>原图</button>{% endif %}
 </div>
 {%- endmacro %}
+
+{# The question as text (KaTeX) and as the original image; app.js shows one of them, without JavaScript both show. #}
+{% macro question_body(q, text) -%}
+{% set view = 'image' if not text or text.figure else 'text' %}
+<div class="qview" data-view="{{ view }}"{% if text and text.figure %} data-figure{% endif %}>
+  {% if text %}
+  <div class="qtext">
+    {{ text.stem|safe }}
+    {% if text.options %}<ul class="qopts{% if text.options_wide %} qopts-wide{% endif %}">{% for key, html in text.options %}<li><b>{{ key }}.</b> {{ html|safe }}</li>{% endfor %}</ul>{% endif %}
+  </div>
+  {% endif %}
+  <div class="qimage paper">{{ images([q.img], 'qimg', '题目 #%03d' % q.num, 1.6, lazy=(view == 'text')) }}</div>
+</div>
+{%- endmacro %}
+
+{# The answer as text with any erratum below it, the 答案速查 image folded away, then the solution images. #}
+{% macro answer_body(q, text) -%}
+<h2 class="panel-label">答案</h2>
+{% if text %}
+<div class="qanswer">{% if text.answer_key %}<p><b>{{ text.answer_key }}.</b> {{ text.option(text.answer_key)|safe }}</p>{% else %}{{ text.answer|safe }}{% endif %}</div>
+{% if text.erratum %}<p class="erratum"><b>勘误</b>{{ text.erratum|safe }}</p>{% endif %}
+<details class="raw-img"><summary>答案原图</summary><div class="paper">{{ images([q.answer], 'aimg', '答案', 2.2) }}</div></details>
+{% else %}
+<div class="paper">{{ images([q.answer], 'aimg', '答案', 2.2) }}</div>
+{% endif %}
+<h2 class="panel-label">解析 <span class="muted">{{ q.solution|length }} 张图</span></h2>
+<div class="paper">{{ images(q.solution, 'simg', '解析', 2) }}</div>
+{%- endmacro %}
+
+{% macro katex_head() -%}<link rel="stylesheet" href="/static/vendor/katex/katex.min.css">{%- endmacro %}
+{% macro katex_script() -%}<script src="/static/vendor/katex/katex.min.js" defer></script>{%- endmacro %}
 
 {% macro images(list, cls, alt, scale=2, lazy=true) -%}
 {% for img in list %}<img class="{{ cls }}" src="/content/{{ img.src }}?v={{ content_v }}" width="{{ (img.w / scale)|round|int }}" height="{{ (img.h / scale)|round|int }}" alt="{{ alt }}" {% if lazy %}loading="lazy" decoding="async"{% else %}fetchpriority="high"{% endif %}>{% endfor %}

@@ -1,5 +1,6 @@
 // Port of tests/test_app.py: the same user-visible behaviour, now against the Worker and D1.
 import { describe, expect, it } from "vitest";
+import { TEXTS } from "./fixtures";
 import { Client, LINKING, setup, visible } from "./harness";
 
 async function loggedIn(options: Parameters<typeof setup>[0] = {}) {
@@ -71,6 +72,41 @@ describe("practice", () => {
     const detail = visible(await text(client, "/q/1"));
     expect(detail).toContain("相关知识点");
     expect(detail).toContain("1 函数基础");
+  });
+
+  it("shows the question as text with a switch to the image", async () => {
+    const { client } = await loggedIn({ texts: TEXTS });
+    const page = await text(client, await start(client, { mode: "group", chapter: "A" }));
+    expect(page).toContain('<div class="qview" data-view="text">');
+    expect(page).toContain('<span class="math inline">f(x)=\\dfrac{1}{x}</span>');
+    expect(page).toContain("<li><b>D.</b> 4.</li>");
+    expect(page).toMatch(/class="qview-toggle js-qview"[^>]*hidden>原图<\/button>/);
+    expect(page).toContain("katex.min.css");
+    expect(page).toContain("katex.min.js");
+    expect(page).toMatch(/class="qimg"[^>]*loading="lazy"/);
+  });
+
+  it("shows the answer's option and the erratum", async () => {
+    const { client } = await loggedIn({ texts: TEXTS });
+    const page = await text(client, await start(client, { mode: "group", chapter: "A" }));
+    expect(page).toContain('<p><b>C.</b> <span class="math inline">x&gt;\\dfrac12</span> 时有界</p>');
+    expect(page).toContain('<p class="erratum"><b>勘误</b>速查原印 B</p>');
+    expect(page).toContain('<details class="raw-img"><summary>答案原图</summary>');
+  });
+
+  it("opens a question with a figure on its image", async () => {
+    const { client } = await loggedIn({ texts: TEXTS });
+    const page = await text(client, "/q/3");
+    expect(page).toContain('<div class="qview" data-view="image" data-figure>');
+    expect(page).toMatch(/class="qimg"[^>]*fetchpriority="high"/);
+  });
+
+  it("shows the images when there is no text version", async () => {
+    const { client } = await loggedIn();
+    const page = await text(client, await start(client, { mode: "group", chapter: "A" }));
+    expect(page).toContain('<div class="qview" data-view="image">');
+    expect(page).not.toContain("js-qview");
+    expect(page).not.toContain("katex.min.css");
   });
 
   it("grades a question and moves to the next one", async () => {
@@ -167,6 +203,16 @@ describe("bank", () => {
     expect(chapter).toContain("导数概念");
     expect(chapter).toContain("基本概念题");
     expect((await client.get("/bank/Z")).status).toBe(404);
+  });
+});
+
+describe("search", () => {
+  it("finds text in the stem", async () => {
+    const { client } = await loggedIn({ texts: TEXTS });
+    const page = await text(client, `/bank/search?q=${encodeURIComponent("再求拐点")}`);
+    expect(page).toContain("#002");
+    expect(page).not.toContain("#001");
+    expect(page).toContain('<p class="snippet">求 x 的值 . (2) 再求拐点</p>');
   });
 });
 

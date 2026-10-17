@@ -75,6 +75,23 @@ export interface Linking {
 
 const MAX_LINKS = 3;
 
+/** generated/bank.json: a question's text version, rendered to HTML by dgy/bank.py (formulas as .math elements). */
+export interface QuestionText {
+  type: "choice" | "fill" | "solve";
+  /** The question has a figure, so its original image is shown first. */
+  figure: boolean;
+  stem: string;
+  options: [letter: string, html: string][];
+  options_wide: boolean;
+  answer: string;
+  /** The letter, for a choice question answered with one. */
+  answer_key: string | null;
+  /** What the book or its 答案速查 printed, when the answer was corrected. */
+  erratum: string | null;
+  /** Plain text of the stem and options, for searching. */
+  search: string;
+}
+
 export const sectionLabel = (s: Section) => `${s.number} ${s.title.replaceAll("$", "")}`;
 
 export class Content {
@@ -84,11 +101,12 @@ export class Content {
   readonly chapterLinks: Record<string, string[]>;
   readonly builtAt: string;
   readonly sections: Map<string, Section>;
+  readonly texts: Map<number, QuestionText>;
   private readonly ordered: Question[];
   private readonly links = new Map<number, string[]>();
   private readonly linked = new Map<string, number[]>();
 
-  constructor(manifest: Manifest, linking: Linking = { sections: [], links: {} }) {
+  constructor(manifest: Manifest, linking: Linking = { sections: [], links: {} }, texts: Record<string, QuestionText> = {}) {
     this.chapters = manifest.chapters;
     this.ordered = [...manifest.questions].sort((a, b) => a.num - b.num);
     this.questions = new Map(this.ordered.map((q) => [q.num, q]));
@@ -96,6 +114,8 @@ export class Content {
     this.chapterLinks = manifest.chapter_links;
     this.builtAt = manifest.built_at;
     this.sections = new Map(linking.sections.map((s) => [s.key, s]));
+    this.texts = new Map(Object.entries(texts).map(([num, t]) => [Number(num), t] as [number, QuestionText])
+      .filter(([num]) => this.questions.has(num)));
     for (const [num, keys] of Object.entries(linking.links).sort(([a], [b]) => Number(a) - Number(b))) {
       const kept = keys.filter((k) => this.sections.has(k)).slice(0, MAX_LINKS);
       if (!this.questions.has(Number(num)) || !kept.length) continue;
@@ -147,6 +167,11 @@ export class Content {
 
   knowledgeFor(chapter: string): KnowledgeEntry[] {
     return (this.chapterLinks[chapter] ?? []).map((slug) => this.knowledgeEntry(slug)).filter((k) => k !== undefined);
+  }
+
+  /** The question's text version, or undefined to show only its images. */
+  text(num: number): QuestionText | undefined {
+    return this.texts.get(num);
   }
 
   knowledgeTitles(): Record<string, string> {

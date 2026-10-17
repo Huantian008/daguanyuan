@@ -1,12 +1,12 @@
 // Port of dgy/templates/_macros.html.
 import { html, raw } from "hono/html";
-import { sectionLabel, type Img, type KnowledgeEntry, type Question, type Section } from "../content";
+import { sectionLabel, type Img, type KnowledgeEntry, type Question, type QuestionText, type Section } from "../content";
 import type { Meta } from "../env";
 import type { UserState } from "../state";
 import type { Distribution } from "../stats";
-import { contentUrl, pad3, stars, type Html } from "./util";
+import { contentUrl, pad3, staticUrl, stars, type Html } from "./util";
 
-export function qmeta(q: Question): Html {
+export function qmeta(q: Question, text?: QuestionText): Html {
   return html`<div class="qmeta">
   <span class="qnum">#${pad3(q.num)}</span>
   <span class="qkp">${q.kp}</span>
@@ -14,8 +14,38 @@ export function qmeta(q: Question): Html {
   <span class="qdiff" title="原书得分率 ${q.difficulty}">${stars(q.stars)}</span>
   <span class="qmins">建议 ${q.minutes} 分钟</span>
   ${q.flags.map((flag) => html`<span class="flag">${flag}</span>`)}
+  ${text ? html`<button type="button" class="qview-toggle js-qview" aria-pressed="false" title="在文字和原图之间切换（V）" hidden>原图</button>` : ""}
 </div>`;
 }
+
+/** The question as text (KaTeX) and as the original image; app.js shows one of them, without JavaScript both show. */
+export function questionBody(meta: Meta, q: Question, text?: QuestionText): Html {
+  const view = !text || text.figure ? "image" : "text";
+  return html`<div class="qview" data-view="${view}"${text?.figure ? raw(" data-figure") : ""}>
+  ${text ? html`<div class="qtext">
+    ${raw(text.stem)}
+    ${text.options.length ? html`<ul class="qopts${text.options_wide ? " qopts-wide" : ""}">${text.options.map(([key, opt]) => html`<li><b>${key}.</b> ${raw(opt)}</li>`)}</ul>` : ""}
+  </div>` : ""}
+  <div class="qimage paper">${images(meta, [q.img], "qimg", `题目 #${pad3(q.num)}`, 1.6, view === "text")}</div>
+</div>`;
+}
+
+/** The answer as text with any erratum below it, the 答案速查 image folded away, then the solution images. */
+export function answerBody(meta: Meta, q: Question, text?: QuestionText): Html {
+  const option = text?.answer_key ? text.options.find(([key]) => key === text.answer_key)?.[1] : undefined;
+  const answer = text
+    ? html`<div class="qanswer">${text.answer_key ? html`<p><b>${text.answer_key}.</b> ${raw(option ?? "")}</p>` : raw(text.answer)}</div>
+${text.erratum ? html`<p class="erratum"><b>勘误</b>${raw(text.erratum)}</p>` : ""}
+<details class="raw-img"><summary>答案原图</summary><div class="paper">${images(meta, [q.answer], "aimg", "答案", 2.2)}</div></details>`
+    : html`<div class="paper">${images(meta, [q.answer], "aimg", "答案", 2.2)}</div>`;
+  return html`<h2 class="panel-label">答案</h2>
+${answer}
+<h2 class="panel-label">解析 <span class="muted">${q.solution.length} 张图</span></h2>
+<div class="paper">${images(meta, q.solution, "simg", "解析", 2)}</div>`;
+}
+
+export const katexCss = (meta: Meta): Html => html`<link rel="stylesheet" href="${staticUrl(meta, "vendor/katex/katex.min.css")}">`;
+export const katexJs = (meta: Meta): Html => html`<script src="${staticUrl(meta, "vendor/katex/katex.min.js")}" defer></script>`;
 
 export function images(meta: Meta, list: Img[], cls: string, alt: string, scale = 2, lazy = true): Html {
   return html`${list.map((img) => html`<img class="${cls}" src="${contentUrl(meta, img.src)}" width="${Math.round(img.w / scale)}" height="${Math.round(img.h / scale)}" alt="${alt}" ${lazy ? raw('loading="lazy" decoding="async"') : raw('fetchpriority="high"')}>`)}`;

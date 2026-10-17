@@ -17,6 +17,7 @@ class Settings:
     password: str | None = None
     secret_key: str = ""
     https_only: bool = False
+    bank_dir: Path | None = None  # the text version of the questions; without it the site shows the images
 
     @property
     def db_path(self) -> Path:
@@ -46,4 +47,5 @@ def load_settings() -> Settings:
         password=os.environ.get("APP_PASSWORD") or None,
         secret_key=os.environ.get("SECRET_KEY") or _stored_secret(data_dir),
         https_only=os.environ.get("HTTPS_ONLY") == "1",
+        bank_dir=Path(os.environ.get("DGY_BANK_DIR", PROJECT_ROOT / "bank-md")),
     )

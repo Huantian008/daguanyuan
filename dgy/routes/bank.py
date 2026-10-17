@@ -24,11 +24,13 @@ def search(request: Request, q: str = "", conn=Depends(get_conn)):
     if term.isdigit() and int(term) in content.questions:
         return redirect(f"/q/{int(term)}")
     found = [
-        question for _num, question in sorted(content.questions.items())
+        question for num, question in sorted(content.questions.items())
         if term and (term in question.source_full or term in question.source
-                     or term in question.kp or term in question.section)
+                     or term in question.kp or term in question.section
+                     or (num in content.texts and term in content.texts[num].search))
     ]
-    return render(request, "search.html", nav="bank", q=q, found=found, state=user_state(conn, content))
+    return render(request, "search.html", nav="bank", q=q, found=found, state=user_state(conn, content),
+                  texts=content.texts)
 
 
 @router.get("/bank/{code}")
@@ -70,4 +72,5 @@ def question(request: Request, num: int, conn=Depends(get_conn)):
         knowledge=[content.knowledge_entry(s) for s in content.chapter_links.get(q.chapter, [])],
         sections=content.sections_for(num),
         titles=content.knowledge_titles(),
+        text=content.text(num),
     )

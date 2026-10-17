@@ -4,8 +4,8 @@ import type { ChapterInfo, Content, KnowledgeEntry } from "../content";
 import type { Meta } from "../env";
 import type { UserState } from "../state";
 import { layout } from "./layout";
-import { sectionQuestions } from "./parts";
-import { contentUrl, staticUrl } from "./util";
+import { katexCss, katexJs, sectionQuestions } from "./parts";
+import { contentUrl } from "./util";
 
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -21,8 +21,6 @@ export function injectSectionQuestions(text: string, slug: string, content: Cont
   return text;
 }
 
-const katexCss = (meta: Meta) => html`<link rel="stylesheet" href="${staticUrl(meta, "vendor/katex/katex.min.css")}">`;
-const katexJs = (meta: Meta) => html`<script src="${staticUrl(meta, "vendor/katex/katex.min.js")}" defer></script>`;
 
 export function knowledgeIndexPage(meta: Meta, groups: [string, KnowledgeEntry[]][], hasText: (slug: string) => boolean, overview: string) {
   return layout(meta, {

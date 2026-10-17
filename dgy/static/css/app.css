@@ -355,6 +355,36 @@ form.inline { display: inline; margin: 0; }
 .flag { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--shaky-soft); color: var(--shaky-ink); }
 .qbody { overflow-x: auto; }
 
+/* the question as text (KaTeX) or as the original image; without JavaScript both show */
+.js .qview[data-view="text"] .qimage, .js .qview[data-view="image"] .qtext { display: none; }
+.qview > * + * { margin-top: 14px; }
+.qtext { font-size: 16px; line-height: 1.9; color: var(--ink); overflow-x: auto; overflow-y: hidden; }
+.qtext p { margin: 0 0 10px; }
+.qtext p:last-child { margin-bottom: 0; }
+.qtext .katex { font-size: 1.06em; }
+.qtext .katex-display, .qtext .math.block { overflow-x: auto; overflow-y: hidden; margin: 6px 0; }
+.qopts { list-style: none; margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; }
+.qopts-wide { grid-template-columns: minmax(0, 1fr); }
+.qopts li { padding: 8px 12px; border-radius: var(--radius-sm); background: var(--surface-2); overflow-x: auto; }
+.qopts b, .qanswer b { color: var(--accent); font-weight: 700; margin-right: 4px; }
+.qview-toggle {
+  margin-left: auto; display: inline-flex; align-items: center; min-height: 30px; padding: 3px 12px;
+  border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--ink-2);
+  font: inherit; font-size: 12px; cursor: pointer; transition: background-color .15s, color .15s;
+}
+.qview-toggle:hover { background: var(--surface-2); color: var(--ink); }
+.qview-toggle[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
+.qanswer { font-size: 16px; line-height: 1.9; overflow-x: auto; overflow-y: hidden; }
+.qanswer p { margin: 0 0 6px; }
+.erratum { margin: 10px 0 0; padding: 10px 14px; border-radius: var(--radius-sm); border-left: 3px solid var(--shaky);
+  background: var(--shaky-soft); color: var(--ink-2); font-size: 14px; line-height: 1.8; overflow-x: auto; }
+.erratum b { color: var(--shaky-ink); margin-right: 8px; }
+.raw-img { margin-top: 10px; }
+.raw-img > summary { cursor: pointer; color: var(--muted); font-size: 13px; padding: 4px 0; width: fit-content; }
+.raw-img > summary:hover { color: var(--ink); }
+.raw-img[open] > summary { margin-bottom: 6px; }
+.snippet { flex-basis: 100%; margin: 0; color: var(--muted); font-size: 13px; }
+
 .reveal-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
 .reveal-toggle {
   display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 46px; padding: 8px 16px;
@@ -598,6 +628,8 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
   .grade { font-size: 14px; padding: 8px 2px; white-space: nowrap; }
   .grade kbd { display: none; }
   .skip .btn-quiet { padding: 12px 6px; }
+  .qopts { grid-template-columns: minmax(0, 1fr); }
+  .qtext, .qanswer { font-size: 15.5px; }
   .drawer { margin: auto 0 0; width: 100vw; height: auto; max-height: 88dvh; border-left: 0; border-radius: 18px 18px 0 0; }
   .drawer[open] { animation-name: sheet-in; }
   .drawer-head, .drawer-body, .drawer-foot { padding-left: 16px; padding-right: 16px; }

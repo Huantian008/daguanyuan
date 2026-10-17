@@ -100,6 +100,7 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
       knowledge: content.knowledgeFor(q.chapter),
       sections: content.sectionsFor(q.num),
       titles: content.knowledgeTitles(),
+      text: content.text(q.num),
     }));
   });
 
@@ -140,9 +141,10 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     const term = q.trim().replace(/^#/, "");
     if (/^\d+$/.test(term) && content.questions.has(Number(term))) return c.redirect(`/q/${Number(term)}`, 303);
     const found = term
-      ? content.all().filter((x) => x.source_full.includes(term) || x.source.includes(term) || x.kp.includes(term) || x.section.includes(term))
+      ? content.all().filter((x) => x.source_full.includes(term) || x.source.includes(term) || x.kp.includes(term) || x.section.includes(term)
+        || (content.text(x.num)?.search.includes(term) ?? false))
       : [];
-    return c.html(searchPage(meta, q, found, await loadState(c.env.DB, c.get("user").id, content)));
+    return c.html(searchPage(meta, q, found, await loadState(c.env.DB, c.get("user").id, content), content.texts));
   });
 
   app.get("/bank/:code", async (c) => {
@@ -177,6 +179,7 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     return c.html(questionPage(meta, {
       q, chapter: content.chapter(q.chapter), card: state.cards.get(q.num), status: state.status(q.num), history,
       knowledge: content.knowledgeFor(q.chapter), sections: content.sectionsFor(q.num), titles: content.knowledgeTitles(),
+      text: content.text(q.num),
       total: content.all().length,
     }));
   });

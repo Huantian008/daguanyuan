@@ -12,6 +12,7 @@ import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from dgy.bank import load_bank
 from dgy.markdown import render_markdown
 from dgy.sections import load_links, load_sections
 
@@ -23,6 +24,7 @@ CONTENT_SUBDIRS = ("q", "a", "s", "k")
 EDGE_DIR = sources.PROJECT_ROOT / "edge"
 STATIC_DIR = sources.PROJECT_ROOT / "dgy" / "static"
 MARKDOWN_DIR = sources.PROJECT_ROOT / "knowledge-md"
+BANK_DIR = sources.PROJECT_ROOT / "bank-md"
 
 
 @dataclass
@@ -69,7 +71,7 @@ def _write_json(path: Path, data) -> None:
 
 def export_edge(content_dir: Path = sources.CONTENT_DIR, static_dir: Path = STATIC_DIR,
                 markdown_dir: Path = MARKDOWN_DIR, edge_dir: Path = EDGE_DIR,
-                max_bytes: int = ASSET_LIMIT) -> ExportReport:
+                max_bytes: int = ASSET_LIMIT, bank_dir: Path = BANK_DIR) -> ExportReport:
     public = edge_dir / "public"
     generated = edge_dir / "src" / "generated"
     shutil.rmtree(public, ignore_errors=True)
@@ -102,6 +104,9 @@ def export_edge(content_dir: Path = sources.CONTENT_DIR, static_dir: Path = STAT
         "sections": [asdict(s) for s in sections.values()],
         "links": {str(num): list(keys) for num, keys in sorted(links.items())},
     })
+
+    # The question text, rendered here once so the Worker serves the same HTML as the Python site.
+    _write_json(generated / "bank.json", {str(num): t.to_json() for num, t in sorted(load_bank(bank_dir).items())})
 
     _write_json(generated / "meta.json", {
         "content_v": "".join(ch for ch in manifest.get("built_at", "") if ch.isdigit()),

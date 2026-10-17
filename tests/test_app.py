@@ -28,7 +28,7 @@ class Clock:
         return self.at
 
 
-def _make_env(tmp_path, password=None, links=None):
+def _make_env(tmp_path, password=None, links=None, texts=None):
     content = tmp_path / "content"
     bank = small_bank()
     bank["knowledge"] = KNOWLEDGE
@@ -47,8 +47,14 @@ def _make_env(tmp_path, password=None, links=None):
                                        encoding="utf-8")
     if links:
         (md / "question_links.json").write_text(json.dumps({"version": 1, "links": links}), encoding="utf-8")
+    bank_dir = None
+    if texts:
+        bank_dir = tmp_path / "bank"
+        bank_dir.mkdir()
+        (bank_dir / "questions.json").write_text(json.dumps({"version": 1, "questions": texts}, ensure_ascii=False),
+                                                 encoding="utf-8")
     settings = Settings(content_dir=content, data_dir=tmp_path / "data", knowledge_md_dir=md,
-                        password=password, secret_key="test-secret")
+                        password=password, secret_key="test-secret", bank_dir=bank_dir)
     clock = Clock(datetime(2026, 10, 16, 21, 0, tzinfo=TZ))
     return SimpleNamespace(client=TestClient(create_app(settings, clock)), clock=clock, settings=settings)
 
@@ -134,6 +140,56 @@ def test_original_pages_list_the_questions_on_them(tagged):
     page = tagged.client.get("/knowledge/01").text
     assert '<figure class="kn-figure" id="p1">' in page
     assert "这一页的题目" in page and 'href="/q/3"' in page
+
+
+BANK = [
+    {"num": 1, "type": "choice", "stem": "函数 $f(x)=\\dfrac{1}{x}$ 在 $(0,1)$ 内（　　）.",
+     "options": {"A": "有界", "B": "无界", "C": "$x>\\dfrac12$ 时有界", "D": "4."}, "figure": False,
+     "answer": "C", "erratum": "速查原印 B"},
+    {"num": 2, "type": "fill", "stem": "求 $x$ 的值 $\\underline{\\qquad}$.\n\n(2) 再求拐点", "options": None,
+     "figure": False, "answer": "$\\dfrac12$"},
+    {"num": 3, "type": "choice", "stem": "如图所示（　　）", "options": None, "figure": True, "answer": "A"},
+]
+
+
+@pytest.fixture
+def texted(tmp_path):
+    return _make_env(tmp_path, texts=BANK)
+
+
+def test_practice_shows_the_question_as_text_with_a_switch_to_the_image(texted):
+    page = texted.client.get(start(texted, mode="group", chapter="A")).text
+    assert '<div class="qview" data-view="text">' in page
+    assert '<span class="math inline">f(x)=\\dfrac{1}{x}</span>' in page
+    assert '<li><b>D.</b> 4.</li>' in page  # inline: not turned into a numbered list
+    assert re.search(r'class="qview-toggle js-qview"[^>]*hidden>原图</button>', page)
+    assert 'katex.min.css' in page and 'katex.min.js' in page
+    assert re.search(r'class="qimg"[^>]*loading="lazy"', page)  # the image waits until it is shown
+
+
+def test_answer_shows_the_option_and_the_erratum(texted):
+    page = texted.client.get(start(texted, mode="group", chapter="A")).text
+    assert '<p><b>C.</b> <span class="math inline">x&gt;\\dfrac12</span> 时有界</p>' in page
+    assert '<p class="erratum"><b>勘误</b>速查原印 B</p>' in page
+    assert '<details class="raw-img"><summary>答案原图</summary>' in page and "a/001.webp" in page
+
+
+def test_a_question_with_a_figure_opens_on_its_image(texted):
+    page = texted.client.get("/q/3").text
+    assert '<div class="qview" data-view="image" data-figure>' in page
+    assert re.search(r'class="qimg"[^>]*fetchpriority="high"', page)
+
+
+def test_search_finds_text_in_the_stem(texted):
+    page = texted.client.get("/bank/search", params={"q": "再求拐点"}).text
+    assert "#002" in page and "#001" not in page
+    assert '<p class="snippet">求 x 的值 . (2) 再求拐点</p>' in page
+
+
+def test_without_the_text_version_the_images_show(env):
+    page = env.client.get(start(env, mode="group", chapter="A")).text
+    assert '<div class="qview" data-view="image">' in page
+    assert "js-qview" not in page and "katex.min.css" not in page
 
 
 def test_top_bar_has_a_theme_switch_shown_by_javascript(env):

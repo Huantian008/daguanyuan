@@ -49,6 +49,11 @@ def heading_ids(source: str) -> dict[int, str]:
     }
 
 
+def render_inline(source: str) -> str:
+    """Inline Markdown only (no paragraphs or lists): for short pieces such as a choice option written "4."."""
+    return _md.renderInline(source)
+
+
 def render_markdown(source: str) -> tuple[str, list[tuple[str, str]]]:
     """HTML plus a table of contents of (anchor id, title) for the h2 headings."""
     env: dict = {}

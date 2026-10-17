@@ -3,6 +3,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from .bank import QuestionText, load_bank
 from .sections import Section, load_links, load_sections
 
 
@@ -64,7 +65,7 @@ def _question(d: dict) -> Question:
 
 class Content:
     def __init__(self, manifest: dict, sections: dict[str, Section] | None = None,
-                 links: dict[int, tuple[str, ...]] | None = None):
+                 links: dict[int, tuple[str, ...]] | None = None, texts: dict[int, QuestionText] | None = None):
         self.chapters = [ChapterInfo(**c) for c in manifest["chapters"]]
         self.questions = {q["num"]: _question(q) for q in manifest["questions"]}
         self.knowledge = list(manifest.get("knowledge", []))
@@ -72,6 +73,7 @@ class Content:
         self.built_at = manifest.get("built_at", "")
         self.sections = dict(sections or {})
         self.links = {num: keys for num, keys in (links or {}).items() if num in self.questions}
+        self.texts = {num: t for num, t in (texts or {}).items() if num in self.questions}
         self._linked: dict[str, list[int]] = {}
         for num in sorted(self.links):
             for key in self.links[num]:
@@ -96,6 +98,10 @@ class Content:
     def knowledge_entry(self, slug: str) -> dict | None:
         return next((k for k in self.knowledge if k["slug"] == slug), None)
 
+    def text(self, num: int) -> QuestionText | None:
+        """The question's text version, or None to show only its images."""
+        return self.texts.get(num)
+
     def knowledge_titles(self) -> dict[str, str]:
         return {k["slug"]: k["title"] for k in self.knowledge}
 
@@ -114,9 +120,10 @@ class Content:
         return sorted(nums)
 
 
-def load_content(content_dir: Path, knowledge_md_dir: Path | None = None) -> Content:
+def load_content(content_dir: Path, knowledge_md_dir: Path | None = None, bank_dir: Path | None = None) -> Content:
     manifest = json.loads((content_dir / "manifest.json").read_text(encoding="utf-8"))
+    texts = load_bank(bank_dir)
     if knowledge_md_dir is None or not knowledge_md_dir.exists():
-        return Content(manifest)
+        return Content(manifest, texts=texts)
     sections = load_sections(knowledge_md_dir)
-    return Content(manifest, sections, load_links(knowledge_md_dir, sections))
+    return Content(manifest, sections, load_links(knowledge_md_dir, sections), texts)
