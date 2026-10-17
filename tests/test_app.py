@@ -91,6 +91,18 @@ def test_dashboard_shows_exam_countdown_and_empty_queues(env):
     assert '<a class="btn btn-primary" href="/bank/A?kp=1">开始做题</a>' in page
 
 
+def test_dashboard_date_and_countdown_turn_at_midnight_while_the_rest_goes_by_study_day(env):
+    grade(env, 1, "shaky")
+    env.clock.at = datetime(2026, 10, 17, 0, 30, tzinfo=TZ)
+    page = env.client.get("/").text
+    assert '<p class="hero-date">10月17日周六</p>' in page and "还有 63 天" in visible(page)
+    # still the 16th's study day: nothing to warm up yet, and #1 counts for today
+    assert 'data-warmup-count="0"' in page and "1 今日题数" in visible(page)
+    env.clock.at = datetime(2026, 10, 17, 4, 0, tzinfo=TZ)
+    page = env.client.get("/").text
+    assert "还有 63 天" in visible(page) and 'data-warmup-count="1"' in page
+
+
 def test_dashboard_picks_up_where_the_last_chapter_page_grade_left_off(env):
     grade(env, 4, "mastered")
     page = env.client.get("/").text

@@ -16,7 +16,8 @@ export interface Onward {
 }
 
 export interface DashboardData {
-  today: Day;
+  /** the calendar date, which turns at midnight; everything else on the page goes by the study day */
+  date: Day;
   daysLeft: number;
   warmup: number[];
   due: number[];
@@ -44,7 +45,7 @@ export function dashboardPage(meta: Meta, d: DashboardData) {
     body: html`<section class="hero">
   <div>
     <h1>今天的数学</h1>
-    <p class="hero-date">${cnDate(d.today)}</p>
+    <p class="hero-date">${cnDate(d.date)}</p>
   </div>
   <p class="countdown">考研初试 · 还有 <strong>${d.daysLeft}</strong> 天</p>
 </section>

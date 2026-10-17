@@ -12,3 +12,8 @@ def now() -> datetime:
 
 def study_day(moment: datetime) -> date:
     return (moment.astimezone(TZ) - timedelta(hours=DAY_START_HOUR)).date()
+
+
+def calendar_day(moment: datetime) -> date:
+    """The Shanghai calendar date, which turns at midnight: for the date and exam countdown at the top of the home page."""
+    return moment.astimezone(TZ).date()

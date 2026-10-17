@@ -54,6 +54,22 @@ describe("dashboard", () => {
     expect(page).toContain('<a class="btn btn-primary" href="/bank/A?kp=1">开始做题</a>');
   });
 
+  it("turns the date and countdown at midnight, while the rest still goes by the study day", async () => {
+    const { client, clock } = await loggedIn();
+    await grade(client, 1, "shaky");
+    clock.at = new Date("2026-10-17T00:30:00+08:00");
+    let page = await text(client, "/");
+    expect(page).toContain('<p class="hero-date">10月17日周六</p>');
+    expect(visible(page)).toContain("还有 63 天");
+    // still the 16th's study day: nothing to warm up yet, and #1 counts for today
+    expect(page).toContain('data-warmup-count="0"');
+    expect(visible(page)).toContain("1 今日题数");
+    clock.at = new Date("2026-10-17T04:00:00+08:00");
+    page = await text(client, "/");
+    expect(visible(page)).toContain("还有 63 天");
+    expect(page).toContain('data-warmup-count="1"');
+  });
+
   it("picks up 继续往下做 at the 考点 of the last question graded on a chapter page", async () => {
     const { client, clock } = await loggedIn();
     await grade(client, 4, "mastered");

@@ -7,7 +7,7 @@ import type { AppEnv, KnowledgeData, Meta } from "./env";
 import { isGrade } from "./srs";
 import { examDate, loadState, warmupDays } from "./state";
 import * as stats from "./stats";
-import { addDays, daysBetween, studyDay } from "./studyday";
+import { addDays, calendarDay, daysBetween, studyDay } from "./studyday";
 import { bankPage, chapterPage, questionPage, searchPage } from "./views/bank";
 import { dashboardPage } from "./views/dashboard";
 import { historyPage, settingsPage, type HistoryDay } from "./views/history";
@@ -38,9 +38,10 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     ]);
     const last = stats.lastDrilled(reviews, (num) => content.questions.has(num));
     const onward = onwardKp(content, state.status, last === undefined ? undefined : content.questions.get(last));
+    const date = calendarDay(now());
     return c.html(dashboardPage(meta, {
-      today: day,
-      daysLeft: daysBetween(day, exam),
+      date,
+      daysLeft: daysBetween(date, exam),
       warmup: stats.warmupQueue(reviews, state.active, day, warmup),
       due: stats.dueQueue(state.cards, state.active, day),
       onward: onward && { ...onward, name: content.chapter(onward.code).name, resumed: last !== undefined },

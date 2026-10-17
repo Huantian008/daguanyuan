@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends, Request
 
 from .. import db, stats
 from ..drill import kp_index_of, onward_kp
-from ..web import bank, exam_date, get_conn, render, today, user_state, warmup_days
+from ..studyday import calendar_day
+from ..web import bank, exam_date, get_conn, now, render, today, user_state, warmup_days
 
 router = APIRouter()
 
@@ -18,11 +19,13 @@ def dashboard(request: Request, conn=Depends(get_conn)):
     totals = stats.daily_totals(reviews, day, days=30)
     last = stats.last_drilled(reviews, lambda num: num in content.questions)
     onward = onward_kp(content, state.status, content.questions[last] if last is not None else None)
+    # the date and countdown at the top turn at midnight; everything else goes by the study day
+    date = calendar_day(now(request))
     return render(
         request, "dashboard.html",
         nav="home",
-        today=day,
-        days_left=(exam_date(conn) - day).days,
+        date=date,
+        days_left=(exam_date(conn) - date).days,
         warmup=stats.warmup_queue(reviews, state.active, day, warmup_days(conn)),
         due=stats.due_queue(state.cards, state.active, day),
         onward=onward and (onward[0], content.chapter(onward[0]).name, onward[1]),

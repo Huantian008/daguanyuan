@@ -12,6 +12,10 @@ const WEEKDAYS = "日一二三四五六";
 export const studyDay = (moment: Date): Day =>
   new Date(moment.getTime() + STUDY_DAY_SHIFT).toISOString().slice(0, 10);
 
+/** The Shanghai calendar date, which turns at midnight: for the date and exam countdown at the top of the home page. */
+export const calendarDay = (moment: Date): Day =>
+  new Date(moment.getTime() + SHANGHAI_OFFSET).toISOString().slice(0, 10);
+
 export function addDays(day: Day, n: number): Day {
   const d = new Date(`${day}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);
