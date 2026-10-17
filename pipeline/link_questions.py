@@ -249,8 +249,9 @@ def check(work_dir: Path = WORK_DIR, markdown_dir: Path = MARKDOWN_DIR) -> Repor
 
 def write_links(links: dict[int, list[str]], markdown_dir: Path = MARKDOWN_DIR) -> Path:
     path = markdown_dir / LINKS_FILE
-    data = {"version": 1, "links": {str(num): links[num] for num in sorted(links)}}
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    # One question per line, so a change to one question's tags is a one-line diff.
+    rows = ",\n".join(f'  "{num}": {json.dumps(links[num], ensure_ascii=False)}' for num in sorted(links))
+    path.write_text(f'{{\n "version": 1,\n "links": {{\n{rows}\n }}\n}}\n', encoding="utf-8")
     return path
 
 
