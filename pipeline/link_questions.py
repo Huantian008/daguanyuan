@@ -4,7 +4,8 @@
     .venv/bin/python -m pipeline.link_questions check          # check content/linking/ results, print a report
     .venv/bin/python -m pipeline.link_questions check --write  # ... and, with no errors, write knowledge-md/question_links.json
 
-The task description for DeepSeek is docs/deepseek/题目知识点标注.md.
+All 613 questions are tagged; the task description for DeepSeek (docs/deepseek/) was removed once the work
+was merged and is still in git history.
 """
 import argparse
 import json

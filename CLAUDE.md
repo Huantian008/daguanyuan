@@ -34,11 +34,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **逐题知识点标注**：`dgy/sections.py` 把文字版带编号的 h2/h3 解析成小节（key 如 `01/7.3`，含页面 anchor 和原版页序号），
 `knowledge-md/question_links.json` 记每题 1–3 个小节 key（进 git）。export 时两者写进 `edge/src/generated/sections.json`。
-标注本身交给 DeepSeek，任务说明在 `docs/deepseek/题目知识点标注.md`；`python -m pipeline.link_questions check --write`
-校验通过才写入。文件缺失时页面退回整章链接。
+613 题已全部标注（由 DeepSeek 完成，`python -m pipeline.link_questions check --write`
+校验通过后写入；当时的交接文档已删，要重做可在 git 历史的 `docs/deepseek/` 里找）。文件缺失时页面退回整章链接。
 
-**题目文字版**：题干和答案速查由能看图的模型从图片转成 Markdown + LaTeX，任务说明在
-`docs/deepseek/题目转LaTeX.md`。`python -m pipeline.transcribe_questions check --write` 校验通过后写入
+**题目文字版**：题干和答案速查已由能看图的模型从图片转成 Markdown + LaTeX（交接文档同样已删，在 git 历史里），
+经 `python -m pipeline.transcribe_questions check --write` 校验后写入
 `bank-md/questions.json`（进 git，一题一行）；校验会用 Node 跑 `pipeline/katex_check.mjs`，拿仓库自带的 KaTeX 编译每一段公式。
 解析仍是图片。原书或答案速查印错的题，`answer` 存验算过的正确答案，`erratum` 写明原来印的是什么（审核时人工加，目前 21 题）。
 网站用 `dgy/bank.py` 读它：Python 版启动时渲染成 HTML（`DGY_BANK_DIR` 可改位置），Worker 版由 `export_edge` 写进

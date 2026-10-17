@@ -12,4 +12,4 @@ edge/.wrangler/
 edge/src/generated/
 edge/worker-configuration.d.ts
 edge/.dev.vars
-/MAC-MIGRATION-MANIFEST.json
+.DS_Store

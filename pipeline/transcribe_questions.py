@@ -1,6 +1,7 @@
 """Inputs and checks for transcribing the question and answer images into Markdown + LaTeX.
 
-The transcription itself is done by a vision model (DeepSeek in opencode); the task is docs/deepseek/题目转LaTeX.md.
+The transcription itself was done by a vision model (DeepSeek in opencode); all 613 questions are in, and the task
+description (docs/deepseek/) was removed once the work was merged and is still in git history.
 
     .venv/bin/python -m pipeline.transcribe_questions prepare        # images and hints in content/transcribe/
     .venv/bin/python -m pipeline.transcribe_questions check --probe  # the three test questions in out/probe.json
