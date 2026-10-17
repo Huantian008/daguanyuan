@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 
 from .. import db, stats
-from ..web import bank, get_conn, redirect, render, safe_back, user_state
+from ..drill import default_kp, drill_kps, kp_tree
+from ..srs import GRADES
+from ..web import bank, get_conn, now, redirect, render, safe_back, today, user_state
 
 router = APIRouter()
 
@@ -34,12 +36,30 @@ def search(request: Request, q: str = "", conn=Depends(get_conn)):
 
 
 @router.get("/bank/{code}")
-def chapter(request: Request, code: str, conn=Depends(get_conn)):
+def chapter(request: Request, code: str, kp: int = 0, conn=Depends(get_conn)):
     content = bank(request)
     if code not in {c.code for c in content.chapters}:
         raise HTTPException(404, "没有这一章")
-    return render(request, "bank_chapter.html", nav="bank", chapter=content.chapter(code),
-                  outline=content.outline(code), state=user_state(conn, content))
+    state = user_state(conn, content)
+    kps = drill_kps(content, code, state.status)
+    current = kps[(kp if 1 <= kp <= len(kps) else default_kp(kps)) - 1]
+    codes = [c.code for c in content.chapters]
+    at = codes.index(code)
+    if current.index > 1:
+        prev = ("上一节", f"/bank/{code}?kp={current.index - 1}")
+    elif at > 0:
+        prev = ("上一章", f"/bank/{codes[at - 1]}?kp={len(drill_kps(content, codes[at - 1], state.status))}")
+    else:
+        prev = None
+    if current.index < len(kps):
+        following = ("下一节", f"/bank/{code}?kp={current.index + 1}")
+    elif at + 1 < len(codes):
+        following = ("下一章", f"/bank/{codes[at + 1]}?kp=1")
+    else:
+        following = None
+    return render(request, "bank_chapter.html", nav="bank", chapter=content.chapter(code), chapters=content.chapters,
+                  tree=kp_tree(kps), current=current, prev=prev, following=following, state=state,
+                  texts=content.texts, graded_today=db.graded_on(conn, today(request)))
 
 
 @router.post("/bank/exclude")
@@ -52,6 +72,18 @@ def exclude(request: Request, excluded: str = Form(...), nums: str = Form(""), c
                     if q.kp == kp and (not chapter or q.chapter == chapter) and (not section or q.section == section)]
     db.set_excluded(conn, targets, excluded == "1")
     return redirect(safe_back(back, "/bank"))
+
+
+@router.post("/q/{num}/grade")
+def grade(request: Request, num: int, grade: str = Form(""), back: str = Form(""), conn=Depends(get_conn)):
+    """Grade a question from the chapter page. A question graded today is left alone, so a double click is one review."""
+    content = bank(request)
+    q = content.questions.get(num)
+    if q is None:
+        raise HTTPException(404, "没有这道题")
+    if grade in GRADES and num not in db.graded_on(conn, today(request)):
+        db.record_review(conn, num, grade, now(request), "browse")
+    return redirect(safe_back(back, f"/bank/{q.chapter}#q-{num}"))
 
 
 @router.get("/q/{num}")

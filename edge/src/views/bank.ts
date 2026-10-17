@@ -1,13 +1,14 @@
 // Port of dgy/templates/bank.html, bank_chapter.html, search.html and question.html.
-import { html } from "hono/html";
-import type { ChapterInfo, KnowledgeEntry, Outline, Question, QuestionText, Section } from "../content";
+import { html, raw } from "hono/html";
+import type { ChapterInfo, KnowledgeEntry, Question, QuestionText, Section } from "../content";
+import type { DrillKp } from "../drill";
 import type { Meta } from "../env";
-import { GRADE_LABELS, type CardState } from "../srs";
+import { GRADE_LABELS, type CardState, type Grade } from "../srs";
 import type { UserState } from "../state";
 import type { ChapterProgress, Distribution, Review } from "../stats";
 import { cnDate } from "../studyday";
 import { layout } from "./layout";
-import { STATUS_LABELS, answerBody, distBar, excludeToggle, katexCss, katexJs, qmeta, questionBody, relatedKnowledge, revealToggle, startForm, type Status } from "./parts";
+import { STATUS_LABELS, answerBody, distBar, excludeToggle, katexCss, katexJs, qmeta, questionBody, questionCard, relatedKnowledge, revealToggle, startForm, type Status } from "./parts";
 import { pad3 } from "./util";
 
 const searchForm = (q = "", placeholder = "题号、年份、考点或题干文字，如 123、2019数二、拐点") => html`<form class="search" action="/bank/search" method="get" role="search">
@@ -40,44 +41,72 @@ export function bankPage(meta: Meta, rows: [ChapterProgress, Distribution][]) {
   });
 }
 
-export function chapterPage(meta: Meta, chapter: ChapterInfo, outline: Outline, state: UserState) {
-  const sections = outline.map(([section, kps], i) => {
-    const anchor = `sec-${i + 1}`;
-    return html`<section class="card section" id="${anchor}">
-  <h2>${section}</h2>
-  ${kps.map(([kp, qs]) => {
-    const open = qs.filter((q) => !state.excluded.has(q.num));
-    return html`<div class="kp-row${open.length ? "" : " is-excluded"}">
-    <div class="kp-name">${kp} <span class="muted">${qs.length} 题</span></div>
-    <div class="chips">${qs.map((q) => html`<a class="chip chip-${state.status(q.num)}" href="/q/${q.num}" title="#${pad3(q.num)} ${q.source_full}">${pad3(q.num)}</a>`)}</div>
-    <div class="kp-actions">
-      ${open.length
-        ? html`${startForm("练这个考点", "group", { cls: "btn btn-small", chapter: chapter.code, section, kp })}
-      ${startForm("只练没做过的", "group", { cls: "btn btn-small btn-ghost", chapter: chapter.code, section, kp, only: "new" })}`
-        : ""}
-      ${excludeToggle(!open.length, `/bank/${chapter.code}#${anchor}`, { chapter: chapter.code, section, kp, onLabel: "整个考点不做了" })}
-    </div>
-  </div>`;
-  })}
-</section>`;
-  });
+export interface ChapterPageData {
+  chapter: ChapterInfo;
+  chapters: ChapterInfo[];
+  tree: [string, DrillKp[]][];
+  current: DrillKp;
+  prev: [string, string] | null;
+  following: [string, string] | null;
+  state: UserState;
+  texts: Map<number, QuestionText>;
+  gradedToday: Map<number, Grade>;
+}
+
+const percent = (done: number, total: number) => (total ? Math.round((100 * done) / total) : 0);
+
+export function chapterPage(meta: Meta, d: ChapterPageData) {
+  const { chapter, current, prev, following } = d;
+  const here = `/bank/${chapter.code}?kp=${current.index}`;
   return layout(meta, {
-    title: chapter.name,
+    title: `${chapter.name} · ${current.kp}`,
     nav: "bank",
-    body: html`<header class="page-head">
-  <div>
-    <p class="eyebrow"><a href="/bank">题库</a></p>
-    <h1>${chapter.name}</h1>
+    pageClass: "page-drill",
+    head: katexCss(meta),
+    scripts: katexJs(meta),
+    body: html`<div class="drill">
+  <nav class="kp-tree" id="kp-tree" aria-label="考点目录">
+    <p class="kt-chapter"><a href="/bank">题库</a> / ${chapter.name}</p>
+    ${d.tree.map(([section, items]) => html`<div class="kt-section">
+      <p class="kt-sec-name">${section}</p>
+      ${items.map((k) => html`<a class="kt-kp${k.index === current.index ? " is-current" : ""}" href="/bank/${chapter.code}?kp=${k.index}"${k.index === current.index ? raw(' aria-current="page"') : ""}>
+        <span class="kt-name">${k.kp}</span>
+        <span class="kt-count">${k.done} / ${k.total}</span>
+        <i class="kt-bar${k.total && k.done === k.total ? " is-full" : ""}"><b style="width: ${percent(k.done, k.total)}%"></b></i>
+      </a>`)}
+    </div>`)}
+    <div class="kt-section kt-chapters">
+      <p class="kt-sec-name">其他章</p>
+      ${d.chapters.filter((c) => c.code !== chapter.code).map((c) => html`<a class="kt-kp" href="/bank/${c.code}"><span class="kt-name">${c.name}</span></a>`)}
+    </div>
+  </nav>
+
+  <div class="drill-main">
+    <header class="drill-head">
+      <button type="button" class="drill-tree-toggle js-tree-toggle" aria-controls="kp-tree" aria-expanded="true" hidden>目录</button>
+      <div class="drill-title">
+        <h1>${current.kp}</h1>
+        <p class="muted">${current.section} · 做过 ${current.done} / ${current.total} 题</p>
+      </div>
+      <div class="drill-actions">
+        ${current.total ? startForm("练这个考点", "group", { cls: "btn btn-small", chapter: chapter.code, section: current.section, kp: current.kp }) : ""}
+        ${excludeToggle(!current.total, here, { chapter: chapter.code, section: current.section, kp: current.kp, onLabel: "整个考点不做了" })}
+        ${prev ? html`<a class="btn btn-small" href="${prev[1]}">${prev[0]}</a>` : ""}
+        ${following ? html`<a class="btn btn-small btn-primary" href="${following[1]}">${following[0]}</a>` : ""}
+      </div>
+      <div class="drill-track" aria-hidden="true"><span style="width: ${percent(current.done, current.total)}%"></span></div>
+    </header>
+
+    <div class="qcards">
+      ${current.questions.map((q, i) => questionCard(meta, q, d.texts.get(q.num), d.state.status(q.num), i + 1, d.gradedToday.get(q.num), `${here}#q-${q.num}`))}
+    </div>
+
+    <nav class="drill-foot" aria-label="翻节">
+      ${prev ? html`<a class="btn" href="${prev[1]}">← ${prev[0]}</a>` : html`<span></span>`}
+      ${following ? html`<a class="btn btn-primary" href="${following[1]}">${following[0]} →</a>` : ""}
+    </nav>
   </div>
-  <div class="head-actions">
-    ${startForm("只练这章没做过的", "group", { cls: "btn btn-primary", chapter: chapter.code, only: "new" })}
-    ${startForm("练这章的薄弱题", "group", { cls: "btn", chapter: chapter.code, only: "weak" })}
-  </div>
-</header>
-<p class="legend-inline">
-  <span class="chip chip-new">未做</span><span class="chip chip-mastered">完全掌握</span><span class="chip chip-shaky">不熟练/错误</span><span class="chip chip-unknown">完全不会</span><span class="chip chip-excluded">不做</span>
-</p>
-${sections}`,
+</div>`,
   });
 }
 

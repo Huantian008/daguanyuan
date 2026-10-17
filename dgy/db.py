@@ -152,6 +152,12 @@ def history_for(conn: sqlite3.Connection, num: int) -> list[Review]:
     return [r for r in review_log(conn) if r.num == num]
 
 
+def graded_on(conn: sqlite3.Connection, day: date) -> dict[int, str]:
+    """The grade each question got on a study day (the last one, if it was graded more than once)."""
+    rows = conn.execute("SELECT num, grade FROM reviews WHERE study_day = ? ORDER BY reviewed_at, id", (day.isoformat(),))
+    return {row["num"]: row["grade"] for row in rows}
+
+
 def set_excluded(conn: sqlite3.Connection, nums, excluded: bool) -> None:
     with conn:
         conn.executemany(

@@ -256,6 +256,77 @@ def test_bank_pages(env):
     assert "函数极限连续" in env.client.get("/bank").text
     chapter = env.client.get("/bank/B").text
     assert "导数概念" in chapter and "基本概念题" in chapter
+    assert env.client.get("/bank/Z").status_code == 404
+
+
+def test_chapter_page_lays_out_one_kp_with_its_questions(env):
+    page = env.client.get("/bank/B").text
+    assert 'id="q-4"' in page and 'id="q-5"' in page and 'id="q-6"' not in page
+    assert 'action="/q/4/grade"' in page and 'name="grade" value="mastered"' in page
+    # the answer and solution wait in folds that open without JavaScript being needed to see them
+    assert 'id="qa-4"' in page and 'id="qs-4"' in page and "s/004-1.webp" in page
+    assert re.search(r'class="qimg"[^>]*loading="lazy"', page)
+    assert "data-shortcuts" not in page
+    # the tree lists every 考点 of the chapter with how many are done
+    assert re.search(r'href="/bank/B\?kp=2"[^>]*>\s*<span class="kt-name">隐函数求导</span>\s*<span class="kt-count">0 / 0</span>', page)
+
+
+def test_chapter_page_opens_on_the_first_kp_with_work_left(env):
+    assert "?kp=1" in env.client.get("/bank/A").text and 'id="q-1"' in env.client.get("/bank/A").text
+    env.client.post("/q/1/grade", data={"grade": "mastered"})
+    page = env.client.get("/bank/A").text
+    assert 'id="q-2"' in page and 'id="q-1"' not in page
+    assert 'id="q-3"' in env.client.get("/bank/A", params={"kp": "3"}).text
+    assert 'id="q-2"' in env.client.get("/bank/A", params={"kp": "99"}).text  # out of range: the default one
+
+
+def test_chapter_page_steps_between_kps_and_chapters(env):
+    first = env.client.get("/bank/A", params={"kp": "1"}).text
+    assert 'href="/bank/A?kp=2"' in first and "下一节" in first and "上一章" not in first and "上一节" not in first
+    last = env.client.get("/bank/A", params={"kp": "3"}).text
+    assert 'href="/bank/B?kp=1"' in last and "下一章" in last
+    assert 'href="/bank/A?kp=3"' in env.client.get("/bank/B", params={"kp": "1"}).text
+    assert "上一章" in env.client.get("/bank/B", params={"kp": "1"}).text
+
+
+def test_grading_from_the_chapter_page_is_recorded_once_a_day(env):
+    r = env.client.post("/q/4/grade", data={"grade": "mastered", "back": "/bank/B?kp=1#q-4"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/bank/B?kp=1#q-4"
+    page = env.client.get("/bank/B").text
+    assert "今天已评" in page and re.search(r"is-picked[^>]*disabled", page)
+    assert "chip-mastered" in env.client.get("/q/4").text
+    # a second click the same study day changes nothing: the card would otherwise jump a level
+    env.client.post("/q/4/grade", data={"grade": "mastered"})
+    env.client.post("/q/4/grade", data={"grade": "unknown"})
+    assert len(re.findall(r"chip-mastered", env.client.get("/q/4").text)) == 2  # status chip and the one history row
+    assert "完全不会" not in visible(env.client.get("/q/4").text)
+    # the next study day it can be graded again
+    env.clock.at += timedelta(days=1)
+    env.client.post("/q/4/grade", data={"grade": "shaky"})
+    assert "不熟练/错误" in visible(env.client.get("/q/4").text)
+
+
+def test_chapter_grade_ignores_bad_input(env):
+    r = env.client.post("/q/4/grade", data={"grade": "perfect"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/bank/B#q-4"
+    assert "今天已评" not in env.client.get("/bank/B").text
+    assert env.client.post("/q/999/grade", data={"grade": "mastered"}).status_code == 404
+    r = env.client.post("/q/4/grade", data={"grade": "shaky", "back": "//evil.example"}, follow_redirects=False)
+    assert r.headers["location"] == "/bank/B#q-4"
+
+
+def test_excluded_questions_stay_on_the_chapter_page_as_a_header_only(env):
+    page = env.client.get("/bank/B", params={"kp": "2"}).text
+    assert 'id="q-6"' in page and 'class="qcard is-excluded"' in page
+    assert 'action="/q/6/grade"' not in page and "恢复，要做" in page
+
+
+def test_chapter_page_shows_the_correct_option_and_questions_as_text(texted):
+    page = texted.client.get("/bank/A", params={"kp": "1"}).text
+    assert '<li data-correct><b>C.</b>' in page and '<li><b>A.</b>' in page
+    assert 'class="qtext"' in page and 'katex.min.js' in page
+    assert re.search(r'class="qcard"[^>]*data-choice', page)
+    assert "勘误" in page
 
 
 def test_knowledge_pages(env):

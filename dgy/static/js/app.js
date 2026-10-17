@@ -99,19 +99,66 @@
       }
     }
   };
-  const sheets = [...document.querySelectorAll(".sheet")].filter((s) => s.querySelector(".qview") && s.querySelector(".js-qview"));
+  const sheets = [...document.querySelectorAll(".sheet, .qcard")].filter((s) => s.querySelector(".qview") && s.querySelector(".js-qview"));
+  let preferred = null;
+  try {
+    preferred = localStorage.getItem(QVIEW_KEY);
+  } catch {
+    // no stored preference
+  }
   for (const sheet of sheets) {
     const view = sheet.querySelector(".qview");
-    let preferred = null;
-    try {
-      preferred = localStorage.getItem(QVIEW_KEY);
-    } catch {
-      // no stored preference
-    }
     setView(sheet, !("figure" in view.dataset) && (preferred === "image" || preferred === "text") ? preferred : view.dataset.view);
     const button = sheet.querySelector(".js-qview");
     button.addEventListener("click", () => toggleView(sheet));
     button.hidden = false;
+  }
+
+  // ---------- chapter page: answer / solution folds on each question card, and the 考点 tree ----------
+
+  document.querySelectorAll(".js-qc-toggle").forEach((button) => {
+    button.hidden = false;
+    button.addEventListener("click", () => {
+      const open = button.getAttribute("aria-expanded") !== "true";
+      const panel = document.getElementById(button.getAttribute("aria-controls"));
+      button.setAttribute("aria-expanded", String(open));
+      button.textContent = `${open ? "隐藏" : "查看"}${button.dataset.label}`;
+      panel.classList.toggle("is-open", open);
+      if (open) renderMath(panel);
+      if (panel.dataset.panel === "answer") button.closest(".qcard").classList.toggle("show-answer", open);
+    });
+  });
+
+  const drill = document.querySelector(".drill");
+  const treeToggle = document.querySelector(".js-tree-toggle");
+  if (drill && treeToggle) {
+    const TREE_KEY = "dgy-tree-closed";
+    const narrow = matchMedia("(max-width: 960px)").matches;
+    let closed = narrow;
+    if (!narrow) {
+      try {
+        closed = localStorage.getItem(TREE_KEY) === "1";
+      } catch {
+        // storage blocked: the tree stays open
+      }
+    }
+    const show = () => {
+      drill.classList.toggle("tree-closed", closed);
+      treeToggle.setAttribute("aria-expanded", String(!closed));
+    };
+    treeToggle.addEventListener("click", () => {
+      closed = !closed;
+      show();
+      if (!narrow) {
+        try {
+          localStorage.setItem(TREE_KEY, closed ? "1" : "0");
+        } catch {
+          // the choice lasts for this page only
+        }
+      }
+    });
+    show();
+    treeToggle.hidden = false;
   }
 
   // ---------- formulas ----------

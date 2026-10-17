@@ -2,6 +2,7 @@
 import type { Hono } from "hono";
 import type { Content, KnowledgeEntry } from "./content";
 import * as db from "./db";
+import { defaultKp, drillKps, kpTree } from "./drill";
 import type { AppEnv, KnowledgeData, Meta } from "./env";
 import { buildQueue, type Mode, type Only, type QueueSpec } from "./queues";
 import { isGrade } from "./srs";
@@ -150,8 +151,21 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
   app.get("/bank/:code", async (c) => {
     const code = c.req.param("code");
     if (!content.hasChapter(code)) return c.notFound();
-    return c.html(chapterPage(meta, content.chapter(code), content.outline(code),
-      await loadState(c.env.DB, c.get("user").id, content)));
+    const uid = c.get("user").id;
+    const [state, gradedToday] = await Promise.all([loadState(c.env.DB, uid, content), db.gradedOn(c.env.DB, uid, today())]);
+    const kps = drillKps(content, code, state.status);
+    const asked = intOrNull(c.req.query("kp"));
+    const current = kps[(asked !== null && asked >= 1 && asked <= kps.length ? asked : defaultKp(kps)) - 1];
+    const codes = content.chapters.map((ch) => ch.code);
+    const at = codes.indexOf(code);
+    const prev: [string, string] | null = current.index > 1 ? ["上一节", `/bank/${code}?kp=${current.index - 1}`]
+      : at > 0 ? ["上一章", `/bank/${codes[at - 1]}?kp=${drillKps(content, codes[at - 1], state.status).length}`] : null;
+    const following: [string, string] | null = current.index < kps.length ? ["下一节", `/bank/${code}?kp=${current.index + 1}`]
+      : at + 1 < codes.length ? ["下一章", `/bank/${codes[at + 1]}?kp=1`] : null;
+    return c.html(chapterPage(meta, {
+      chapter: content.chapter(code), chapters: content.chapters, tree: kpTree(kps), current, prev, following, state,
+      texts: content.texts, gradedToday,
+    }));
   });
 
   app.post("/bank/exclude", async (c) => {
@@ -167,6 +181,21 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     }
     await db.setExcluded(c.env.DB, c.get("user").id, targets, str(form.excluded) === "1");
     return c.redirect(safeBack(str(form.back), "/bank"), 303);
+  });
+
+  // Grade a question from the chapter page. A question graded today is left alone, so a double click is one review.
+  app.post("/q/:num/grade", async (c) => {
+    const DB = c.env.DB;
+    const uid = c.get("user").id;
+    const num = intOrNull(c.req.param("num"));
+    const q = num === null ? undefined : content.questions.get(num);
+    if (!q) return c.notFound();
+    const form = await c.req.parseBody();
+    const grade = str(form.grade);
+    if (isGrade(grade) && !(await db.gradedOn(DB, uid, today())).has(q.num)) {
+      await db.recordReview(DB, uid, { num: q.num, grade, at: now(), mode: "browse" });
+    }
+    return c.redirect(safeBack(str(form.back), `/bank/${q.chapter}#q-${q.num}`), 303);
   });
 
   app.get("/q/:num", async (c) => {

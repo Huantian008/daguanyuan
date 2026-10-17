@@ -11,21 +11,21 @@
 {%- endmacro %}
 
 {# The question as text (KaTeX) and as the original image; app.js shows one of them, without JavaScript both show. #}
-{% macro question_body(q, text) -%}
+{% macro question_body(q, text, force_lazy=false, data_correct=false) -%}
 {% set view = 'image' if not text or text.figure else 'text' %}
 <div class="qview" data-view="{{ view }}"{% if text and text.figure %} data-figure{% endif %}>
   {% if text %}
   <div class="qtext">
     {{ text.stem|safe }}
-    {% if text.options %}<ul class="qopts{% if text.options_wide %} qopts-wide{% endif %}">{% for key, html in text.options %}<li><b>{{ key }}.</b> {{ html|safe }}</li>{% endfor %}</ul>{% endif %}
+    {% if text.options %}<ul class="qopts{% if text.options_wide %} qopts-wide{% endif %}">{% for key, html in text.options %}<li{% if data_correct and key == text.answer_key %} data-correct{% endif %}><b>{{ key }}.</b> {{ html|safe }}</li>{% endfor %}</ul>{% endif %}
   </div>
   {% endif %}
-  <div class="qimage paper">{{ images([q.img], 'qimg', '题目 #%03d' % q.num, 1.6, lazy=(view == 'text')) }}</div>
+  <div class="qimage paper">{{ images([q.img], 'qimg', '题目 #%03d' % q.num, 1.6, lazy=(view == 'text' or force_lazy)) }}</div>
 </div>
 {%- endmacro %}
 
-{# The answer as text with any erratum below it, the 答案速查 image folded away, then the solution images. #}
-{% macro answer_body(q, text) -%}
+{# The answer as text with any erratum below it, then the 答案速查 image folded away. #}
+{% macro answer_part(q, text) -%}
 <h2 class="panel-label">答案</h2>
 {% if text %}
 <div class="qanswer">{% if text.answer_key %}<p><b>{{ text.answer_key }}.</b> {{ text.option(text.answer_key)|safe }}</p>{% else %}{{ text.answer|safe }}{% endif %}</div>
@@ -34,8 +34,48 @@
 {% else %}
 <div class="paper">{{ images([q.answer], 'aimg', '答案', 2.2) }}</div>
 {% endif %}
+{%- endmacro %}
+
+{% macro solution_part(q) -%}
 <h2 class="panel-label">解析 <span class="muted">{{ q.solution|length }} 张图</span></h2>
 <div class="paper">{{ images(q.solution, 'simg', '解析', 2) }}</div>
+{%- endmacro %}
+
+{% macro answer_body(q, text) -%}
+{{ answer_part(q, text) }}
+{{ solution_part(q) }}
+{%- endmacro %}
+
+{# One question on the chapter page: header, the question, a bar of buttons, and the answer and solution folded away. #}
+{% macro qcard(q, text, status, index, graded, back) -%}
+<article class="qcard{% if status == 'excluded' %} is-excluded{% endif %}" id="q-{{ q.num }}"{% if text and text.answer_key %} data-choice{% endif %}>
+  <header class="qc-head">
+    <strong class="qc-num" title="#{{ '%03d' % q.num }}">{{ index }}</strong>
+    <span class="qc-src">{{ q.source_full }}</span>
+    <span class="qc-path">{{ q.path|join(' / ') }}</span>
+    <span class="qc-meta"><span class="qdiff" title="原书得分率 {{ q.difficulty }}">{{ q.stars|stars }}</span> 建议 {{ q.minutes }} 分钟{% for flag in q.flags %} <span class="flag">{{ flag }}</span>{% endfor %}</span>
+    {% if text and status != 'excluded' %}<button type="button" class="qview-toggle js-qview" aria-pressed="false" title="在文字和原图之间切换" hidden>原图</button>{% endif %}
+    <span class="qc-tools"><a class="btn-quiet" href="/q/{{ q.num }}">详情</a>{{ exclude_toggle(status == 'excluded', back, nums=q.num) }}</span>
+  </header>
+  {% if status != 'excluded' %}
+  {{ question_body(q, text, force_lazy=true, data_correct=true) }}
+  <div class="qc-actions">
+    <div class="qc-toggles">
+      <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qa-{{ q.num }}" data-label="答案" hidden>查看答案</button>
+      <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qs-{{ q.num }}" data-label="解析" hidden>查看解析</button>
+    </div>
+    <form method="post" action="/q/{{ q.num }}/grade" class="qc-grades">
+      <input type="hidden" name="back" value="{{ back }}">
+      {% if graded %}<span class="qc-graded">今天已评</span>{% endif %}
+      <button name="grade" value="shaky" class="qc-grade qc-grade-shaky{% if graded == 'shaky' %} is-picked{% endif %}"{% if graded %} disabled{% endif %}>不熟练</button>
+      <button name="grade" value="unknown" class="qc-grade qc-grade-unknown{% if graded == 'unknown' %} is-picked{% endif %}"{% if graded %} disabled{% endif %}>不会</button>
+      <button name="grade" value="mastered" class="qc-grade qc-grade-mastered{% if graded == 'mastered' %} is-picked{% endif %}"{% if graded %} disabled{% endif %}>掌握</button>
+    </form>
+  </div>
+  <section class="qc-panel" id="qa-{{ q.num }}" data-panel="answer" aria-label="答案">{{ answer_part(q, text) }}</section>
+  <section class="qc-panel" id="qs-{{ q.num }}" data-panel="solution" aria-label="解析">{{ solution_part(q) }}</section>
+  {% endif %}
+</article>
 {%- endmacro %}
 
 {% macro katex_head() -%}<link rel="stylesheet" href="/static/vendor/katex/katex.min.css">{%- endmacro %}

@@ -77,6 +77,13 @@ export async function advanceSession(db: D1Database, uid: number, session: Pract
   await advanceStatement(db, uid, session, at).run();
 }
 
+/** The grade each question got on a study day (the last one, if it was graded more than once). */
+export async function gradedOn(db: D1Database, uid: number, day: Day): Promise<Map<number, Grade>> {
+  const { results } = await db.prepare("SELECT num, grade FROM reviews WHERE user_id = ? AND study_day = ? ORDER BY reviewed_at, id")
+    .bind(uid, day).all<{ num: number; grade: Grade }>();
+  return new Map(results.map((r) => [r.num, r.grade]));
+}
+
 export async function reviewLog(db: D1Database, uid: number, since?: Day): Promise<Review[]> {
   const stmt = since
     ? db.prepare("SELECT * FROM reviews WHERE user_id = ? AND study_day >= ? ORDER BY reviewed_at, id").bind(uid, since)

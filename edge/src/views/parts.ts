@@ -2,6 +2,7 @@
 import { html, raw } from "hono/html";
 import { sectionLabel, type Img, type KnowledgeEntry, type Question, type QuestionText, type Section } from "../content";
 import type { Meta } from "../env";
+import type { Grade } from "../srs";
 import type { UserState } from "../state";
 import type { Distribution } from "../stats";
 import { contentUrl, pad3, staticUrl, stars, type Html } from "./util";
@@ -19,19 +20,19 @@ export function qmeta(q: Question, text?: QuestionText): Html {
 }
 
 /** The question as text (KaTeX) and as the original image; app.js shows one of them, without JavaScript both show. */
-export function questionBody(meta: Meta, q: Question, text?: QuestionText): Html {
+export function questionBody(meta: Meta, q: Question, text?: QuestionText, o: { forceLazy?: boolean; dataCorrect?: boolean } = {}): Html {
   const view = !text || text.figure ? "image" : "text";
   return html`<div class="qview" data-view="${view}"${text?.figure ? raw(" data-figure") : ""}>
   ${text ? html`<div class="qtext">
     ${raw(text.stem)}
-    ${text.options.length ? html`<ul class="qopts${text.options_wide ? " qopts-wide" : ""}">${text.options.map(([key, opt]) => html`<li><b>${key}.</b> ${raw(opt)}</li>`)}</ul>` : ""}
+    ${text.options.length ? html`<ul class="qopts${text.options_wide ? " qopts-wide" : ""}">${text.options.map(([key, opt]) => html`<li${o.dataCorrect && key === text.answer_key ? raw(" data-correct") : ""}><b>${key}.</b> ${raw(opt)}</li>`)}</ul>` : ""}
   </div>` : ""}
-  <div class="qimage paper">${images(meta, [q.img], "qimg", `题目 #${pad3(q.num)}`, 1.6, view === "text")}</div>
+  <div class="qimage paper">${images(meta, [q.img], "qimg", `题目 #${pad3(q.num)}`, 1.6, view === "text" || !!o.forceLazy)}</div>
 </div>`;
 }
 
-/** The answer as text with any erratum below it, the 答案速查 image folded away, then the solution images. */
-export function answerBody(meta: Meta, q: Question, text?: QuestionText): Html {
+/** The answer as text with any erratum below it, then the 答案速查 image folded away. */
+export function answerPart(meta: Meta, q: Question, text?: QuestionText): Html {
   const option = text?.answer_key ? text.options.find(([key]) => key === text.answer_key)?.[1] : undefined;
   const answer = text
     ? html`<div class="qanswer">${text.answer_key ? html`<p><b>${text.answer_key}.</b> ${raw(option ?? "")}</p>` : raw(text.answer)}</div>
@@ -39,9 +40,48 @@ ${text.erratum ? html`<p class="erratum"><b>勘误</b>${raw(text.erratum)}</p>` 
 <details class="raw-img"><summary>答案原图</summary><div class="paper">${images(meta, [q.answer], "aimg", "答案", 2.2)}</div></details>`
     : html`<div class="paper">${images(meta, [q.answer], "aimg", "答案", 2.2)}</div>`;
   return html`<h2 class="panel-label">答案</h2>
-${answer}
-<h2 class="panel-label">解析 <span class="muted">${q.solution.length} 张图</span></h2>
+${answer}`;
+}
+
+export const solutionPart = (meta: Meta, q: Question): Html => html`<h2 class="panel-label">解析 <span class="muted">${q.solution.length} 张图</span></h2>
 <div class="paper">${images(meta, q.solution, "simg", "解析", 2)}</div>`;
+
+export const answerBody = (meta: Meta, q: Question, text?: QuestionText): Html => html`${answerPart(meta, q, text)}
+${solutionPart(meta, q)}`;
+
+/** One question on the chapter page: header, the question, a bar of buttons, and the answer and solution folded away. */
+export function questionCard(
+  meta: Meta, q: Question, text: QuestionText | undefined, status: Status, index: number, graded: Grade | undefined, back: string,
+): Html {
+  const excluded = status === "excluded";
+  const gradeButton = (grade: Grade, label: string) =>
+    html`<button name="grade" value="${grade}" class="qc-grade qc-grade-${grade}${graded === grade ? " is-picked" : ""}"${graded ? raw(" disabled") : ""}>${label}</button>`;
+  return html`<article class="qcard${excluded ? " is-excluded" : ""}" id="q-${q.num}"${text?.answer_key ? raw(" data-choice") : ""}>
+  <header class="qc-head">
+    <strong class="qc-num" title="#${pad3(q.num)}">${index}</strong>
+    <span class="qc-src">${q.source_full}</span>
+    <span class="qc-path">${q.path.join(" / ")}</span>
+    <span class="qc-meta"><span class="qdiff" title="原书得分率 ${q.difficulty}">${stars(q.stars)}</span> 建议 ${q.minutes} 分钟${q.flags.map((flag) => html` <span class="flag">${flag}</span>`)}</span>
+    ${text && !excluded ? html`<button type="button" class="qview-toggle js-qview" aria-pressed="false" title="在文字和原图之间切换" hidden>原图</button>` : ""}
+    <span class="qc-tools"><a class="btn-quiet" href="/q/${q.num}">详情</a>${excludeToggle(excluded, back, { nums: String(q.num) })}</span>
+  </header>
+  ${excluded ? "" : html`${questionBody(meta, q, text, { forceLazy: true, dataCorrect: true })}
+  <div class="qc-actions">
+    <div class="qc-toggles">
+      <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qa-${q.num}" data-label="答案" hidden>查看答案</button>
+      <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qs-${q.num}" data-label="解析" hidden>查看解析</button>
+    </div>
+    <form method="post" action="/q/${q.num}/grade" class="qc-grades">
+      <input type="hidden" name="back" value="${back}">
+      ${graded ? html`<span class="qc-graded">今天已评</span>` : ""}
+      ${gradeButton("shaky", "不熟练")}
+      ${gradeButton("unknown", "不会")}
+      ${gradeButton("mastered", "掌握")}
+    </form>
+  </div>
+  <section class="qc-panel" id="qa-${q.num}" data-panel="answer" aria-label="答案">${answerPart(meta, q, text)}</section>
+  <section class="qc-panel" id="qs-${q.num}" data-panel="solution" aria-label="解析">${solutionPart(meta, q)}</section>`}
+</article>`;
 }
 
 export const katexCss = (meta: Meta): Html => html`<link rel="stylesheet" href="${staticUrl(meta, "vendor/katex/katex.min.css")}">`;

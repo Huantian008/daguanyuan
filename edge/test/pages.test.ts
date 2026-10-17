@@ -204,6 +204,100 @@ describe("bank", () => {
     expect(chapter).toContain("基本概念题");
     expect((await client.get("/bank/Z")).status).toBe(404);
   });
+
+  it("lays out one 考点 with its questions on the chapter page", async () => {
+    const { client } = await loggedIn();
+    const page = await text(client, "/bank/B");
+    expect(page).toContain('id="q-4"');
+    expect(page).toContain('id="q-5"');
+    expect(page).not.toContain('id="q-6"');
+    expect(page).toContain('action="/q/4/grade"');
+    expect(page).toContain('name="grade" value="mastered"');
+    expect(page).toContain('id="qa-4"');
+    expect(page).toContain('id="qs-4"');
+    expect(page).toContain("s/004-1.webp");
+    expect(page).toMatch(/class="qimg"[^>]*loading="lazy"/);
+    expect(page).not.toContain("data-shortcuts");
+    expect(page).toMatch(/href="\/bank\/B\?kp=2"[^>]*>\s*<span class="kt-name">隐函数求导<\/span>\s*<span class="kt-count">0 \/ 0<\/span>/);
+  });
+
+  it("opens on the first 考点 with work left, and takes ?kp=", async () => {
+    const { client } = await loggedIn();
+    expect(await text(client, "/bank/A")).toContain('id="q-1"');
+    await client.post("/q/1/grade", { grade: "mastered" });
+    const page = await text(client, "/bank/A");
+    expect(page).toContain('id="q-2"');
+    expect(page).not.toContain('id="q-1"');
+    expect(await text(client, "/bank/A?kp=3")).toContain('id="q-3"');
+    expect(await text(client, "/bank/A?kp=99")).toContain('id="q-2"');
+  });
+
+  it("steps between 考点 and chapters", async () => {
+    const { client } = await loggedIn();
+    const first = await text(client, "/bank/A?kp=1");
+    expect(first).toContain('href="/bank/A?kp=2"');
+    expect(first).toContain("下一节");
+    expect(first).not.toContain("上一章");
+    expect(first).not.toContain("上一节");
+    const last = await text(client, "/bank/A?kp=3");
+    expect(last).toContain('href="/bank/B?kp=1"');
+    expect(last).toContain("下一章");
+    const nextChapter = await text(client, "/bank/B?kp=1");
+    expect(nextChapter).toContain('href="/bank/A?kp=3"');
+    expect(nextChapter).toContain("上一章");
+  });
+
+  it("grades from the chapter page once a study day", async () => {
+    const { client, clock } = await loggedIn();
+    const res = await client.post("/q/4/grade", { grade: "mastered", back: "/bank/B?kp=1#q-4" });
+    expect(res.status).toBe(303);
+    expect(res.headers.get("location")).toBe("/bank/B?kp=1#q-4");
+    const page = await text(client, "/bank/B");
+    expect(page).toContain("今天已评");
+    expect(page).toMatch(/is-picked[^>]*disabled/);
+    expect(await text(client, "/q/4")).toContain("chip-mastered");
+    // a second click the same study day changes nothing: the card would otherwise jump a level
+    await client.post("/q/4/grade", { grade: "mastered" });
+    await client.post("/q/4/grade", { grade: "unknown" });
+    const detail = await text(client, "/q/4");
+    expect(detail.match(/chip-mastered/g)).toHaveLength(2);
+    expect(visible(detail)).not.toContain("完全不会");
+    // the next study day it can be graded again
+    clock.addDays(1);
+    await client.post("/q/4/grade", { grade: "shaky" });
+    expect(visible(await text(client, "/q/4"))).toContain("不熟练/错误");
+  });
+
+  it("ignores bad input when grading from the chapter page", async () => {
+    const { client } = await loggedIn();
+    const res = await client.post("/q/4/grade", { grade: "perfect" });
+    expect(res.status).toBe(303);
+    expect(res.headers.get("location")).toBe("/bank/B#q-4");
+    expect(await text(client, "/bank/B")).not.toContain("今天已评");
+    expect((await client.post("/q/999/grade", { grade: "mastered" })).status).toBe(404);
+    const evil = await client.post("/q/4/grade", { grade: "shaky", back: "//evil.example" });
+    expect(evil.headers.get("location")).toBe("/bank/B#q-4");
+  });
+
+  it("keeps excluded questions on the chapter page as a header only", async () => {
+    const { client } = await loggedIn();
+    const page = await text(client, "/bank/B?kp=2");
+    expect(page).toContain('id="q-6"');
+    expect(page).toContain('class="qcard is-excluded"');
+    expect(page).not.toContain('action="/q/6/grade"');
+    expect(page).toContain("恢复，要做");
+  });
+
+  it("shows the correct option and the question as text", async () => {
+    const { client } = await loggedIn({ texts: TEXTS });
+    const page = await text(client, "/bank/A?kp=1");
+    expect(page).toContain("<li data-correct><b>C.</b>");
+    expect(page).toContain("<li><b>A.</b>");
+    expect(page).toContain('class="qtext"');
+    expect(page).toContain("katex.min.js");
+    expect(page).toMatch(/class="qcard"[^>]*data-choice/);
+    expect(page).toContain("勘误");
+  });
 });
 
 describe("search", () => {
