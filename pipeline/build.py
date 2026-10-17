@@ -10,14 +10,15 @@ from datetime import datetime
 from pathlib import Path
 
 import fitz
+from PIL import Image
 
 from . import sources
 from .answers import parse_answers
 from .chapters import CHAPTERS, chapter_of
 from .imaging import extract_image, is_jpeg, render_clip, save_webp, trim_whitespace
 from .knowledge import QUESTION_CHAPTER_LINKS, parse_markdown_index, title_of
-from .questions import QuestionMeta, parse_questions
-from .solutions import align, parse_outline, solution_images
+from .questions import STATEMENT_FROM_SOLUTION, QuestionMeta, parse_questions, render_question
+from .solutions import ImageRef, align, parse_outline, solution_images
 from .validate import validate
 
 QUESTION_ZOOM = 3
@@ -38,10 +39,25 @@ def _flags(q: QuestionMeta) -> list[str]:
     return flags
 
 
-def _save_embedded(doc: fitz.Document, xref: int, page_index: int, bbox, out: Path) -> tuple[int, int]:
+def _embedded(doc: fitz.Document, xref: int, page_index: int, bbox) -> tuple[Image.Image, bool]:
+    """An embedded image, or the region rendered when there is none, and whether to store it losslessly."""
     if xref:
-        return save_webp(extract_image(doc, xref), out, lossless=not is_jpeg(doc, xref))
-    return save_webp(render_clip(doc[page_index], bbox, QUESTION_ZOOM), out)
+        return extract_image(doc, xref), not is_jpeg(doc, xref)
+    return render_clip(doc[page_index], bbox, QUESTION_ZOOM), True
+
+
+def _save_embedded(doc: fitz.Document, xref: int, page_index: int, bbox, out: Path) -> tuple[int, int]:
+    img, lossless = _embedded(doc, xref, page_index, bbox)
+    return save_webp(img, out, lossless=lossless)
+
+
+def _save_question(qdoc: fitz.Document, sdoc: fitz.Document, q: QuestionMeta, solution: list[ImageRef],
+                   out: Path) -> tuple[int, int]:
+    if q.num in STATEMENT_FROM_SOLUTION:
+        first = solution[0]
+        img, lossless = _embedded(sdoc, first.xref, first.page_index, first.bbox)
+        return save_webp(trim_whitespace(img), out, lossless=lossless)
+    return save_webp(trim_whitespace(render_question(qdoc, q, QUESTION_ZOOM)), out)
 
 
 def build_questions(content_dir: Path, only: set[int] | None = None) -> tuple[list[dict], dict]:
@@ -56,13 +72,13 @@ def build_questions(content_dir: Path, only: set[int] | None = None) -> tuple[li
             fitz.open(sources.SOLUTIONS_PDF) as sdoc:
         for i, q in enumerate(selected, start=1):
             n = f"{q.num:03d}"
-            question_img = trim_whitespace(render_clip(qdoc[q.page_index], q.rect, QUESTION_ZOOM))
-            question_size = save_webp(question_img, content_dir / f"q/{n}.webp")
+            entry = alignment.matched[q.num]
+            refs = solution_images(sdoc, outline, entry)
+            question_size = _save_question(qdoc, sdoc, q, refs, content_dir / f"q/{n}.webp")
             answer = answers[q.num]
             answer_size = _save_embedded(adoc, answer.xref, answer.page_index, answer.bbox, content_dir / f"a/{n}.webp")
-            entry = alignment.matched[q.num]
             solution = []
-            for k, ref in enumerate(solution_images(sdoc, outline, entry), start=1):
+            for k, ref in enumerate(refs, start=1):
                 rel = f"s/{n}-{k}.webp"
                 solution.append(_image(rel, _save_embedded(sdoc, ref.xref, ref.page_index, ref.bbox, content_dir / rel)))
             records.append({
