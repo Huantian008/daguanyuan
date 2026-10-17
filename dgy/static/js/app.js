@@ -1,4 +1,4 @@
-// 大观园：主题切换；练习页和题目页的展开开关与快捷键；知识点抽屉；知识点文字版的公式渲染。
+// 大观园：主题切换、题目字号；练习页和题目页的展开开关与快捷键；知识点抽屉；知识点文字版的公式渲染。
 // 页面不依赖这段脚本也能用：没有脚本时答案和知识点直接展开，知识点链接打开文字版页面。
 (() => {
   const root = document.documentElement;
@@ -33,6 +33,36 @@
     });
     show();
     themeButton.hidden = false;
+  }
+
+  // ---------- question text size: 标准 / 大 / 特大, on pages that show question text ----------
+
+  const QSIZE_KEY = "dgy-qsize";
+  const QSIZES = ["normal", "large", "xl"];
+  const QSIZE_LABELS = { normal: "标准", large: "大", xl: "特大" };
+  const sizeButton = document.querySelector(".js-qsize");
+  if (sizeButton && document.querySelector(".qtext, .qanswer")) {
+    const show = () => {
+      const size = root.dataset.qsize || "large";
+      const label = `题目字号：${QSIZE_LABELS[size]}`;
+      sizeButton.dataset.size = size;
+      sizeButton.setAttribute("aria-label", label);
+      sizeButton.title = `${label}（点按切换）`;
+    };
+    sizeButton.addEventListener("click", () => {
+      const next = QSIZES[(QSIZES.indexOf(root.dataset.qsize || "large") + 1) % QSIZES.length];
+      if (next === "large") delete root.dataset.qsize;
+      else root.dataset.qsize = next;
+      try {
+        if (next === "large") localStorage.removeItem(QSIZE_KEY);
+        else localStorage.setItem(QSIZE_KEY, next);
+      } catch {
+        // private window or blocked storage: the choice lasts for this page only
+      }
+      show();
+    });
+    show();
+    sizeButton.hidden = false;
   }
 
   // ---------- 「答案与解析」「知识点」 toggles ----------

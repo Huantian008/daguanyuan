@@ -40,12 +40,12 @@ describe("question text", () => {
   });
 });
 
-describe("theme markup", () => {
+describe("theme and question size markup", () => {
   it("is the same as the Python templates'", async () => {
     const { client } = setup();
     await client.login();
     const page = await (await client.get("/")).text();
-    for (const name of ["_theme_head.html", "_theme_toggle.html"]) {
+    for (const name of ["_theme_head.html", "_qsize_toggle.html", "_theme_toggle.html"]) {
       const snippet = readFileSync(new URL(`../../dgy/templates/${name}`, import.meta.url), "utf8").trim();
       expect(page).toContain(snippet);
     }

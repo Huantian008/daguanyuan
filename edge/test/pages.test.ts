@@ -30,6 +30,13 @@ describe("layout", () => {
     expect(page).toContain('classList.add("js")');
     expect(page).toContain('localStorage.getItem("dgy-theme")');
   });
+
+  it("has a question size switch that JavaScript shows", async () => {
+    const { client } = await loggedIn();
+    const page = await text(client, "/bank/A");
+    expect(page).toMatch(/class="qsize-toggle js-qsize"[^>]*hidden>Aa<\/button>/);
+    expect(page).toContain('localStorage.getItem("dgy-qsize")');
+  });
 });
 
 describe("dashboard", () => {

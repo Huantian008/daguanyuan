@@ -198,6 +198,12 @@ def test_top_bar_has_a_theme_switch_shown_by_javascript(env):
     assert 'classList.add("js")' in page and 'localStorage.getItem("dgy-theme")' in page
 
 
+def test_top_bar_has_a_question_size_switch_shown_by_javascript(env):
+    page = env.client.get("/bank/A").text
+    assert re.search(r'class="qsize-toggle js-qsize"[^>]*hidden>Aa</button>', page)
+    assert 'localStorage.getItem("dgy-qsize")' in page
+
+
 def test_grading_a_question_that_is_not_current_is_ignored(env):
     url = start(env, mode="group", chapter="A")
     grade(env, url, 3, "mastered")

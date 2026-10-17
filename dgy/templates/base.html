@@ -22,6 +22,7 @@
         <a href="/history" {% if nav == 'history' %}aria-current="page"{% endif %}>学习记录</a>
         <a href="/settings" {% if nav == 'settings' %}aria-current="page"{% endif %}>设置</a>
       </nav>
+      {% include "_qsize_toggle.html" %}
       {% include "_theme_toggle.html" %}
     </div>
   </header>
