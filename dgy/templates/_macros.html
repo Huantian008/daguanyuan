@@ -47,7 +47,8 @@
 {%- endmacro %}
 
 {# One question on the chapter page: header, the question, a bar of buttons, and the answer and solution folded away. #}
-{% macro qcard(q, text, status, index, graded, back, sections, knowledge, titles, history, card) -%}
+{# `mode` is warmup / due on those pages, so the grade is recorded as part of them. #}
+{% macro qcard(q, text, status, index, graded, back, sections, knowledge, titles, history, card, mode='') -%}
 <article class="qcard{% if status == 'excluded' %} is-excluded{% endif %}" id="q-{{ q.num }}"{% if text and text.answer_key %} data-choice{% endif %}>
   <header class="qc-head">
     <strong class="qc-num" title="#{{ '%03d' % q.num }}">{{ index }}</strong>
@@ -67,7 +68,7 @@
       <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qh-{{ q.num }}" hidden>做题记录</button>
     </div>
     <form method="post" action="/q/{{ q.num }}/grade" class="qc-grades">
-      <input type="hidden" name="back" value="{{ back }}">
+      <input type="hidden" name="back" value="{{ back }}">{% if mode %}<input type="hidden" name="mode" value="{{ mode }}">{% endif %}
       {% if graded %}<span class="qc-graded">今天已评</span>{% endif %}
       <button name="grade" value="shaky" class="qc-grade qc-grade-shaky{% if graded == 'shaky' %} is-picked{% endif %}"{% if graded %} disabled{% endif %}>不熟练</button>
       <button name="grade" value="unknown" class="qc-grade qc-grade-unknown{% if graded == 'unknown' %} is-picked{% endif %}"{% if graded %} disabled{% endif %}>不会</button>
@@ -108,18 +109,6 @@
   <li><i class="dot dot-unknown"></i>完全不会<b>{{ dist.unknown }}</b></li>
   <li><i class="dot dot-new"></i>未做<b>{{ dist.new }}</b></li>
 </ul>
-{%- endmacro %}
-
-{% macro start(label, mode, cls='btn', chapter='', section='', kp='', only='all', nums='', disabled=false) -%}
-<form method="post" action="/practice/start" class="inline">
-  <input type="hidden" name="mode" value="{{ mode }}">
-  {%- if chapter %}<input type="hidden" name="chapter" value="{{ chapter }}">{% endif %}
-  {%- if section %}<input type="hidden" name="section" value="{{ section }}">{% endif %}
-  {%- if kp %}<input type="hidden" name="kp" value="{{ kp }}">{% endif %}
-  {%- if only != 'all' %}<input type="hidden" name="only" value="{{ only }}">{% endif %}
-  {%- if nums %}<input type="hidden" name="nums" value="{{ nums }}">{% endif %}
-  <button class="{{ cls }}"{% if disabled %} disabled{% endif %}>{{ label }}</button>
-</form>
 {%- endmacro %}
 
 {% macro exclude_toggle(excluded, back, nums='', chapter='', section='', kp='', on_label='不做了') -%}
@@ -178,20 +167,9 @@
 {% endif %}
 {%- endmacro %}
 
-{% macro knowledge_panel(q, sections, knowledge, titles) -%}
-<p class="kn-kp">书上的考点 <b>{{ q.kp }}</b> <span class="muted">{{ q.path|join(' / ') }}</span></p>
-{% if sections %}
-{{ kn_links(sections, titles) }}
-{% else %}
-<p class="muted">这道题还没有逐题标注，先看整章：{% for k in knowledge if k %}{% if not loop.first %}、{% endif %}<a href="/knowledge/{{ k.slug }}?tab=text">{{ k.title }}</a>{% endfor %}</p>
-{% endif %}
-{%- endmacro %}
-
 {% macro section_questions(nums, state, label='本节题目') -%}
-{% set open_nums = nums|reject('in', state.excluded)|list %}
 <div class="section-qs">
   <span class="section-qs-label">{{ label }}</span>
   <span class="chips">{% for n in nums %}<a class="chip chip-{{ state.status(n) }}" href="/q/{{ n }}">{{ '%03d' % n }}</a>{% endfor %}</span>
-  {% if open_nums %}{{ start('练这 %d 题' % open_nums|length, 'single', cls='btn btn-small', nums=open_nums|join(',')) }}{% endif %}
 </div>
 {%- endmacro %}

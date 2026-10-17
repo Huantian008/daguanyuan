@@ -1,5 +1,6 @@
 import json
 import re
+import sqlite3
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
@@ -69,16 +70,14 @@ def visible(html):
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html))
 
 
-def start(env, **form):
-    r = env.client.post("/practice/start", data=form, follow_redirects=False)
+def grade(env, num, value, **form):
+    r = env.client.post(f"/q/{num}/grade", data={"grade": value, **form}, follow_redirects=False)
     assert r.status_code == 303
-    return r.headers["location"]
 
 
-def grade(env, url, num, value):
-    r = env.client.post(url + "/grade", data={"num": str(num), "grade": value},
-                        follow_redirects=False)
-    assert r.status_code == 303
+def review_modes(env):
+    with sqlite3.connect(env.settings.db_path) as conn:
+        return conn.execute("SELECT num, mode FROM reviews ORDER BY id").fetchall()
 
 
 def test_dashboard_shows_exam_countdown_and_empty_queues(env):
@@ -87,34 +86,84 @@ def test_dashboard_shows_exam_countdown_and_empty_queues(env):
     assert 'data-due-count="0"' in page and 'data-warmup-count="0"' in page
     # nothing to warm up or review: a calm note instead of a disabled button
     assert "今天不用热身" in page and "今天没有到期的题" in page and "disabled" not in page
-    # no open session: what is left over the whole bank (#6 is excluded), and the only primary button
-    assert "<b>5</b> 题没做过" in page and '<a class="btn btn-primary" href="/bank">去题库选题</a>' in page
+    # nothing graded yet: 继续往下做 starts at the first 考点 of the book, and has the only primary button
+    assert "<b>1</b> 题没做" in page and "函数极限连续 / 函数性质 / 有界" in page
+    assert '<a class="btn btn-primary" href="/bank/A?kp=1">开始做题</a>' in page
 
 
-def test_practice_by_chapter_grades_and_moves_to_next_question(env):
-    url = start(env, mode="group", chapter="A")
-    page = env.client.get(url).text
-    assert "#001" in page
-    for src in ("q/001.webp", "a/001.webp", "s/001-1.webp"):
-        assert src in page
-    grade(env, url, 1, "unknown")
-    assert "#002" in env.client.get(url).text
-    assert 'data-dist-unknown="1"' in env.client.get("/").text
+def test_dashboard_picks_up_where_the_last_chapter_page_grade_left_off(env):
+    grade(env, 4, "mastered")
+    page = env.client.get("/").text
+    assert '<a class="btn btn-primary" href="/bank/B?kp=1">继续上次</a>' in page
+    assert "<b>1</b> 题没做" in page and "一元微分 / 导数概念 / 基本概念题" in page and "换个考点" in page
+    # #2's 考点 is done now, so it moves on to the next one with work left
+    grade(env, 2, "mastered")
+    assert 'href="/bank/A?kp=3">继续上次</a>' in env.client.get("/").text
+    # grading in warm-up the next day does not move it back to #4
+    env.clock.at += timedelta(days=1)
+    grade(env, 4, "mastered", mode="warmup")
+    page = env.client.get("/").text
+    assert 'href="/bank/A?kp=3">继续上次</a>' in page and "/practice/" not in page
 
 
-def test_practice_page_has_no_timer(env):
-    page = env.client.get(start(env, mode="group", chapter="A")).text
-    assert "timer" not in page and 'name="elapsed"' not in page
+def test_dashboard_says_so_when_the_whole_bank_is_done(env):
+    for num in (1, 2, 3, 4, 5):
+        grade(env, num, "mastered")
+    page = env.client.get("/").text
+    assert "整本题库都做过一遍了" in page and '<a class="btn btn-primary" href="/bank">去题库</a>' in page
 
 
-def test_practice_page_switches_work_without_javascript(env):
-    page = env.client.get(start(env, mode="group", chapter="A")).text
+def test_weak_spots_lead_to_their_kp_on_the_chapter_page(env):
+    grade(env, 3, "unknown")
+    assert '<a class="btn btn-small" href="/bank/A?kp=3">去巩固</a>' in env.client.get("/").text
+
+
+def test_next_day_offers_warmup_and_due_review_as_card_pages(env):
+    grade(env, 1, "shaky")
+    env.clock.at += timedelta(days=1)
+    page = env.client.get("/").text
+    assert 'data-warmup-count="1"' in page and 'data-due-count="1"' in page and "今天不用热身" not in page
+    # warm-up comes first tonight, so it alone gets the primary button
+    assert '<a class="btn btn-primary" href="/review/warmup">开始热身</a>' in page
+    assert '<a class="btn" href="/review/due">开始复习</a>' in page
+    for mode in ("warmup", "due"):
+        cards = env.client.get(f"/review/{mode}").text
+        assert 'id="q-1"' in cards and 'action="/q/1/grade"' in cards and 'id="q-2"' not in cards
+        assert (f'<input type="hidden" name="back" value="/review/{mode}#q-1">'
+                f'<input type="hidden" name="mode" value="{mode}">') in cards
+        assert "今天已评 0 / 1 题" in cards
+
+
+def test_review_page_keeps_a_graded_card_and_records_the_mode(env):
+    grade(env, 1, "shaky")
+    grade(env, 2, "mastered")
+    env.clock.at += timedelta(days=1)
+    r = env.client.post("/q/1/grade", data={"grade": "mastered", "mode": "warmup", "back": "/review/warmup#q-1"},
+                        follow_redirects=False)
+    assert r.headers["location"] == "/review/warmup#q-1"
+    cards = env.client.get("/review/warmup").text
+    assert re.search(r'id="q-1"[\s\S]*今天已评[\s\S]*id="q-2"', cards) and "今天已评 1 / 2 题" in cards
+    assert 'data-warmup-count="1"' in env.client.get("/").text
+    # #1 was due as well; graded today, it has left due review
+    assert "今天没有到期的题。" in env.client.get("/review/due").text
+    assert review_modes(env) == [(1, "browse"), (2, "browse"), (1, "warmup")]
+
+
+def test_any_other_grade_mode_is_recorded_as_a_chapter_page_grade(env):
+    grade(env, 1, "mastered", mode="group")
+    assert review_modes(env) == [(1, "browse")]
+
+
+def test_review_pages_on_a_quiet_day_and_unknown_ones(env):
+    assert "今天不用热身。" in env.client.get("/review/warmup").text
+    assert env.client.get("/review/random").status_code == 404
+
+
+def test_question_page_answer_switch_works_without_javascript(env):
+    page = env.client.get("/q/1").text
     assert ('<button type="button" class="reveal-toggle js-reveal" aria-expanded="false" aria-controls="answer">'
             in page)
-    assert 'aria-controls="knowledge"' in page
-    # Both panels are in the page and not hidden: without JavaScript they simply show.
     assert '<section id="answer" class="reveal-panel"' in page
-    assert '<section id="knowledge" class="reveal-panel"' in page
     assert "这道题还没有逐题标注" in page and 'href="/knowledge/01?tab=text"' in page
 
 
@@ -124,7 +173,7 @@ def tagged(tmp_path):
 
 
 def test_tagged_question_links_to_its_knowledge_section(tagged):
-    page = tagged.client.get(start(tagged, mode="group", chapter="A")).text
+    page = tagged.client.get("/bank/A", params={"kp": "1"}).text
     assert 'href="/knowledge/01?tab=text#1-函数基础"' in page and 'data-anchor="1-函数基础"' in page
     assert 'href="/knowledge/01#p1"' in page and "原版第 1 页" in page
     assert "这道题还没有逐题标注" not in page
@@ -133,11 +182,11 @@ def test_tagged_question_links_to_its_knowledge_section(tagged):
 
 
 def test_knowledge_text_lists_the_questions_of_each_section(tagged):
-    grade(tagged, start(tagged, mode="group", chapter="A"), 1, "shaky")
+    grade(tagged, 1, "shaky")
     block = tagged.client.get("/knowledge/01?tab=text").text.split('id="1-函数基础"', 1)[1]
     assert 'class="section-qs"' in block
     assert '<a class="chip chip-shaky" href="/q/1">001</a>' in block and 'href="/q/3"' in block
-    assert 'name="nums" value="1,3"' in block and "练这 2 题" in block
+    assert "练这" not in block
 
 
 def test_original_pages_list_the_questions_on_them(tagged):
@@ -161,8 +210,8 @@ def texted(tmp_path):
     return _make_env(tmp_path, texts=BANK)
 
 
-def test_practice_shows_the_question_as_text_with_a_switch_to_the_image(texted):
-    page = texted.client.get(start(texted, mode="group", chapter="A")).text
+def test_question_shows_as_text_with_a_switch_to_the_image(texted):
+    page = texted.client.get("/bank/A", params={"kp": "1"}).text
     assert '<div class="qview" data-view="text">' in page
     assert '<span class="math inline">f(x)=\\dfrac{1}{x}</span>' in page
     assert '<li><b>D.</b> 4.</li>' in page  # inline: not turned into a numbered list
@@ -172,7 +221,7 @@ def test_practice_shows_the_question_as_text_with_a_switch_to_the_image(texted):
 
 
 def test_answer_shows_the_option_and_the_erratum(texted):
-    page = texted.client.get(start(texted, mode="group", chapter="A")).text
+    page = texted.client.get("/bank/A", params={"kp": "1"}).text
     assert '<p><b>C.</b> <span class="math inline">x&gt;\\dfrac12</span> 时有界</p>' in page
     assert '<p class="erratum"><b>勘误</b>速查原印 B</p>' in page
     assert '<details class="raw-img"><summary>答案原图</summary>' in page and "a/001.webp" in page
@@ -191,7 +240,7 @@ def test_search_finds_text_in_the_stem(texted):
 
 
 def test_without_the_text_version_the_images_show(env):
-    page = env.client.get(start(env, mode="group", chapter="A")).text
+    page = env.client.get("/q/1").text
     assert '<div class="qview" data-view="image">' in page
     assert "js-qview" not in page and "katex.min.css" not in page
 
@@ -208,47 +257,20 @@ def test_top_bar_has_a_question_size_switch_shown_by_javascript(env):
     assert 'localStorage.getItem("dgy-qsize")' in page
 
 
-def test_grading_a_question_that_is_not_current_is_ignored(env):
-    url = start(env, mode="group", chapter="A")
-    grade(env, url, 3, "mastered")
-    assert "#001" in env.client.get(url).text
-    assert 'data-dist-mastered="0"' in env.client.get("/").text
-
-
-def test_next_day_offers_warmup_and_due_review(env):
-    url = start(env, mode="group", chapter="A")
-    grade(env, url, 1, "shaky")
-    env.clock.at += timedelta(days=1)
-    page = env.client.get("/").text
-    assert 'data-warmup-count="1"' in page and 'data-due-count="1"' in page
-    assert "开始热身" in page and "开始复习" in page and "今天不用热身" not in page
-    # warm-up comes first tonight, so it alone gets the primary button
-    assert '<button class="btn btn-primary">开始热身</button>' in page
-    assert '<button class="btn">开始复习</button>' in page
-    assert re.search(r'<a class="btn" href="/practice/[^"]+">继续上次</a>', page) and "换个考点" in page
-    assert "#001" in env.client.get(start(env, mode="due")).text
-
-
-def test_finishing_a_session_shows_a_summary(env):
-    url = start(env, mode="single", nums="2")
-    grade(env, url, 2, "mastered")
-    page = env.client.get(url).text
-    assert "这组做完了" in page and "完全掌握 1" in page
-
-
-def test_excluding_a_kp_removes_it_from_queues(env):
+def test_excluding_a_kp_skips_it(env):
     r = env.client.post("/bank/exclude", data={"chapter": "A", "section": "函数性质", "kp": "有界",
                                                "excluded": "1", "back": "/bank/A"}, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/bank/A"
-    assert "#002" in env.client.get(start(env, mode="group", chapter="A")).text
+    assert 'id="q-2"' in env.client.get("/bank/A").text
+    assert 'href="/bank/A?kp=2">开始做题</a>' in env.client.get("/").text
     assert "不做" in env.client.get("/q/1").text
 
 
 def test_question_6_is_excluded_by_default_and_can_be_restored(env):
     assert "仅数一" in env.client.get("/q/6").text
-    assert "#006" not in env.client.get(start(env, mode="group", chapter="B", kp="隐函数求导")).text
+    assert 'action="/q/6/grade"' not in env.client.get("/bank/B", params={"kp": "2"}).text
     env.client.post("/bank/exclude", data={"nums": "6", "excluded": "0", "back": "/q/6"})
-    assert "#006" in env.client.get(start(env, mode="group", chapter="B", kp="隐函数求导")).text
+    assert 'action="/q/6/grade"' in env.client.get("/bank/B", params={"kp": "2"}).text
 
 
 def test_question_page_and_search(env):
@@ -260,22 +282,16 @@ def test_question_page_and_search(env):
     assert env.client.get("/q/999").status_code == 404
 
 
-def test_random_practice_still_works_but_the_bank_page_no_longer_offers_it(env):
-    assert 'name="mode" value="random"' not in env.client.get("/bank").text
-    first = env.client.get(start(env, mode="random", only="new")).text
-    assert "随机" in first and "#00" in first
-
-
-def test_one_by_one_practice_is_not_offered_where_the_chapter_page_replaces_it(env):
+def test_one_by_one_practice_is_gone(env):
+    assert env.client.post("/practice/start", data={"mode": "due"}).status_code in (404, 405)
+    assert env.client.get("/practice/1").status_code == 404
     chapter = env.client.get("/bank/A", params={"kp": "1"}).text
-    assert "练这个考点" not in chapter and 'action="/practice/start"' not in chapter
-    assert "整个考点不做了" not in chapter
+    assert 'action="/practice/' not in chapter and "整个考点不做了" not in chapter
     question = env.client.get("/q/4").text
-    assert "练这道题" not in question and 'action="/practice/start"' not in question
+    assert 'action="/practice/' not in question
     # the question page leads back to the card on the chapter page (#4 is in 考点 1 of chapter B)
     assert 'href="/bank/B?kp=1#q-4"' in question
     assert 'href="/bank/B?kp=2#q-6"' in env.client.get("/q/6").text
-    assert "按考点往下刷" in env.client.get("/").text
 
 
 def test_bank_pages(env):
@@ -380,8 +396,7 @@ def test_knowledge_pages(env):
 
 
 def test_history_lists_reviews(env):
-    url = start(env, mode="group", chapter="A")
-    grade(env, url, 1, "mastered")
+    grade(env, 1, "mastered")
     page = env.client.get("/history").text
     assert "10月16日" in page and "#001" in page
 

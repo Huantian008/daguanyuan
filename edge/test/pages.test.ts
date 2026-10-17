@@ -9,16 +9,14 @@ async function loggedIn(options: Parameters<typeof setup>[0] = {}) {
   return ctx;
 }
 
-async function start(client: Client, form: Record<string, string>) {
-  const res = await client.post("/practice/start", form);
+async function grade(client: Client, num: number, value: string, form: Record<string, string> = {}) {
+  const res = await client.post(`/q/${num}/grade`, { grade: value, ...form });
   expect(res.status).toBe(303);
-  return res.headers.get("location")!;
 }
 
-async function grade(client: Client, url: string, num: number, value: string) {
-  const res = await client.post(`${url}/grade`, { num: String(num), grade: value });
-  expect(res.status).toBe(303);
-}
+type Dump = { tables: { reviews: { id: number; num: number; mode: string }[] } };
+const reviewModes = async (client: Client) => ((await (await client.get("/settings/export")).json()) as Dump).tables.reviews
+  .sort((a, b) => a.id - b.id).map((r) => [r.num, r.mode]);
 
 const text = async (client: Client, path: string) => (await client.get(path)).text();
 
@@ -50,34 +48,111 @@ describe("dashboard", () => {
     expect(page).toContain("今天不用热身");
     expect(page).toContain("今天没有到期的题");
     expect(page).not.toContain("disabled");
-    // no open session: what is left over the whole bank (#6 is excluded), and the only primary button
-    expect(page).toContain("<b>5</b> 题没做过");
-    expect(page).toContain('<a class="btn btn-primary" href="/bank">去题库选题</a>');
+    // nothing graded yet: 继续往下做 starts at the first 考点 of the book, and has the only primary button
+    expect(page).toContain("<b>1</b> 题没做");
+    expect(page).toContain("函数极限连续 / 函数性质 / 有界");
+    expect(page).toContain('<a class="btn btn-primary" href="/bank/A?kp=1">开始做题</a>');
+  });
+
+  it("picks up 继续往下做 at the 考点 of the last question graded on a chapter page", async () => {
+    const { client, clock } = await loggedIn();
+    await grade(client, 4, "mastered");
+    let page = await text(client, "/");
+    expect(page).toContain('<a class="btn btn-primary" href="/bank/B?kp=1">继续上次</a>');
+    expect(page).toContain("<b>1</b> 题没做");
+    expect(page).toContain("一元微分 / 导数概念 / 基本概念题");
+    expect(page).toContain("换个考点");
+    // #2's 考点 is done now, so it moves on to the next one with work left
+    await grade(client, 2, "mastered");
+    expect(await text(client, "/")).toContain('href="/bank/A?kp=3">继续上次</a>');
+    // grading in warm-up the next day does not move it back to #4
+    clock.addDays(1);
+    await grade(client, 4, "mastered", { mode: "warmup" });
+    page = await text(client, "/");
+    expect(page).toContain('href="/bank/A?kp=3">继续上次</a>');
+    expect(page).not.toContain("/practice/");
+  });
+
+  it("says so when the whole bank has been done", async () => {
+    const { client } = await loggedIn();
+    for (const num of [1, 2, 3, 4, 5]) await grade(client, num, "mastered");
+    const page = await text(client, "/");
+    expect(page).toContain("整本题库都做过一遍了");
+    expect(page).toContain('<a class="btn btn-primary" href="/bank">去题库</a>');
+  });
+
+  it("sends 去巩固 to the 考点 on the chapter page", async () => {
+    const { client } = await loggedIn();
+    await grade(client, 3, "unknown");
+    expect(await text(client, "/")).toContain('<a class="btn btn-small" href="/bank/A?kp=3">去巩固</a>');
   });
 });
 
-describe("practice", () => {
-  it("has no timer", async () => {
-    const { client } = await loggedIn();
-    const page = await text(client, await start(client, { mode: "group", chapter: "A" }));
-    expect(page).not.toContain("timer");
-    expect(page).not.toContain('name="elapsed"');
+describe("warm-up and due review", () => {
+  it("are offered the next day as links to card pages", async () => {
+    const { client, clock } = await loggedIn();
+    await grade(client, 1, "shaky");
+    clock.addDays(1);
+    const page = await text(client, "/");
+    expect(page).toContain('data-warmup-count="1"');
+    expect(page).toContain('data-due-count="1"');
+    expect(page).not.toContain("今天不用热身");
+    // warm-up comes first tonight, so it alone gets the primary button
+    expect(page).toContain('<a class="btn btn-primary" href="/review/warmup">开始热身</a>');
+    expect(page).toContain('<a class="btn" href="/review/due">开始复习</a>');
+    for (const mode of ["warmup", "due"]) {
+      const cards = await text(client, `/review/${mode}`);
+      expect(cards).toContain('id="q-1"');
+      expect(cards).toContain('action="/q/1/grade"');
+      expect(cards).toContain(`<input type="hidden" name="back" value="/review/${mode}#q-1"><input type="hidden" name="mode" value="${mode}">`);
+      expect(cards).toContain("今天已评 0 / 1 题");
+      expect(cards).not.toContain('id="q-2"');
+    }
   });
 
-  it("has answer and knowledge switches whose panels show without JavaScript", async () => {
+  it("keep a card graded there on the page and record the grade as part of them", async () => {
+    const { client, clock } = await loggedIn();
+    await grade(client, 1, "shaky");
+    await grade(client, 2, "mastered");
+    clock.addDays(1);
+    const res = await client.post("/q/1/grade", { grade: "mastered", mode: "warmup", back: "/review/warmup#q-1" });
+    expect(res.headers.get("location")).toBe("/review/warmup#q-1");
+    const cards = await text(client, "/review/warmup");
+    expect(cards).toMatch(/id="q-1"[\s\S]*今天已评[\s\S]*id="q-2"/);
+    expect(cards).toContain("今天已评 1 / 2 题");
+    expect(await text(client, "/")).toContain('data-warmup-count="1"');
+    // #1 was due as well; graded today, it has left due review
+    expect(await text(client, "/review/due")).toContain("今天没有到期的题。");
+    expect(await reviewModes(client)).toEqual([[1, "browse"], [2, "browse"], [1, "warmup"]]);
+  });
+
+  it("record any other mode as a chapter page grade", async () => {
     const { client } = await loggedIn();
-    const page = await text(client, await start(client, { mode: "group", chapter: "A" }));
+    await grade(client, 1, "mastered", { mode: "group" });
+    expect(await reviewModes(client)).toEqual([[1, "browse"]]);
+  });
+
+  it("have a calm note on a day with nothing to do, and no other pages", async () => {
+    const { client } = await loggedIn();
+    expect(await text(client, "/review/warmup")).toContain("今天不用热身。");
+    expect((await client.get("/review/random")).status).toBe(404);
+    expect((await client.get("/review/constructor")).status).toBe(404);
+  });
+});
+
+describe("question rendering", () => {
+  it("has an answer switch on the question page whose panel shows without JavaScript", async () => {
+    const { client } = await loggedIn();
+    const page = await text(client, "/q/1");
     expect(page).toContain('<button type="button" class="reveal-toggle js-reveal" aria-expanded="false" aria-controls="answer">');
-    expect(page).toContain('aria-controls="knowledge"');
     expect(page).toContain('<section id="answer" class="reveal-panel"');
-    expect(page).toContain('<section id="knowledge" class="reveal-panel"');
     expect(page).toContain("这道题还没有逐题标注");
     expect(page).toContain('href="/knowledge/01?tab=text"');
   });
 
   it("links a tagged question to its knowledge section", async () => {
     const { client } = await loggedIn({ linking: LINKING });
-    const page = await text(client, await start(client, { mode: "group", chapter: "A" }));
+    const page = await text(client, "/bank/A?kp=1");
     expect(page).toContain('href="/knowledge/01?tab=text#1-函数基础"');
     expect(page).toContain('data-anchor="1-函数基础"');
     expect(page).toContain('href="/knowledge/01#p1"');
@@ -90,7 +165,7 @@ describe("practice", () => {
 
   it("shows the question as text with a switch to the image", async () => {
     const { client } = await loggedIn({ texts: TEXTS });
-    const page = await text(client, await start(client, { mode: "group", chapter: "A" }));
+    const page = await text(client, "/bank/A?kp=1");
     expect(page).toContain('<div class="qview" data-view="text">');
     expect(page).toContain('<span class="math inline">f(x)=\\dfrac{1}{x}</span>');
     expect(page).toContain("<li><b>D.</b> 4.</li>");
@@ -102,7 +177,7 @@ describe("practice", () => {
 
   it("shows the answer's option and the erratum", async () => {
     const { client } = await loggedIn({ texts: TEXTS });
-    const page = await text(client, await start(client, { mode: "group", chapter: "A" }));
+    const page = await text(client, "/bank/A?kp=1");
     expect(page).toContain('<p><b>C.</b> <span class="math inline">x&gt;\\dfrac12</span> 时有界</p>');
     expect(page).toContain('<p class="erratum"><b>勘误</b>速查原印 B</p>');
     expect(page).toContain('<details class="raw-img"><summary>答案原图</summary>');
@@ -117,107 +192,44 @@ describe("practice", () => {
 
   it("shows the images when there is no text version", async () => {
     const { client } = await loggedIn();
-    const page = await text(client, await start(client, { mode: "group", chapter: "A" }));
+    const page = await text(client, "/q/1");
     expect(page).toContain('<div class="qview" data-view="image">');
     expect(page).not.toContain("js-qview");
     expect(page).not.toContain("katex.min.css");
   });
 
-  it("grades a question and moves to the next one", async () => {
+  it("has no one-by-one practice page any more", async () => {
     const { client } = await loggedIn();
-    const url = await start(client, { mode: "group", chapter: "A" });
-    const page = await text(client, url);
-    expect(page).toContain("#001");
-    for (const src of ["q/001.webp", "a/001.webp", "s/001-1.webp"]) expect(page).toContain(src);
-    expect(page).toContain('rel="prefetch"');
-    await grade(client, url, 1, "unknown");
-    expect(await text(client, url)).toContain("#002");
-    expect(await text(client, "/")).toContain('data-dist-unknown="1"');
-  });
-
-  it("ignores a grade for a question that is not the current one", async () => {
-    const { client } = await loggedIn();
-    const url = await start(client, { mode: "group", chapter: "A" });
-    await grade(client, url, 3, "mastered");
-    expect(await text(client, url)).toContain("#001");
-    expect(await text(client, "/")).toContain('data-dist-mastered="0"');
-  });
-
-  it("offers warm-up and due review the next day", async () => {
-    const { client, clock } = await loggedIn();
-    const url = await start(client, { mode: "group", chapter: "A" });
-    await grade(client, url, 1, "shaky");
-    clock.addDays(1);
-    const page = await text(client, "/");
-    expect(page).toContain('data-warmup-count="1"');
-    expect(page).toContain('data-due-count="1"');
-    expect(page).toContain("开始热身");
-    expect(page).toContain("开始复习");
-    expect(page).not.toContain("今天不用热身");
-    // warm-up comes first tonight, so it alone gets the primary button
-    expect(page).toContain('<button class="btn btn-primary">开始热身</button>');
-    expect(page).toContain('<button class="btn">开始复习</button>');
-    expect(page).toMatch(/<a class="btn" href="\/practice\/[^"]+">继续上次<\/a>/);
-    expect(page).toContain("换个考点");
-    expect(await text(client, await start(client, { mode: "due" }))).toContain("#001");
-  });
-
-  it("shows a summary when the set is finished", async () => {
-    const { client } = await loggedIn();
-    const url = await start(client, { mode: "single", nums: "2" });
-    await grade(client, url, 2, "mastered");
-    const page = await text(client, url);
-    expect(page).toContain("这组做完了");
-    expect(page).toContain("完全掌握 1");
-  });
-
-  it("can skip a question", async () => {
-    const { client } = await loggedIn();
-    const url = await start(client, { mode: "group", chapter: "A" });
-    expect((await client.post(`${url}/skip`, { num: "1" })).status).toBe(303);
-    expect(await text(client, url)).toContain("#002");
-  });
-
-  it("still runs random practice, but the bank page no longer offers it", async () => {
-    const { client } = await loggedIn();
-    expect(await text(client, "/bank")).not.toContain('name="mode" value="random"');
-    const first = await text(client, await start(client, { mode: "random", only: "new" }));
-    expect(first).toContain("随机");
-    expect(first).toContain("#00");
-  });
-
-  it("does not offer one-by-one practice where the chapter page replaces it", async () => {
-    const { client } = await loggedIn();
+    expect((await client.post("/practice/start", { mode: "due" })).status).toBe(404);
+    expect((await client.get("/practice/1")).status).toBe(404);
     const chapter = await text(client, "/bank/A?kp=1");
-    expect(chapter).not.toContain("练这个考点");
-    expect(chapter).not.toContain('action="/practice/start"');
+    expect(chapter).not.toContain('action="/practice/');
     expect(chapter).not.toContain("整个考点不做了");
     const question = await text(client, "/q/4");
-    expect(question).not.toContain("练这道题");
-    expect(question).not.toContain('action="/practice/start"');
+    expect(question).not.toContain('action="/practice/');
     // the question page leads back to the card on the chapter page (#4 is in 考点 1 of chapter B)
     expect(question).toContain('href="/bank/B?kp=1#q-4"');
     expect(await text(client, "/q/6")).toContain('href="/bank/B?kp=2#q-6"');
-    expect(await text(client, "/")).toContain("按考点往下刷");
   });
 });
 
 describe("不做 marks", () => {
-  it("removes a whole 考点 from queues", async () => {
+  it("skips a whole 考点", async () => {
     const { client } = await loggedIn();
     const res = await client.post("/bank/exclude", { chapter: "A", section: "函数性质", kp: "有界", excluded: "1", back: "/bank/A" });
     expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("/bank/A");
-    expect(await text(client, await start(client, { mode: "group", chapter: "A" }))).toContain("#002");
+    expect(await text(client, "/bank/A")).toContain('id="q-2"');
+    expect(await text(client, "/")).toContain('href="/bank/A?kp=2">开始做题</a>');
     expect(await text(client, "/q/1")).toContain("不做");
   });
 
   it("starts with #006 excluded and can restore it", async () => {
     const { client } = await loggedIn();
     expect(await text(client, "/q/6")).toContain("仅数一");
-    expect(await text(client, await start(client, { mode: "group", chapter: "B", kp: "隐函数求导" }))).not.toContain("#006");
+    expect(await text(client, "/bank/B?kp=2")).not.toContain('action="/q/6/grade"');
     await client.post("/bank/exclude", { nums: "6", excluded: "0", back: "/q/6" });
-    expect(await text(client, await start(client, { mode: "group", chapter: "B", kp: "隐函数求导" }))).toContain("#006");
+    expect(await text(client, "/bank/B?kp=2")).toContain('action="/q/6/grade"');
   });
 });
 
@@ -369,13 +381,12 @@ describe("search", () => {
 describe("knowledge", () => {
   it("lists the questions of each section under its heading", async () => {
     const { client } = await loggedIn({ linking: LINKING });
-    await grade(client, await start(client, { mode: "group", chapter: "A" }), 1, "shaky");
+    await grade(client, 1, "shaky");
     const block = (await text(client, "/knowledge/01?tab=text")).split('id="1-函数基础"')[1];
     expect(block).toContain('class="section-qs"');
     expect(block).toContain('<a class="chip chip-shaky" href="/q/1">001</a>');
     expect(block).toContain('href="/q/3"');
-    expect(block).toContain('name="nums" value="1,3"');
-    expect(block).toContain("练这 2 题");
+    expect(block).not.toContain("练这");
   });
 
   it("lists the questions on each original page", async () => {
@@ -403,8 +414,7 @@ describe("knowledge", () => {
 describe("history and settings", () => {
   it("lists reviews by day", async () => {
     const { client } = await loggedIn();
-    const url = await start(client, { mode: "group", chapter: "A" });
-    await grade(client, url, 1, "mastered");
+    await grade(client, 1, "mastered");
     const page = await text(client, "/history");
     expect(page).toContain("10月16日");
     expect(page).toContain("#001");
@@ -428,8 +438,7 @@ describe("history and settings", () => {
 
   it("downloads all learning data as JSON", async () => {
     const { client } = await loggedIn();
-    const url = await start(client, { mode: "group", chapter: "A" });
-    await grade(client, url, 1, "mastered");
+    await grade(client, 1, "mastered");
     const res = await client.get("/settings/export");
     expect(res.headers.get("content-disposition")).toMatch(/attachment/);
     const dump = (await res.json()) as { tables: Record<string, unknown[]> };

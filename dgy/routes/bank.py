@@ -4,6 +4,7 @@ from .. import db, stats
 from ..drill import default_kp, drill_kps, kp_tree
 from ..srs import GRADES
 from ..web import bank, get_conn, now, redirect, render, safe_back, today, user_state
+from .review import REVIEW_PAGES
 
 router = APIRouter()
 
@@ -80,14 +81,16 @@ def exclude(request: Request, excluded: str = Form(...), nums: str = Form(""), c
 
 
 @router.post("/q/{num}/grade")
-def grade(request: Request, num: int, grade: str = Form(""), back: str = Form(""), conn=Depends(get_conn)):
-    """Grade a question from the chapter page. A question graded today is left alone, so a double click is one review."""
+def grade(request: Request, num: int, grade: str = Form(""), back: str = Form(""), mode: str = Form(""),
+          conn=Depends(get_conn)):
+    """Grade a question from the chapter page or a review page.
+    A question graded today is left alone, so a double click is one review."""
     content = bank(request)
     q = content.questions.get(num)
     if q is None:
         raise HTTPException(404, "没有这道题")
     if grade in GRADES and num not in db.graded_on(conn, today(request)):
-        db.record_review(conn, num, grade, now(request), "browse")
+        db.record_review(conn, num, grade, now(request), mode if mode in REVIEW_PAGES else "browse")
     return redirect(safe_back(back, f"/bank/{q.chapter}#q-{num}"))
 
 

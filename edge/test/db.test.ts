@@ -56,31 +56,6 @@ describe("exclusions and settings", () => {
   });
 });
 
-describe("practice sessions", () => {
-  it("walks the queue, finishes, and counts grades", async () => {
-    const sid = await db.createSession(d1, ME, "到期复习", "due", [3, 1, 2], EVENING);
-    let s = (await db.getSession(d1, ME, sid))!;
-    expect([s.queue, s.position, db.current(s), s.finishedAt]).toEqual([[3, 1, 2], 0, 3, null]);
-    expect((await db.latestOpenSession(d1, ME))!.id).toBe(sid);
-    await db.recordReview(d1, ME, { num: 3, grade: "unknown", at: EVENING, mode: "due", session: s });
-    s = (await db.getSession(d1, ME, sid))!;
-    expect(db.current(s)).toBe(1);
-    await db.advanceSession(d1, ME, s, EVENING);
-    s = (await db.getSession(d1, ME, sid))!;
-    await db.advanceSession(d1, ME, s, EVENING);
-    s = (await db.getSession(d1, ME, sid))!;
-    expect(db.current(s)).toBeNull();
-    expect(s.finishedAt).not.toBeNull();
-    expect(await db.latestOpenSession(d1, ME)).toBeNull();
-    expect(await db.sessionGrades(d1, ME, sid)).toEqual({ unknown: 1 });
-  });
-
-  it("finishes an empty session immediately", async () => {
-    const sid = await db.createSession(d1, ME, "到期复习", "due", [], EVENING);
-    expect((await db.getSession(d1, ME, sid))!.finishedAt).not.toBeNull();
-  });
-});
-
 describe("exportAll", () => {
   it("dumps every table for backup, without the internal user id", async () => {
     await db.recordReview(d1, ME, { num: 1, grade: "mastered", at: EVENING, mode: "kp" });
@@ -110,11 +85,9 @@ describe("two users sharing one database", () => {
     await db.recordReview(d1, ME, { num: 5, grade: "mastered", at: EVENING, mode: "kp" });
     await db.setExcluded(d1, ME, [5], true);
     await db.setSetting(d1, ME, "exam_date", "2026-12-20");
-    await db.createSession(d1, ME, "t", "due", [1], EVENING);
     expect((await db.allCards(d1, PAL)).size).toBe(0);
     expect((await db.exclusionOverrides(d1, PAL)).size).toBe(0);
     expect(await db.getSetting(d1, PAL, "exam_date", "2026-12-19")).toBe("2026-12-19");
-    expect(await db.latestOpenSession(d1, PAL)).toBeNull();
   });
 
   it("keep separate 不做 marks and settings", async () => {
@@ -128,23 +101,15 @@ describe("two users sharing one database", () => {
     expect(await db.getSetting(d1, PAL, "exam_date", "x")).toBe("2027-01-01");
   });
 
-  it("cannot see, advance or count in each other's practice sessions", async () => {
-    const sid = await db.createSession(d1, ME, "到期复习", "due", [1, 2], EVENING);
-    const mine = (await db.getSession(d1, ME, sid))!;
-    await db.recordReview(d1, ME, { num: 1, grade: "mastered", at: EVENING, mode: "due", session: mine });
-    expect(await db.getSession(d1, PAL, sid)).toBeNull();
-    expect(await db.latestOpenSession(d1, PAL)).toBeNull();
-    expect(await db.sessionGrades(d1, PAL, sid)).toEqual({});
-    await db.advanceSession(d1, PAL, mine, EVENING);
-    expect((await db.getSession(d1, ME, sid))!.position).toBe(1);
-  });
-
   it("export only their own rows", async () => {
     await db.recordReview(d1, ME, { num: 5, grade: "mastered", at: EVENING, mode: "kp" });
     await db.setSetting(d1, ME, "exam_date", "2026-12-20");
-    await db.createSession(d1, ME, "t", "due", [1], EVENING);
+    // a practice set from before the practice page was removed
+    await d1.prepare("INSERT INTO sessions (user_id, title, mode, queue, position, created_at) VALUES (?, 't', 'due', '[1]', 0, 'x')")
+      .bind(ME).run();
     const theirs = await db.exportAll(d1, PAL);
     for (const rows of Object.values(theirs.tables)) expect(rows).toEqual([]);
     expect((await db.exportAll(d1, ME)).tables.reviews).toHaveLength(1);
+    expect((await db.exportAll(d1, ME)).tables.sessions).toHaveLength(1);
   });
 });

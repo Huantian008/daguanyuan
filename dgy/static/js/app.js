@@ -1,4 +1,4 @@
-// 大观园：主题切换、题目字号；练习页和题目页的展开开关与快捷键；知识点抽屉；知识点文字版的公式渲染。
+// 大观园：主题切换、题目字号；题卡和题目页的展开开关，题目页的快捷键；知识点抽屉；知识点文字版的公式渲染。
 // 页面不依赖这段脚本也能用：没有脚本时答案和知识点直接展开，知识点链接打开文字版页面。
 (() => {
   const root = document.documentElement;
@@ -65,9 +65,9 @@
     sizeButton.hidden = false;
   }
 
-  // ---------- 「答案与解析」「知识点」 toggles ----------
+  // ---------- the question page's 「答案与解析」 toggle ----------
 
-  const REVEAL_PEEK = 360; // px of a newly opened panel to show above the grade bar
+  const REVEAL_PEEK = 360; // px of a newly opened panel to bring into view
 
   const toggleReveal = (id) => {
     const button = document.querySelector(`.js-reveal[aria-controls="${id}"]`);
@@ -94,14 +94,8 @@
       if (key === " " || key === "s") {
         event.preventDefault();
         toggleReveal("answer");
-      } else if (key === "k") {
-        toggleReveal("knowledge");
       } else if (key === "v" && sheets.length) {
         toggleView(sheets[0]);
-      } else if (["1", "2", "3"].includes(key)) {
-        document.querySelector(`button[data-key="${key}"]`)?.click();
-      } else if (event.key === "ArrowRight") {
-        document.querySelector(".js-skip")?.click();
       }
     });
   }

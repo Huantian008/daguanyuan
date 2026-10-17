@@ -68,6 +68,17 @@ export function warmupQueue(reviews: Review[], active: Set<number>, today: Day, 
   return queue;
 }
 
+/** The cards on the warm-up or due-review page: those graded there today in the order graded, then `queue`, what is left. */
+export function reviewList(reviews: Review[], mode: string, today: Day, queue: number[]): number[] {
+  const graded: number[] = [];
+  for (const r of reviews) if (r.studyDay === today && r.mode === mode && !graded.includes(r.num)) graded.push(r.num);
+  return [...graded, ...queue.filter((n) => !graded.includes(n))];
+}
+
+/** The last question graded outside warm-up and due review, which is where 继续往下做 picks up. */
+export const lastDrilled = (reviews: Review[], known: (num: number) => boolean): number | undefined =>
+  [...reviews].reverse().find((r) => r.mode !== "warmup" && r.mode !== "due" && known(r.num))?.num;
+
 export function chapterProgress(content: Content, cards: Map<number, CardState>, excluded: Set<number>): ChapterProgress[] {
   return content.chapters.map((ch) => {
     const nums = content.inChapter(ch.code).map((q) => q.num).filter((n) => !excluded.has(n));

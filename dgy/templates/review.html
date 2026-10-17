@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "_macros.html" import qcard, katex_head, katex_script %}
+{% block title %}{{ page.title }}{% endblock %}
+{% block page_class %}page-review{% endblock %}
+{% block head %}{{ katex_head() }}{% endblock %}
+{% block scripts %}{{ katex_script() }}{% endblock %}
+{% block content %}
+{% set here = '/review/' ~ mode %}
+{% set graded = questions|selectattr('num', 'in', graded_today)|list|length %}
+<header class="page-head">
+  <div>
+    <p class="eyebrow"><a href="/">今天</a></p>
+    <h1>{{ page.title }}</h1>
+    <p class="muted">{{ page.note }}{% if questions %} · 今天已评 {{ graded }} / {{ questions|length }} 题{% endif %}</p>
+  </div>
+</header>
+{% if questions %}
+<div class="qcards">
+  {% for q in questions %}
+  {{ qcard(q, texts.get(q.num), state.status(q.num), loop.index, graded_today.get(q.num), here ~ '#q-' ~ q.num,
+           sections[q.num], knowledge[q.chapter], titles, histories[q.num], state.cards.get(q.num), mode=mode) }}
+  {% endfor %}
+</div>
+{% else %}
+<p class="empty">{{ page.empty }}</p>
+{% endif %}
+<nav class="drill-foot" aria-label="回首页">
+  <a class="btn{% if questions and graded == questions|length %} btn-primary{% endif %}" href="/">← 回首页</a>
+</nav>
+{% endblock %}

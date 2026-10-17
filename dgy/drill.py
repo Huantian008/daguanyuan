@@ -30,6 +30,28 @@ def default_kp(kps: list[DrillKp]) -> int:
     return next((k.index for k in kps if k.done < k.total), 1)
 
 
+def kp_index_of(content: Content, code: str, section: str, kp: str, status) -> int:
+    """The ?kp= of the 考点 a question is in."""
+    return next((k.index for k in drill_kps(content, code, status) if k.section == section and k.kp == kp), 1)
+
+
+def onward_kp(content: Content, status, last: Question | None = None) -> tuple[str, DrillKp] | None:
+    """Where 继续往下做 goes: the first 考点 with a question not done yet, from the one `last` is in onwards through the
+    book, round again from the start; from the very first 考点 when there is no `last`. None when everything is done."""
+    codes = [c.code for c in content.chapters]
+    start = codes.index(last.chapter) if last else 0
+    at = next(i for i, k in enumerate(drill_kps(content, last.chapter, status)) if last in k.questions) if last else 0
+    for step in range(len(codes) + 1):
+        code = codes[(start + step) % len(codes)]
+        kps = drill_kps(content, code, status)
+        # the starting chapter is looked at twice: from `last`'s 考点 on, and at the end the 考点 before it
+        span = kps[at:] if step == 0 else kps[:at] if step == len(codes) else kps
+        found = next((k for k in span if k.done < k.total), None)
+        if found:
+            return code, found
+    return None
+
+
 def kp_tree(kps: list[DrillKp]) -> list[tuple[str, list[DrillKp]]]:
     tree: list[tuple[str, list[DrillKp]]] = []
     for k in kps:

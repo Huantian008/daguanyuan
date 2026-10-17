@@ -57,6 +57,8 @@ export interface CardExtras {
   titles: Record<string, string>;
   history: Review[];
   card?: CardState;
+  /** warmup / due on those pages, so the grade is recorded as part of them */
+  mode?: string;
 }
 
 export function questionCard(
@@ -84,7 +86,7 @@ export function questionCard(
       <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qh-${q.num}" hidden>做题记录</button>
     </div>
     <form method="post" action="/q/${q.num}/grade" class="qc-grades">
-      <input type="hidden" name="back" value="${back}">
+      <input type="hidden" name="back" value="${back}">${hidden("mode", x.mode)}
       ${graded ? html`<span class="qc-graded">今天已评</span>` : ""}
       ${gradeButton("shaky", "不熟练")}
       ${gradeButton("unknown", "不会")}
@@ -124,21 +126,6 @@ export const legend = (d: Distribution): Html => html`<ul class="legend" data-di
 
 const hidden = (name: string, value?: string) => (value ? html`<input type="hidden" name="${name}" value="${value}">` : "");
 
-export interface StartOptions {
-  cls?: string;
-  chapter?: string;
-  section?: string;
-  kp?: string;
-  only?: string;
-  nums?: string;
-  disabled?: boolean;
-}
-
-export const startForm = (label: string, mode: string, o: StartOptions = {}): Html => html`<form method="post" action="/practice/start" class="inline">
-  <input type="hidden" name="mode" value="${mode}">${hidden("chapter", o.chapter)}${hidden("section", o.section)}${hidden("kp", o.kp)}${o.only && o.only !== "all" ? hidden("only", o.only) : ""}${hidden("nums", o.nums)}
-  <button class="${o.cls ?? "btn"}"${o.disabled ? raw(" disabled") : ""}>${label}</button>
-</form>`;
-
 export interface ExcludeOptions {
   nums?: string;
   chapter?: string;
@@ -155,7 +142,7 @@ export const excludeToggle = (excluded: boolean, back: string, o: ExcludeOptions
 
 const CHEVRON = raw('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>');
 
-/** A 「答案与解析」/「知识点」 switch; app.js opens and closes the panel it controls. */
+/** The question page's 「答案与解析」 switch; app.js opens and closes the panel it controls. */
 export const revealToggle = (target: string, label: string, key: string): Html =>
   html`<button type="button" class="reveal-toggle js-reveal" aria-expanded="false" aria-controls="${target}">${label} <kbd>${key}</kbd>${CHEVRON}</button>`;
 
@@ -177,10 +164,6 @@ export const knLinks = (sections: Section[], titles: Record<string, string>): Ht
 const chapterFallback = (knowledge: KnowledgeEntry[]): Html =>
   html`<p class="muted">这道题还没有逐题标注，先看整章：${knowledge.map((k, i) => html`${i ? "、" : ""}<a href="/knowledge/${k.slug}?tab=text">${k.title}</a>`)}</p>`;
 
-export const knowledgePanel = (q: Question, sections: Section[], knowledge: KnowledgeEntry[], titles: Record<string, string>): Html =>
-  html`<p class="kn-kp">书上的考点 <b>${q.kp}</b> <span class="muted">${q.path.join(" / ")}</span></p>
-${sections.length ? knLinks(sections, titles) : chapterFallback(knowledge)}`;
-
 export const relatedKnowledge = (sections: Section[], knowledge: KnowledgeEntry[], titles: Record<string, string>): Html =>
   sections.length ? knLinks(sections, titles) : chapterFallback(knowledge);
 
@@ -188,13 +171,11 @@ export const reviewHistory = (history: Review[]): Html => history.length
   ? html`<ul class="plain">${[...history].reverse().map((r) => html`<li><span class="muted">${cnDate(r.studyDay)}</span> <span class="chip chip-${r.grade}">${GRADE_LABELS[r.grade]}</span></li>`)}</ul>`
   : html`<p class="empty">还没做过这道题。</p>`;
 
-/** The questions tagged with a knowledge section (or an original page), with a button to practise the ones still to do. */
+/** The questions tagged with a knowledge section (or an original page), each linking to its question page. */
 export function sectionQuestions(nums: number[], state: UserState, label = "本节题目"): Html {
-  const open = nums.filter((n) => !state.excluded.has(n));
   return html`<div class="section-qs">
   <span class="section-qs-label">${label}</span>
   <span class="chips">${nums.map((n) => html`<a class="chip chip-${state.status(n)}" href="/q/${n}">${pad3(n)}</a>`)}</span>
-  ${open.length ? startForm(`练这 ${open.length} 题`, "single", { cls: "btn btn-small", nums: open.join(",") }) : ""}
 </div>`;
 }
 

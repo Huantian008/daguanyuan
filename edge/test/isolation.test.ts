@@ -12,20 +12,14 @@ async function twoUsers() {
 
 const text = async (client: Client, path: string) => (await client.get(path)).text();
 
-async function start(client: Client, form: Record<string, string>) {
-  const res = await client.post("/practice/start", form);
-  expect(res.status).toBe(303);
-  return res.headers.get("location")!;
-}
-
-async function grade(client: Client, url: string, num: number, value: string) {
-  expect((await client.post(`${url}/grade`, { num: String(num), grade: value })).status).toBe(303);
+async function grade(client: Client, num: number, value: string, form: Record<string, string> = {}) {
+  expect((await client.post(`/q/${num}/grade`, { grade: value, ...form })).status).toBe(303);
 }
 
 describe("two users on one site", () => {
   it("do not see each other's progress", async () => {
     const { me, pal } = await twoUsers();
-    await grade(me, await start(me, { mode: "group", chapter: "A" }), 1, "mastered");
+    await grade(me, 1, "mastered");
     expect(await text(me, "/")).toContain('data-dist-mastered="1"');
     expect(await text(pal, "/")).toContain('data-dist-mastered="0"');
     expect(await text(me, "/history")).toContain("#001");
@@ -34,7 +28,7 @@ describe("two users on one site", () => {
 
   it("each have their own review schedule", async () => {
     const { me, pal, clock } = await twoUsers();
-    await grade(me, await start(me, { mode: "group", chapter: "A" }), 1, "shaky");
+    await grade(me, 1, "shaky");
     clock.addDays(1);
     expect(await text(me, "/")).toContain('data-due-count="1"');
     expect(await text(pal, "/")).toContain('data-due-count="0"');
@@ -42,37 +36,39 @@ describe("two users on one site", () => {
 
   it("grade the same question without disturbing each other", async () => {
     const { me, pal } = await twoUsers();
-    await grade(me, await start(me, { mode: "single", nums: "2" }), 2, "mastered");
-    await grade(pal, await start(pal, { mode: "single", nums: "2" }), 2, "unknown");
+    await grade(me, 2, "mastered");
+    await grade(pal, 2, "unknown");
     expect(await text(me, "/")).toContain('data-dist-mastered="1"');
     expect(await text(me, "/")).toContain('data-dist-unknown="0"');
     expect(await text(pal, "/")).toContain('data-dist-mastered="0"');
     expect(await text(pal, "/")).toContain('data-dist-unknown="1"');
   });
 
-  it("cannot open, grade or skip each other's practice sets", async () => {
-    const { me, pal } = await twoUsers();
-    const url = await start(me, { mode: "group", chapter: "A" });
-    expect((await pal.get(url)).status).toBe(404);
-    expect((await pal.post(`${url}/grade`, { num: "1", grade: "mastered" })).status).toBe(404);
-    expect((await pal.post(`${url}/skip`, { num: "1" })).status).toBe(404);
-    expect(await text(me, url)).toContain("#001");
-    expect(await text(me, "/")).toContain('data-dist-mastered="0"');
-    expect(await text(pal, "/")).toContain('data-dist-mastered="0"');
+  it("each see only their own warm-up and due review", async () => {
+    const { me, pal, clock } = await twoUsers();
+    await grade(me, 1, "shaky");
+    clock.addDays(1);
+    for (const mode of ["warmup", "due"]) {
+      expect(await text(me, `/review/${mode}`)).toContain('id="q-1"');
+      expect(await text(pal, `/review/${mode}`)).not.toContain('id="q-1"');
+    }
+    // what the friend grades as warm-up does not count on my page
+    await grade(pal, 1, "mastered", { mode: "warmup" });
+    expect(await text(me, "/review/warmup")).toContain("今天已评 0 / 1 题");
   });
 
-  it("do not pick up each other's unfinished practice set on the dashboard", async () => {
+  it("each continue from their own last question", async () => {
     const { me, pal } = await twoUsers();
-    const url = await start(me, { mode: "group", chapter: "A" });
-    expect(await text(me, "/")).toContain(url);
-    expect(await text(pal, "/")).not.toContain(url);
+    await grade(me, 4, "mastered");
+    expect(await text(me, "/")).toContain('href="/bank/B?kp=1">继续上次</a>');
+    expect(await text(pal, "/")).toContain('href="/bank/A?kp=1">开始做题</a>');
   });
 
   it("keep their own 不做 marks", async () => {
     const { me, pal } = await twoUsers();
     await me.post("/bank/exclude", { chapter: "A", section: "函数性质", kp: "有界", excluded: "1", back: "/bank/A" });
-    expect(await text(me, await start(me, { mode: "group", chapter: "A" }))).toContain("#002");
-    expect(await text(pal, await start(pal, { mode: "group", chapter: "A" }))).toContain("#001");
+    expect(await text(me, "/bank/A")).not.toContain('id="q-1"');
+    expect(await text(pal, "/bank/A")).toContain('id="q-1"');
   });
 
   it("keep their own exam date", async () => {
@@ -84,7 +80,7 @@ describe("two users on one site", () => {
 
   it("download only their own data", async () => {
     const { me, pal } = await twoUsers();
-    await grade(me, await start(me, { mode: "group", chapter: "A" }), 1, "mastered");
+    await grade(me, 1, "mastered");
     type Dump = { tables: Record<string, unknown[]> };
     const mine = (await (await me.get("/settings/export")).json()) as Dump;
     const theirs = (await (await pal.get("/settings/export")).json()) as Dump;

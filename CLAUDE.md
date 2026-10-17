@@ -42,14 +42,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `bank-md/questions.json`（进 git，一题一行）；校验会用 Node 跑 `pipeline/katex_check.mjs`，拿仓库自带的 KaTeX 编译每一段公式。
 解析仍是图片。原书或答案速查印错的题，`answer` 存验算过的正确答案，`erratum` 写明原来印的是什么（审核时人工加，目前 21 题）。
 网站用 `dgy/bank.py` 读它：Python 版启动时渲染成 HTML（`DGY_BANK_DIR` 可改位置），Worker 版由 `export_edge` 写进
-`generated/bank.json`；公式在浏览器里用 KaTeX 渲染。练习页和题目页默认显示文字（带图的题默认原图，可切换，偏好存本机），
+`generated/bank.json`；公式在浏览器里用 KaTeX 渲染。题卡和题目页默认显示文字（带图的题默认原图，可切换，偏好存本机），
 文件缺失时退回纯图片。
+
+**做题只在题卡上**：章节页 `/bank/<章>?kp=<序号>` 一个考点一页，热身和到期复习是 `/review/warmup`、`/review/due`，
+都用同一个题卡（`_macros.html` 的 `qcard` / `views/parts.ts` 的 `questionCard`），打分都走 `POST /q/<num>/grade`，
+表单里的 `mode`（`warmup` / `due`，其余记 `browse`）决定这条记录算在哪；一个学习日一题只记一次。首页「继续往下做」
+从最近一条不是热身/复习的记录所在考点往后找（`drill.onward_kp`）。原来一题一题的练习页（`/practice/...`）已删，
+`sessions` 表和 `reviews.session_id` 只剩历史数据，备份和 `pipeline.export_progress` 照旧带上。
 
 **Python 与 Worker 的对应关系**（行为改动两边都改、都测）：
 
 | Python（`dgy/`） | Worker（`edge/src/`） |
 |---|---|
-| `srs.py`、`studyday.py`、`queues.py`、`stats.py`、`db.py` | 同名 `.ts` |
+| `srs.py`、`studyday.py`、`drill.py`、`stats.py`、`db.py` | 同名 `.ts` |
 | `templates/*.html`（Jinja） | `views/*.ts`（同样的标签和 class） |
 | `static/css/app.css`、`static/js/app.js` | 不另写，export 时原样拷到 `edge/public/static/` |
 | `markdown.py`（知识点 Markdown 渲染） | 不另写，读 export 生成的 `generated/knowledge.json` |

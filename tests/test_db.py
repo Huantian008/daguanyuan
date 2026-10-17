@@ -53,16 +53,3 @@ def test_settings_roundtrip(conn):
     assert db.get_setting(conn, "exam_date", "2026-12-19") == "2026-12-19"
     db.set_setting(conn, "exam_date", "2026-12-20")
     assert db.get_setting(conn, "exam_date", "2026-12-19") == "2026-12-20"
-
-
-def test_practice_session_walks_its_queue_and_finishes(conn):
-    sid = db.create_session(conn, "到期复习", "due", [3, 1, 2], EVENING)
-    s = db.get_session(conn, sid)
-    assert (s.queue, s.position, s.current, s.finished_at) == ([3, 1, 2], 0, 3, None)
-    assert db.latest_open_session(conn).id == sid
-    db.advance_session(conn, sid, EVENING)
-    assert db.get_session(conn, sid).current == 1
-    db.advance_session(conn, sid, EVENING)
-    finished = db.advance_session(conn, sid, EVENING)
-    assert finished.current is None and finished.finished_at is not None
-    assert db.latest_open_session(conn) is None

@@ -3,6 +3,7 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends, Request
 
 from .. import db, stats
+from ..drill import kp_index_of, onward_kp
 from ..web import bank, exam_date, get_conn, render, today, user_state, warmup_days
 
 router = APIRouter()
@@ -15,6 +16,8 @@ def dashboard(request: Request, conn=Depends(get_conn)):
     state = user_state(conn, content)
     reviews = db.review_log(conn, since=day - timedelta(days=400))
     totals = stats.daily_totals(reviews, day, days=30)
+    last = stats.last_drilled(reviews, lambda num: num in content.questions)
+    onward = onward_kp(content, state.status, content.questions[last] if last is not None else None)
     return render(
         request, "dashboard.html",
         nav="home",
@@ -22,11 +25,13 @@ def dashboard(request: Request, conn=Depends(get_conn)):
         days_left=(exam_date(conn) - day).days,
         warmup=stats.warmup_queue(reviews, state.active, day, warmup_days(conn)),
         due=stats.due_queue(state.cards, state.active, day),
-        open_session=db.latest_open_session(conn),
+        onward=onward and (onward[0], content.chapter(onward[0]).name, onward[1]),
+        resumed=last is not None,
         progress=stats.chapter_progress(content, state.cards, state.excluded),
         dist=stats.mastery_distribution(state.active, state.cards),
         active_total=len(state.active),
-        weak=stats.weak_spots(content, state.cards, state.excluded, top=3),
+        weak=[(s, kp_index_of(content, s.chapter, s.section, s.kp, state.status))
+              for s in stats.weak_spots(content, state.cards, state.excluded, top=3)],
         chapter_names={c.code: c.name for c in content.chapters},
         totals=totals,
         today_total=totals[-1],

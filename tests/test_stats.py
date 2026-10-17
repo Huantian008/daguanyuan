@@ -11,9 +11,30 @@ from .factories import small_bank
 TODAY = date(2026, 10, 16)
 
 
-def review(num, day, grade="mastered", hour=21):
+def review(num, day, grade="mastered", hour=21, mode="kp"):
     at = datetime(day.year, day.month, day.day, hour, 0, tzinfo=TZ)
-    return Review(num, grade, at, day, "kp")
+    return Review(num, grade, at, day, mode)
+
+
+def test_review_list_keeps_todays_graded_cards_in_order_above_what_is_left():
+    reviews = [
+        review(7, TODAY - timedelta(days=1), "shaky", 21, "warmup"),
+        review(3, TODAY, "mastered", 20, "warmup"),
+        review(9, TODAY, "shaky", 20, "browse"),
+        review(1, TODAY, "unknown", 21, "warmup"),
+        review(5, TODAY, "shaky", 22, "due"),
+    ]
+    assert stats.review_list(reviews, "warmup", TODAY, [2, 4]) == [3, 1, 2, 4]
+    assert stats.review_list(reviews, "due", TODAY, []) == [5]
+    assert stats.review_list([], "due", TODAY, [8, 6]) == [8, 6]
+
+
+def test_last_drilled_skips_warmup_and_due_review():
+    reviews = [review(2, TODAY - timedelta(days=1), "mastered", 21, "browse"), review(4, TODAY, "shaky", 20, "group"),
+               review(1, TODAY, "shaky", 21, "warmup"), review(5, TODAY, "shaky", 22, "due")]
+    assert stats.last_drilled(reviews, lambda n: True) == 4
+    assert stats.last_drilled(reviews, lambda n: n != 4) == 2
+    assert stats.last_drilled(reviews[2:], lambda n: True) is None
 
 
 def card(level, due, last_grade):

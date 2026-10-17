@@ -11,9 +11,13 @@ EVENING = datetime(2026, 10, 16, 22, 0, tzinfo=TZ)
 def _local_db(path):
     conn = db.connect(path)
     db.init_db(conn)
-    sid = db.create_session(conn, "到期复习", "due", [5, 6], EVENING)
-    db.record_review(conn, 5, "shaky", EVENING, mode="due", session_id=sid)
-    with conn:  # reviews from before the timer was removed still carry their time; it is copied as is
+    db.record_review(conn, 5, "shaky", EVENING, mode="due")
+    with conn:
+        # a practice set from before the practice page was removed, and a review graded in it
+        conn.execute("INSERT INTO sessions (title, mode, queue, position, created_at) "
+                     "VALUES ('到期复习', 'due', '[5, 6]', 1, ?)", (EVENING.isoformat(),))
+        conn.execute("UPDATE reviews SET session_id = 1")
+        # reviews from before the timer was removed still carry their time; it is copied as is
         conn.execute("UPDATE reviews SET elapsed_sec = 300")
     db.set_excluded(conn, [7], True)
     db.set_setting(conn, "exam_date", "2026-12-19")

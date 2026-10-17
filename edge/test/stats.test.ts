@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Content } from "../src/content";
 import { NEW_CARD, type CardState, type Grade } from "../src/srs";
 import {
-  chapterProgress, dailyTotals, dueQueue, masteryDistribution, streak, warmupQueue, weakSpots, type Review,
+  chapterProgress, dailyTotals, dueQueue, lastDrilled, masteryDistribution, reviewList, streak, warmupQueue, weakSpots, type Review,
 } from "../src/stats";
 import { addDays } from "../src/studyday";
 import { smallBank } from "./fixtures";
@@ -10,8 +10,8 @@ import { smallBank } from "./fixtures";
 const TODAY = "2026-10-16";
 const day = (n: number) => addDays(TODAY, n);
 
-function review(num: number, studyDay: string, grade: Grade = "mastered", hour = 21): Review {
-  return { num, grade, reviewedAt: `${studyDay}T${String(hour).padStart(2, "0")}:00:00+08:00`, studyDay, mode: "kp" };
+function review(num: number, studyDay: string, grade: Grade = "mastered", hour = 21, mode = "kp"): Review {
+  return { num, grade, reviewedAt: `${studyDay}T${String(hour).padStart(2, "0")}:00:00+08:00`, studyDay, mode };
 }
 
 const card = (level: number, due: string, lastGrade: Grade): CardState => ({ ...NEW_CARD, level, due, lastGrade, reps: 1 });
@@ -42,6 +42,27 @@ describe("stats", () => {
       review(4, TODAY),
     ];
     expect(warmupQueue(reviews, new Set([1, 2, 3, 4, 5]), TODAY, 2)).toEqual([2, 3, 5]);
+  });
+
+  it("keeps a review page's cards graded today on it, in the order graded, above what is left", () => {
+    const reviews = [
+      review(7, day(-1), "shaky", 21, "warmup"),
+      review(3, TODAY, "mastered", 20, "warmup"),
+      review(9, TODAY, "shaky", 20, "browse"),
+      review(1, TODAY, "unknown", 21, "warmup"),
+      review(5, TODAY, "shaky", 22, "due"),
+    ];
+    expect(reviewList(reviews, "warmup", TODAY, [2, 4])).toEqual([3, 1, 2, 4]);
+    expect(reviewList(reviews, "due", TODAY, [])).toEqual([5]);
+    expect(reviewList([], "due", TODAY, [8, 6])).toEqual([8, 6]);
+  });
+
+  it("finds the last question graded outside warm-up and due review", () => {
+    const reviews = [review(2, day(-1), "mastered", 21, "browse"), review(4, TODAY, "shaky", 20, "group"),
+      review(1, TODAY, "shaky", 21, "warmup"), review(5, TODAY, "shaky", 22, "due")];
+    expect(lastDrilled(reviews, () => true)).toBe(4);
+    expect(lastDrilled(reviews, (n) => n !== 4)).toBe(2);
+    expect(lastDrilled(reviews.slice(2), () => true)).toBeUndefined();
   });
 
   it("leaves excluded questions out of chapter progress", () => {

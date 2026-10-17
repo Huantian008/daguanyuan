@@ -71,6 +71,20 @@ def warmup_queue(reviews: list[Review], active: set[int], today: date, days: int
     return queue
 
 
+def review_list(reviews: list[Review], mode: str, today: date, queue: list[int]) -> list[int]:
+    """The cards on the warm-up or due-review page: those graded there today in the order graded, then `queue`, what is left."""
+    graded: list[int] = []
+    for r in reviews:
+        if r.study_day == today and r.mode == mode and r.num not in graded:
+            graded.append(r.num)
+    return graded + [n for n in queue if n not in graded]
+
+
+def last_drilled(reviews: list[Review], known) -> int | None:
+    """The last question graded outside warm-up and due review, which is where 继续往下做 picks up."""
+    return next((r.num for r in reversed(reviews) if r.mode not in ("warmup", "due") and known(r.num)), None)
+
+
 def chapter_progress(content: Content, cards: dict[int, CardState], excluded: set[int]) -> list[ChapterProgress]:
     progress = []
     for ch in content.chapters:

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import dist_bar, legend, start %}
+{% from "_macros.html" import dist_bar, legend %}
 {% block title %}今天{% endblock %}
 {% block content %}
 <section class="hero">
@@ -18,27 +18,28 @@
     <div class="step-head"><span class="step-no" aria-hidden="true">1</span><h2>热身</h2></div>
     <p class="step-count"><b>{{ warmup|length }}</b> 题</p>
     <p class="step-note">把前几天做过的题再做一遍</p>
-    {% if warmup %}{{ start('开始热身', 'warmup', cls='btn btn-primary') }}{% else %}<p class="step-clear">今天不用热身</p>{% endif %}
+    {% if warmup %}<a class="btn btn-primary" href="/review/warmup">开始热身</a>{% else %}<p class="step-clear">今天不用热身</p>{% endif %}
   </li>
   <li class="step{% if not due %} is-clear{% endif %}" data-due-count="{{ due|length }}">
     <div class="step-head"><span class="step-no" aria-hidden="true">2</span><h2>到期复习</h2></div>
     <p class="step-count"><b>{{ due|length }}</b> 题</p>
     <p class="step-note">按复习间隔排到今天的题</p>
-    {% if due %}{{ start('开始复习', 'due', cls=due_cls) }}{% else %}<p class="step-clear">今天没有到期的题</p>{% endif %}
+    {% if due %}<a class="{{ due_cls }}" href="/review/due">开始复习</a>{% else %}<p class="step-clear">今天没有到期的题</p>{% endif %}
   </li>
   <li class="step">
     <div class="step-head"><span class="step-no" aria-hidden="true">3</span><h2>继续往下做</h2></div>
-    {% if open_session %}
-    <p class="step-count"><b>{{ open_session.queue|length - open_session.position }}</b> 题没做完</p>
-    <p class="step-note">{{ open_session.title }}</p>
+    {% if onward %}
+    {% set code, name, kp = onward %}
+    <p class="step-count"><b>{{ kp.total - kp.done }}</b> 题没做</p>
+    <p class="step-note">{{ name }} / {{ kp.section }} / {{ kp.kp }}</p>
     <div class="step-actions">
-      <a class="{{ onwards_cls }}" href="/practice/{{ open_session.id }}">继续上次</a>
+      <a class="{{ onwards_cls }}" href="/bank/{{ code }}?kp={{ kp.index }}">{{ '继续上次' if resumed else '开始做题' }}</a>
       <a class="btn" href="/bank">换个考点</a>
     </div>
     {% else %}
-    <p class="step-count"><b>{{ progress|sum(attribute='total') - progress|sum(attribute='done') }}</b> 题没做过</p>
-    <p class="step-note">去题库点开章节，按考点往下刷</p>
-    <a class="{{ onwards_cls }}" href="/bank">去题库选题</a>
+    <p class="step-count"><b>0</b> 题没做过</p>
+    <p class="step-note">整本题库都做过一遍了</p>
+    <a class="{{ onwards_cls }}" href="/bank">去题库</a>
     {% endif %}
   </li>
 </ol>
@@ -64,13 +65,13 @@
     <h3 class="minor">优先巩固</h3>
     {% if weak %}
     <ul class="weak">
-      {% for s in weak %}
+      {% for s, kp_index in weak %}
       <li>
         <div>
           <b>{{ s.section }} / {{ s.kp }}</b>
           <span class="muted">{{ chapter_names[s.chapter] }} · {{ s.nums|length }} 题待巩固</span>
         </div>
-        {{ start('去巩固', 'group', cls='btn btn-small', chapter=s.chapter, section=s.section, kp=s.kp, only='weak') }}
+        <a class="btn btn-small" href="/bank/{{ s.chapter }}?kp={{ kp_index }}">去巩固</a>
       </li>
       {% endfor %}
     </ul>

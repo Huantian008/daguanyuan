@@ -1,22 +1,31 @@
 // Port of dgy/templates/dashboard.html.
 import { html } from "hono/html";
-import type { PracticeSession } from "../db";
+import type { DrillKp } from "../drill";
 import type { Meta } from "../env";
 import type { ChapterProgress, DayTotal, Distribution, WeakSpot } from "../stats";
 import { cnDate, type Day } from "../studyday";
 import { layout } from "./layout";
-import { distBar, legend, startForm } from "./parts";
+import { distBar, legend } from "./parts";
+
+/** Where 继续往下做 goes; `resumed` when it carries on from the last question graded, not from the start of the book. */
+export interface Onward {
+  code: string;
+  name: string;
+  kp: DrillKp;
+  resumed: boolean;
+}
 
 export interface DashboardData {
   today: Day;
   daysLeft: number;
   warmup: number[];
   due: number[];
-  openSession: PracticeSession | null;
+  onward: Onward | null;
   progress: ChapterProgress[];
   dist: Distribution;
   activeTotal: number;
-  weak: WeakSpot[];
+  /** each with the ?kp= of its 考点 on the chapter page */
+  weak: [WeakSpot, number][];
   chapterNames: Record<string, string>;
   totals: DayTotal[];
   streak: number;
@@ -25,7 +34,7 @@ export interface DashboardData {
 export function dashboardPage(meta: Meta, d: DashboardData) {
   const today = d.totals[d.totals.length - 1];
   const maxCount = Math.max(1, ...d.totals.map((t) => t.count));
-  const s = d.openSession;
+  const o = d.onward;
   // only the first step that has questions today gets the primary button
   const dueCls = d.warmup.length ? "btn" : "btn btn-primary";
   const onwardsCls = d.warmup.length || d.due.length ? "btn" : "btn btn-primary";
@@ -45,26 +54,26 @@ export function dashboardPage(meta: Meta, d: DashboardData) {
     <div class="step-head"><span class="step-no" aria-hidden="true">1</span><h2>热身</h2></div>
     <p class="step-count"><b>${d.warmup.length}</b> 题</p>
     <p class="step-note">把前几天做过的题再做一遍</p>
-    ${d.warmup.length ? startForm("开始热身", "warmup", { cls: "btn btn-primary" }) : html`<p class="step-clear">今天不用热身</p>`}
+    ${d.warmup.length ? html`<a class="btn btn-primary" href="/review/warmup">开始热身</a>` : html`<p class="step-clear">今天不用热身</p>`}
   </li>
   <li class="step${d.due.length ? "" : " is-clear"}" data-due-count="${d.due.length}">
     <div class="step-head"><span class="step-no" aria-hidden="true">2</span><h2>到期复习</h2></div>
     <p class="step-count"><b>${d.due.length}</b> 题</p>
     <p class="step-note">按复习间隔排到今天的题</p>
-    ${d.due.length ? startForm("开始复习", "due", { cls: dueCls }) : html`<p class="step-clear">今天没有到期的题</p>`}
+    ${d.due.length ? html`<a class="${dueCls}" href="/review/due">开始复习</a>` : html`<p class="step-clear">今天没有到期的题</p>`}
   </li>
   <li class="step">
     <div class="step-head"><span class="step-no" aria-hidden="true">3</span><h2>继续往下做</h2></div>
-    ${s
-      ? html`<p class="step-count"><b>${s.queue.length - s.position}</b> 题没做完</p>
-    <p class="step-note">${s.title}</p>
+    ${o
+      ? html`<p class="step-count"><b>${o.kp.total - o.kp.done}</b> 题没做</p>
+    <p class="step-note">${o.name} / ${o.kp.section} / ${o.kp.kp}</p>
     <div class="step-actions">
-      <a class="${onwardsCls}" href="/practice/${s.id}">继续上次</a>
+      <a class="${onwardsCls}" href="/bank/${o.code}?kp=${o.kp.index}">${o.resumed ? "继续上次" : "开始做题"}</a>
       <a class="btn" href="/bank">换个考点</a>
     </div>`
-      : html`<p class="step-count"><b>${d.progress.reduce((n, p) => n + p.total - p.done, 0)}</b> 题没做过</p>
-    <p class="step-note">去题库点开章节，按考点往下刷</p>
-    <a class="${onwardsCls}" href="/bank">去题库选题</a>`}
+      : html`<p class="step-count"><b>0</b> 题没做过</p>
+    <p class="step-note">整本题库都做过一遍了</p>
+    <a class="${onwardsCls}" href="/bank">去题库</a>`}
   </li>
 </ol>
 
@@ -86,12 +95,12 @@ export function dashboardPage(meta: Meta, d: DashboardData) {
     ${legend(d.dist)}
     <h3 class="minor">优先巩固</h3>
     ${d.weak.length
-      ? html`<ul class="weak">${d.weak.map((w) => html`<li>
+      ? html`<ul class="weak">${d.weak.map(([w, kpIndex]) => html`<li>
         <div>
           <b>${w.section} / ${w.kp}</b>
           <span class="muted">${d.chapterNames[w.chapter]} · ${w.nums.length} 题待巩固</span>
         </div>
-        ${startForm("去巩固", "group", { cls: "btn btn-small", chapter: w.chapter, section: w.section, kp: w.kp, only: "weak" })}
+        <a class="btn btn-small" href="/bank/${w.chapter}?kp=${kpIndex}">去巩固</a>
       </li>`)}</ul>`
       : html`<p class="empty">还没有自评为“不熟练”或“完全不会”的题，做题后这里会列出最该补的考点。</p>`}
   </section>

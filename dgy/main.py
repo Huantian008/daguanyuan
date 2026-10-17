@@ -14,7 +14,7 @@ from . import db, studyday
 from .backup import backup_daily
 from .config import Settings, load_settings
 from .content import load_content
-from .routes import auth, bank, dashboard, history, knowledge, practice, preferences
+from .routes import auth, bank, dashboard, history, knowledge, preferences, review
 from .web import TEMPLATES
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -60,6 +60,6 @@ def create_app(settings: Settings | None = None, clock: Callable[[], datetime] |
     app.mount("/content", StaticFiles(directory=settings.content_dir), name="content")
     app.mount("/knowledge/assets", StaticFiles(directory=settings.knowledge_md_dir / "assets", check_dir=False),
               name="knowledge-assets")
-    for module in (auth, dashboard, practice, bank, knowledge, history, preferences):
+    for module in (auth, dashboard, review, bank, knowledge, history, preferences):
         app.include_router(module.router)
     return app

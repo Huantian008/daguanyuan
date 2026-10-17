@@ -2,9 +2,8 @@
 import type { Hono } from "hono";
 import type { Content, KnowledgeEntry } from "./content";
 import * as db from "./db";
-import { defaultKp, drillKps, kpTree } from "./drill";
+import { defaultKp, drillKps, kpIndexOf, kpTree, onwardKp } from "./drill";
 import type { AppEnv, KnowledgeData, Meta } from "./env";
-import { buildQueue, type Mode, type Only, type QueueSpec } from "./queues";
 import { isGrade } from "./srs";
 import { examDate, loadState, warmupDays } from "./state";
 import * as stats from "./stats";
@@ -13,11 +12,8 @@ import { bankPage, chapterPage, questionPage, searchPage } from "./views/bank";
 import { dashboardPage } from "./views/dashboard";
 import { historyPage, settingsPage, type HistoryDay } from "./views/history";
 import { injectSectionQuestions, knowledgeIndexPage, knowledgePage } from "./views/knowledge";
-import { practiceDonePage, practicePage } from "./views/practice";
+import { isReviewMode, reviewPage } from "./views/review";
 import { safeBack } from "./views/util";
-
-const MODES: Mode[] = ["warmup", "due", "group", "single", "random"];
-const ONLY: Only[] = ["all", "new", "weak"];
 
 const str = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 const intOrNull = (value: unknown): number | null => (/^\d+$/.test(str(value)) ? Number(str(value)) : null);
@@ -37,96 +33,45 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     const DB = c.env.DB;
     const uid = c.get("user").id;
     const day = today();
-    const [state, reviews, openSession, exam, warmup] = await Promise.all([
-      loadState(DB, uid, content), db.reviewLog(DB, uid, addDays(day, -400)), db.latestOpenSession(DB, uid),
-      examDate(DB, uid), warmupDays(DB, uid),
+    const [state, reviews, exam, warmup] = await Promise.all([
+      loadState(DB, uid, content), db.reviewLog(DB, uid, addDays(day, -400)), examDate(DB, uid), warmupDays(DB, uid),
     ]);
+    const last = stats.lastDrilled(reviews, (num) => content.questions.has(num));
+    const onward = onwardKp(content, state.status, last === undefined ? undefined : content.questions.get(last));
     return c.html(dashboardPage(meta, {
       today: day,
       daysLeft: daysBetween(day, exam),
       warmup: stats.warmupQueue(reviews, state.active, day, warmup),
       due: stats.dueQueue(state.cards, state.active, day),
-      openSession,
+      onward: onward && { ...onward, name: content.chapter(onward.code).name, resumed: last !== undefined },
       progress: stats.chapterProgress(content, state.cards, state.excluded),
       dist: stats.masteryDistribution(state.active, state.cards),
       activeTotal: state.active.size,
-      weak: stats.weakSpots(content, state.cards, state.excluded, 3),
+      weak: stats.weakSpots(content, state.cards, state.excluded, 3)
+        .map((w): [stats.WeakSpot, number] => [w, kpIndexOf(content, w.chapter, w.section, w.kp, state.status)]),
       chapterNames: Object.fromEntries(content.chapters.map((ch) => [ch.code, ch.name])),
       totals: stats.dailyTotals(reviews, day, 30),
       streak: stats.streak(new Set(reviews.map((r) => r.studyDay)), day),
     }));
   });
 
-  app.post("/practice/start", async (c) => {
+  // Warm-up and due review, laid out as cards like the chapter page.
+  app.get("/review/:mode", async (c) => {
+    const mode = c.req.param("mode");
+    if (!isReviewMode(mode)) return c.notFound();
     const DB = c.env.DB;
     const uid = c.get("user").id;
-    const form = await c.req.parseBody();
-    const mode = str(form.mode) as Mode;
-    const only = str(form.only) as Only;
-    const chapter = str(form.chapter) || undefined;
-    if (!MODES.includes(mode) || (chapter && !content.hasChapter(chapter))) return c.text("无法开始这组练习", 400);
-    const spec: QueueSpec = {
-      mode, chapter, section: str(form.section) || undefined, kp: str(form.kp) || undefined,
-      only: ONLY.includes(only) ? only : "all", nums: numList(form.nums), count: intOrNull(form.count) ?? 10,
-    };
     const day = today();
-    const [state, reviews, warmup] = await Promise.all([
-      loadState(DB, uid, content), db.reviewLog(DB, uid, addDays(day, -60)), warmupDays(DB, uid),
+    const [state, reviews, warmup, gradedToday] = await Promise.all([
+      loadState(DB, uid, content), db.reviewLog(DB, uid, addDays(day, -60)), warmupDays(DB, uid), db.gradedOn(DB, uid, day),
     ]);
-    const { title, nums } = buildQueue(spec, content, state.cards, reviews, state.excluded, day, warmup);
-    const sid = await db.createSession(DB, uid, title, mode, nums, now());
-    return c.redirect(`/practice/${sid}`, 303);
-  });
-
-  /** The user's own practice set; someone else's set looks like it does not exist. */
-  const sessionFrom = async (DB: D1Database, uid: number, raw: string) => {
-    const sid = intOrNull(raw);
-    return sid === null ? null : db.getSession(DB, uid, sid);
-  };
-
-  app.get("/practice/:sid", async (c) => {
-    const DB = c.env.DB;
-    const uid = c.get("user").id;
-    const session = await sessionFrom(DB, uid, c.req.param("sid"));
-    if (!session) return c.notFound();
-    const num = db.current(session);
-    if (num === null) return c.html(practiceDonePage(meta, session, await db.sessionGrades(DB, uid, session.id)));
-    const q = content.questions.get(num);
-    if (!q) return c.notFound();
-    const nextNum = session.queue[session.position + 1];
-    return c.html(practicePage(meta, {
-      session, q,
-      next: nextNum ? content.questions.get(nextNum) : undefined,
-      history: (await db.historyFor(DB, uid, num)).slice(-5),
-      knowledge: content.knowledgeFor(q.chapter),
-      sections: content.sectionsFor(q.num),
-      titles: content.knowledgeTitles(),
-      text: content.text(q.num),
+    const queue = mode === "warmup" ? stats.warmupQueue(reviews, state.active, day, warmup) : stats.dueQueue(state.cards, state.active, day);
+    const nums = stats.reviewList(reviews, mode, day, queue);
+    return c.html(reviewPage(meta, {
+      mode, questions: nums.map((n) => content.questions.get(n)!), state, texts: content.texts, gradedToday,
+      sections: new Map(nums.map((n) => [n, content.sectionsFor(n)])), knowledge: (q) => content.knowledgeFor(q.chapter),
+      titles: content.knowledgeTitles(), histories: await db.historiesFor(DB, uid, nums),
     }));
-  });
-
-  app.post("/practice/:sid/grade", async (c) => {
-    const DB = c.env.DB;
-    const uid = c.get("user").id;
-    const session = await sessionFrom(DB, uid, c.req.param("sid"));
-    if (!session) return c.notFound();
-    const form = await c.req.parseBody();
-    const num = intOrNull(form.num);
-    const grade = str(form.grade);
-    if (num !== null && db.current(session) === num && isGrade(grade)) {
-      await db.recordReview(DB, uid, { num, grade, at: now(), mode: session.mode, session });
-    }
-    return c.redirect(`/practice/${session.id}`, 303);
-  });
-
-  app.post("/practice/:sid/skip", async (c) => {
-    const DB = c.env.DB;
-    const uid = c.get("user").id;
-    const session = await sessionFrom(DB, uid, c.req.param("sid"));
-    if (!session) return c.notFound();
-    const num = intOrNull((await c.req.parseBody()).num);
-    if (num !== null && db.current(session) === num) await db.advanceSession(DB, uid, session, now());
-    return c.redirect(`/practice/${session.id}`, 303);
   });
 
   app.get("/bank", async (c) => {
@@ -186,7 +131,7 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     return c.redirect(safeBack(str(form.back), "/bank"), 303);
   });
 
-  // Grade a question from the chapter page. A question graded today is left alone, so a double click is one review.
+  // Grade a question from the chapter page or a review page. A question graded today is left alone, so a double click is one review.
   app.post("/q/:num/grade", async (c) => {
     const DB = c.env.DB;
     const uid = c.get("user").id;
@@ -195,8 +140,9 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     if (!q) return c.notFound();
     const form = await c.req.parseBody();
     const grade = str(form.grade);
+    const mode = str(form.mode);
     if (isGrade(grade) && !(await db.gradedOn(DB, uid, today())).has(q.num)) {
-      await db.recordReview(DB, uid, { num: q.num, grade, at: now(), mode: "browse" });
+      await db.recordReview(DB, uid, { num: q.num, grade, at: now(), mode: isReviewMode(mode) ? mode : "browse" });
     }
     return c.redirect(safeBack(str(form.back), `/bank/${q.chapter}#q-${q.num}`), 303);
   });
