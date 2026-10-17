@@ -37,6 +37,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 标注本身交给 DeepSeek，任务说明在 `docs/deepseek/题目知识点标注.md`；`python -m pipeline.link_questions check --write`
 校验通过才写入。文件缺失时页面退回整章链接。
 
+**题目文字版**（网站尚未接入）：题干和答案速查由能看图的模型从图片转成 Markdown + LaTeX，任务说明在
+`docs/deepseek/题目转LaTeX.md`。`python -m pipeline.transcribe_questions check --write` 校验通过后写入
+`bank-md/questions.json`（进 git，一题一行）；校验会用 Node 跑 `pipeline/katex_check.mjs`，拿仓库自带的 KaTeX 编译每一段公式。
+解析仍是图片。
+
 **Python 与 Worker 的对应关系**（行为改动两边都改、都测）：
 
 | Python（`dgy/`） | Worker（`edge/src/`） |
