@@ -37,6 +37,7 @@ MAX_PIXELS = 640_000  # what the vision model sees without shrinking (about 800 
 COVERAGE_MIN = 0.8
 SAMPLE_SIZE = 40
 PROBE_FILE = "probe.json"
+FULL_WIDTH_IN_MATH = re.compile(r"[，；。：、]")
 
 # Book numbering left at the start of a stem: (5)  （5）  【11】  4.  4、
 BOOK_LABEL = re.compile(r"^\s*(\(\s*\d+\s*\)|（\s*\d+\s*）|【\s*\d+\s*】|\d+\s*[.．、])")
@@ -235,6 +236,10 @@ def check_formulas(entries: list[tuple[str, dict]], report: Report) -> None:
         for part, text in _texts(entry):
             for i, (display, tex) in enumerate(math_segments(text)):
                 formulas.append({"id": f"{where} {part} 第{i + 1}个公式", "tex": tex, "display": display})
+    for f in formulas:
+        # KaTeX renders a stray ， inside math without complaint; it only ever gets there by a bulk find-and-replace.
+        if found := FULL_WIDTH_IN_MATH.search(f["tex"]):
+            report.errors.append(f"{f['id']}：公式里有全角标点「{found.group(0)}」，公式内一律用半角")
     errors = katex_errors(formulas)
     if errors is None:
         report.warnings.append("没有找到 node，跳过公式编译检查")
@@ -274,9 +279,10 @@ def load_questions(work_dir: Path) -> dict[int, dict]:
     return {q["num"]: q for q in (json.loads(line) for line in lines if line)}
 
 
-def load_results(work_dir: Path, report: Report, probe: bool = False) -> list[tuple[str, dict]]:
-    paths = [work_dir / "out" / PROBE_FILE] if probe else \
-        [p for p in sorted((work_dir / "out").glob("*.json")) if p.name != PROBE_FILE]
+def load_results(work_dir: Path, report: Report, probe: bool = False, probe_file: str = PROBE_FILE) -> list[tuple[str, dict]]:
+    # Probe files (probe.json, probe-harness.json, ...) are never part of the full results.
+    paths = [work_dir / "out" / probe_file] if probe else \
+        [p for p in sorted((work_dir / "out").glob("*.json")) if not p.name.startswith("probe")]
     entries = []
     for path in paths:
         if not path.exists():
@@ -292,10 +298,10 @@ def load_results(work_dir: Path, report: Report, probe: bool = False) -> list[tu
     return entries
 
 
-def check(work_dir: Path = WORK_DIR, probe: bool = False) -> tuple[Report, dict[int, dict]]:
+def check(work_dir: Path = WORK_DIR, probe: bool = False, probe_file: str = PROBE_FILE) -> tuple[Report, dict[int, dict]]:
     report = Report()
     questions = load_questions(work_dir)
-    entries = load_results(work_dir, report, probe)
+    entries = load_results(work_dir, report, probe, probe_file)
     by_num: dict[int, dict] = {}
     for where, entry in entries:
         num = entry.get("num")
@@ -404,6 +410,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("prepare", help="生成转写用的图片和参考信息")
     check_cmd = sub.add_parser("check", help="校验转写结果")
     check_cmd.add_argument("--probe", action="store_true", help="只校验看图测验 out/probe.json")
+    check_cmd.add_argument("--probe-file", default=PROBE_FILE, help="测验文件名，换模型接手时用另一个，例如 probe-harness.json")
     check_cmd.add_argument("--write", action="store_true", help="没有错误时写入 bank-md/questions.json")
     review_cmd = sub.add_parser("review", help="生成原图与转写的对照页")
     review_cmd.add_argument("--nums", help="只看这些题，逗号分隔，例如 1,12,300")
@@ -415,7 +422,7 @@ def main(argv: list[str] | None = None) -> int:
         nums = [int(x) for x in args.nums.split(",")] if args.nums else None
         print(f"已写入 {review(nums=nums)}")
         return 0
-    report, entries = check(probe=args.probe)
+    report, entries = check(probe=args.probe, probe_file=args.probe_file)
     print(report.render())
     if args.write and not args.probe and report.ok:
         print(f"已写入 {write_bank(entries)}")

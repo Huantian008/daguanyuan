@@ -153,3 +153,35 @@ JSON 字符串里的反斜杠要写两个：`\\lim`、`\\frac`。
 ```json
 {"num": 526, "type": "choice", "stem": "设 $y_1(x),y_2(x)$ 是某 2 阶非齐次线性微分方程的两个特解.若常数 $\\lambda,\\mu$ 使得 $2\\lambda y_1(x)+\\mu y_2(x)$ 是该方程的解, $\\lambda y_1(x)-2\\mu y_2(x)$ 是该方程对应的齐次方程的解, 则（　　）", "options": {"A": "$\\lambda=\\dfrac{1}{5},\\ \\mu=\\dfrac{2}{5}$", "B": "$\\lambda=\\dfrac{2}{5},\\ \\mu=\\dfrac{1}{5}$", "C": "$\\lambda=\\dfrac{1}{4},\\ \\mu=\\dfrac{1}{2}$", "D": "$\\lambda=\\dfrac{1}{2},\\ \\mu=\\dfrac{1}{4}$"}, "figure": false, "answer": "B", "confidence": "high", "note": ""}
 ```
+
+## 11. 中途接手（换模型或换工具继续）
+
+前一个执行者（opencode 里的 DeepSeek）做到一半停了。接手时按下面的顺序做，**已完成的题不要重做**。
+
+1. **先查进度**：
+
+   ```bash
+   .venv/bin/python content/transcribe/out/.qa.py validate
+   ```
+
+   它会把 `out/.parts/` 里的分片和 `out/probe.json` 一起校验，报出“进度 X/613”和“未做”的题号，以它为准。2026-10-17 停下时已完成 398 题，**未做的是 #371–#585**。
+2. **换了模型，先重做看图测验**：
+   - 转写 #012、#205、#300，写进 `out/probe-harness.json`，**不要动 `out/probe.json`**；
+   - 运行 `.venv/bin/python -m pipeline.transcribe_questions check --probe --probe-file probe-harness.json`；
+   - 校验通过才继续，不通过就停下回报。
+3. **分片规则**：
+   - 剩下的题按章分批，每批 20–30 题，写成 `out/.parts/<章>-<起>-<止>.json`，例如 `D-399-430.json`，格式同第 5 节；
+   - 一个分片文件只能由一个执行者写；
+   - 不确定接口有没有限流时，**一次只跑一批**。前一个执行者就是因为同时开了 4 个子代理才被限流卡死的。
+4. **修复前一个执行者留下的错误**：
+   - **#113、#142、#146、#147、#290**：它用脚本批量改标点时，把公式里的一些字符换成了全角逗号、分号，有时连原来的字符都吞掉了。到各自所在的分片里，对照原图改回原来的符号，`note` 写“修正批量替换造成的全角标点”。已核对的几处：
+     - #146 的 `g；(0)` 应为 `g'(0)`；
+     - #147 的 `(\alpha>0,\beta>0，` 应为 `(\alpha>0,\beta>0)`；
+     - #290 的 `& ，\geqslant1` 应为 `& x\geqslant1`；
+     - #113、#142 的 `…0，end{cases}` 处吞掉了反斜杠，应为 `…0,\end{cases}` 一类写法，以原图为准。
+   - **#300 重复**：它在 `.parts/C-276-306.json` 和 `out/probe.json` 里各有一份。对照原图确认分片里那份无误后，**只从 `out/probe.json` 删掉 #300 这一条**，probe.json 里只留 #12、#205。
+5. **禁止用脚本批量改标点或做全局替换**，尤其不能动 `$…$` 里的内容。校验现在会把公式里的全角标点直接报成错误。
+6. **收尾**：
+   - `.qa.py validate` 零错误后，运行 `.venv/bin/python content/transcribe/out/.qa.py merge`，生成 `out/A.json`…`out/F.json`；
+   - 再运行 `.venv/bin/python -m pipeline.transcribe_questions check`；
+   - 按第 8 节汇报。**不要运行 `check --write`。**

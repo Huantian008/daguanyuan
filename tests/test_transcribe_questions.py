@@ -119,3 +119,25 @@ def test_check_reads_chapter_files_but_not_the_probe(tmp_path):
     assert list(entries) == [1]
     assert any("还有 1 题没有结果：#002" in e for e in report.errors)
     assert not any("重复" in e for e in report.errors)
+
+
+def test_full_width_punctuation_inside_a_formula_is_an_error():
+    report = Report()
+    entry = dict(GOOD_CHOICE, stem="设 $f(x)=\\begin{cases}x, & x>0，\\\\ 0, & x\\leqslant0\\end{cases}$，则（　　）.")
+    tq.check_formulas([("#t", entry)], report)
+    assert any("全角标点「，」" in e for e in report.errors)
+    report = Report()
+    tq.check_formulas([("#t", GOOD_CHOICE)], report)  # full-width punctuation outside $…$ is fine
+    assert not any("全角" in e for e in report.errors)
+
+
+def test_a_second_probe_file_for_a_new_model(tmp_path):
+    (tmp_path / "out").mkdir()
+    (tmp_path / "questions.jsonl").write_text(json.dumps({"num": 1, "pdf_text": PDF_TEXT_1}, ensure_ascii=False), encoding="utf-8")
+    (tmp_path / "out" / "A.json").write_text(json.dumps({"questions": [GOOD_CHOICE]}, ensure_ascii=False), encoding="utf-8")
+    (tmp_path / "out" / "probe-harness.json").write_text(json.dumps({"questions": [dict(GOOD_CHOICE, stem="改过")]},
+                                                                    ensure_ascii=False), encoding="utf-8")
+    _report, entries = tq.check(tmp_path, probe=True, probe_file="probe-harness.json")
+    assert entries[1]["stem"] == "改过"
+    report, entries = tq.check(tmp_path)  # the full check leaves every probe file out
+    assert entries[1]["stem"] == GOOD_CHOICE["stem"] and report.ok, report.errors
