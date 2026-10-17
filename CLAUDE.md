@@ -32,6 +32,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 的知识点、`meta.json` 里的 URL 版本号）。Worker 打包时把 generated 里的 JSON 编进去，所以题库、知识点、CSS/JS
 改了之后都要重新 export 才会上线。题目内容从不进数据库，两边的数据库只存做题进度。
 
+**逐题知识点标注**：`dgy/sections.py` 把文字版带编号的 h2/h3 解析成小节（key 如 `01/7.3`，含页面 anchor 和原版页序号），
+`knowledge-md/question_links.json` 记每题 1–3 个小节 key（进 git）。export 时两者写进 `edge/src/generated/sections.json`。
+标注本身交给 DeepSeek，任务说明在 `docs/deepseek/题目知识点标注.md`；`python -m pipeline.link_questions check --write`
+校验通过才写入。文件缺失时页面退回整章链接。
+
 **Python 与 Worker 的对应关系**（行为改动两边都改、都测）：
 
 | Python（`dgy/`） | Worker（`edge/src/`） |
@@ -40,8 +45,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `templates/*.html`（Jinja） | `views/*.ts`（同样的标签和 class） |
 | `static/css/app.css`、`static/js/app.js` | 不另写，export 时原样拷到 `edge/public/static/` |
 | `markdown.py`（知识点 Markdown 渲染） | 不另写，读 export 生成的 `generated/knowledge.json` |
+| `templates/_theme_head.html`、`_theme_toggle.html` | `views/layout.ts` 里的两个常量，`edge/test/content.test.ts` 检查两边逐字一致 |
 
-所以前端样式和脚本只改 `dgy/static/` 一处；页面结构要改 Jinja 模板和 TS 视图两处。
+所以前端样式和脚本只改 `dgy/static/` 一处；页面结构要改 Jinja 模板和 TS 视图两处。颜色全部是 `app.css` 里 `:root`
+的变量，深色模式在同一文件里重新定义；知识点抽屉、展开开关和快捷键都在 `app.js`，不新增服务端接口。
 
 **两边的数据模型不一样**：
 
