@@ -43,18 +43,18 @@
   const sizeButton = document.querySelector(".js-qsize");
   if (sizeButton && document.querySelector(".qtext, .qanswer")) {
     const show = () => {
-      const size = root.dataset.qsize || "large";
+      const size = root.dataset.qsize || "xl";
       const label = `题目字号：${QSIZE_LABELS[size]}`;
       sizeButton.dataset.size = size;
       sizeButton.setAttribute("aria-label", label);
       sizeButton.title = `${label}（点按切换）`;
     };
     sizeButton.addEventListener("click", () => {
-      const next = QSIZES[(QSIZES.indexOf(root.dataset.qsize || "large") + 1) % QSIZES.length];
-      if (next === "large") delete root.dataset.qsize;
+      const next = QSIZES[(QSIZES.indexOf(root.dataset.qsize || "xl") + 1) % QSIZES.length];
+      if (next === "xl") delete root.dataset.qsize;
       else root.dataset.qsize = next;
       try {
-        if (next === "large") localStorage.removeItem(QSIZE_KEY);
+        if (next === "xl") localStorage.removeItem(QSIZE_KEY);
         else localStorage.setItem(QSIZE_KEY, next);
       } catch {
         // private window or blocked storage: the choice lasts for this page only

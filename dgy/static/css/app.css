@@ -40,10 +40,10 @@
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "HarmonyOS Sans SC",
     "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
   --mono: "SF Mono", "JetBrains Mono", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
-  --q-size: 18px; /* question text; the Aa button in the top bar picks 标准 / 大 / 特大 */
+  --q-size: 20px; /* question text; the Aa button in the top bar picks 标准 / 大 / 特大 */
 }
 :root[data-qsize="normal"] { --q-size: 16px; }
-:root[data-qsize="xl"] { --q-size: 20px; }
+:root[data-qsize="large"] { --q-size: 18px; }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {

@@ -6,14 +6,14 @@ const FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
 
 // Same markup as dgy/templates/_theme_head.html, _qsize_toggle.html and _theme_toggle.html. The head script runs before the first paint,
 // so a page never flashes the wrong theme; app.js shows the toggle and handles it.
-const THEME_HEAD = raw(`<script>document.documentElement.classList.add("js");try{var t=localStorage.getItem("dgy-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;var s=localStorage.getItem("dgy-qsize");if(s==="normal"||s==="xl")document.documentElement.dataset.qsize=s}catch(e){}</script>`);
+const THEME_HEAD = raw(`<script>document.documentElement.classList.add("js");try{var t=localStorage.getItem("dgy-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;var s=localStorage.getItem("dgy-qsize");if(s==="normal"||s==="large")document.documentElement.dataset.qsize=s}catch(e){}</script>`);
 const THEME_TOGGLE = raw(`<button type="button" class="theme-toggle js-theme" data-mode="auto" aria-label="主题：跟随系统" title="主题：跟随系统" hidden>
         <svg class="icon-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 0 0 17z" fill="currentColor" stroke="none"/></svg>
         <svg class="icon-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></svg>
         <svg class="icon-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
       </button>`);
 
-const QSIZE_TOGGLE = raw(`<button type="button" class="qsize-toggle js-qsize" data-size="large" aria-label="题目字号：大" title="题目字号：大（点按切换）" hidden>Aa</button>`);
+const QSIZE_TOGGLE = raw(`<button type="button" class="qsize-toggle js-qsize" data-size="xl" aria-label="题目字号：特大" title="题目字号：特大（点按切换）" hidden>Aa</button>`);
 
 const NAV: [href: string, label: string, key: string][] = [
   ["/", "首页", "home"],
