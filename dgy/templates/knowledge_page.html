@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import section_questions %}
 {% block title %}{{ entry.title }}{% endblock %}
 {% block head %}{% if tab == 'text' %}<link rel="stylesheet" href="/static/vendor/katex/katex.min.css">{% endif %}{% endblock %}
 {% block content %}
@@ -33,9 +34,12 @@
 {% endif %}
 <div class="kn-pages">
   {% for p in entry.pages %}
-  <a class="kn-page" id="p{{ loop.index }}" href="/content/{{ p.src }}?v={{ content_v }}" target="_blank" rel="noopener" title="在新标签页放大">
-    <img src="/content/{{ p.src }}?v={{ content_v }}" width="{{ p.w }}" height="{{ p.h }}" alt="{{ entry.title }} 第 {{ loop.index }} 页" {% if loop.first %}fetchpriority="high"{% else %}loading="lazy" decoding="async"{% endif %}>
-  </a>
+  <figure class="kn-figure" id="p{{ loop.index }}">
+    <a class="kn-page" href="/content/{{ p.src }}?v={{ content_v }}" target="_blank" rel="noopener" title="在新标签页放大">
+      <img src="/content/{{ p.src }}?v={{ content_v }}" width="{{ p.w }}" height="{{ p.h }}" alt="{{ entry.title }} 第 {{ loop.index }} 页" {% if loop.first %}fetchpriority="high"{% else %}loading="lazy" decoding="async"{% endif %}>
+    </a>
+    <figcaption class="kn-caption"><span class="muted">第 {{ loop.index }} 页</span>{% if page_questions[loop.index0] %}{{ section_questions(page_questions[loop.index0], state, '这一页的题目') }}{% endif %}</figcaption>
+  </figure>
   {% endfor %}
 </div>
 {% endif %}

@@ -1,13 +1,13 @@
 // Port of dgy/templates/bank.html, bank_chapter.html, search.html and question.html.
 import { html } from "hono/html";
-import type { ChapterInfo, KnowledgeEntry, Outline, Question } from "../content";
+import type { ChapterInfo, KnowledgeEntry, Outline, Question, Section } from "../content";
 import type { Meta } from "../env";
 import { GRADE_LABELS, type CardState } from "../srs";
 import type { UserState } from "../state";
 import type { ChapterProgress, Distribution, Review } from "../stats";
 import { cnDate } from "../studyday";
 import { layout } from "./layout";
-import { STATUS_LABELS, distBar, excludeToggle, images, qmeta, startForm, type Status } from "./parts";
+import { STATUS_LABELS, distBar, excludeToggle, images, qmeta, relatedKnowledge, revealToggle, startForm, type Status } from "./parts";
 import { pad3 } from "./util";
 
 const searchForm = (q = "", placeholder = "题号、年份或考点，如 123、2019数二、拐点") => html`<form class="search" action="/bank/search" method="get" role="search">
@@ -112,6 +112,8 @@ export interface QuestionData {
   status: Status;
   history: Review[];
   knowledge: KnowledgeEntry[];
+  sections: Section[];
+  titles: Record<string, string>;
   total: number;
 }
 
@@ -120,7 +122,8 @@ export function questionPage(meta: Meta, d: QuestionData) {
   return layout(meta, {
     title: `#${pad3(q.num)} ${q.kp}`,
     nav: "bank",
-    body: html`<header class="page-head">
+    body: html`<div data-shortcuts>
+<header class="page-head">
   <div>
     <p class="eyebrow"><a href="/bank/${d.chapter.code}">${d.chapter.name}</a> / ${q.path.join(" / ")}</p>
     <h1>#${pad3(q.num)} ${q.kp}</h1>
@@ -138,35 +141,36 @@ export function questionPage(meta: Meta, d: QuestionData) {
 
 <article class="sheet">
   ${qmeta(q)}
-  <div class="qbody">${images(meta, [q.img], "qimg", `题目 #${pad3(q.num)}`, 1.6, false)}</div>
+  <div class="qbody paper">${images(meta, [q.img], "qimg", `题目 #${pad3(q.num)}`, 1.6, false)}</div>
 </article>
-<details class="reveal answer">
-  <summary>显示答案</summary>
-  <div class="reveal-body">${images(meta, [q.answer], "aimg", "答案", 2.2)}</div>
-</details>
-<details class="reveal solution">
-  <summary>看解析 <span class="muted">${q.solution.length} 张图</span></summary>
-  <div class="reveal-body">${images(meta, q.solution, "simg", "解析", 2)}</div>
-</details>
+<div class="reveal-bar reveal-bar-single">
+  ${revealToggle("answer", "答案与解析", "空格")}
+</div>
+<section id="answer" class="reveal-panel" aria-label="答案与解析">
+  <h2 class="panel-label">答案</h2>
+  <div class="paper">${images(meta, [q.answer], "aimg", "答案", 2.2)}</div>
+  <h2 class="panel-label">解析 <span class="muted">${q.solution.length} 张图</span></h2>
+  <div class="paper">${images(meta, q.solution, "simg", "解析", 2)}</div>
+</section>
 
 <div class="grid grid-2">
   <section class="card">
-    <h2>做题记录</h2>
+    <h2 class="card-title">相关知识点</h2>
+    ${relatedKnowledge(d.sections, d.knowledge, d.titles)}
+  </section>
+  <section class="card">
+    <h2 class="card-title">做题记录</h2>
     ${d.history.length
       ? html`<ul class="plain">${[...d.history].reverse().map((r) => html`<li><span class="muted">${cnDate(r.studyDay)}</span> <span class="chip chip-${r.grade}">${GRADE_LABELS[r.grade]}</span></li>`)}</ul>`
       : html`<p class="empty">还没做过这道题。</p>`}
   </section>
-  <section class="card">
-    <h2>相关</h2>
-    <ul class="plain">
-      ${d.knowledge.map((k) => html`<li><a href="/knowledge/${k.slug}">知识点：${k.title}</a></li>`)}
-      <li>答案速查编号 ${q.quick_id} · 原稿第 ${q.orig_page} 页</li>
-      <li class="pager">
-        ${q.num > 1 ? html`<a href="/q/${q.num - 1}">← #${pad3(q.num - 1)}</a>` : ""}
-        ${q.num < d.total ? html`<a href="/q/${q.num + 1}">#${pad3(q.num + 1)} →</a>` : ""}
-      </li>
-    </ul>
-  </section>
+</div>
+
+<p class="side-info">答案速查编号 ${q.quick_id} · 原稿第 ${q.orig_page} 页</p>
+<nav class="pager" aria-label="翻题">
+  ${q.num > 1 ? html`<a class="btn btn-small" href="/q/${q.num - 1}">← #${pad3(q.num - 1)}</a>` : html`<span></span>`}
+  ${q.num < d.total ? html`<a class="btn btn-small" href="/q/${q.num + 1}">#${pad3(q.num + 1)} →</a>` : ""}
+</nav>
 </div>`,
   });
 }

@@ -55,3 +55,40 @@
 {% macro status_label(status) -%}
 {{ {'excluded': '不做', 'new': '未做', 'mastered': '完全掌握', 'shaky': '不熟练/错误', 'unknown': '完全不会'}[status] }}
 {%- endmacro %}
+
+{% macro reveal_toggle(target, label, key) -%}
+<button type="button" class="reveal-toggle js-reveal" aria-expanded="false" aria-controls="{{ target }}">{{ label }} <kbd>{{ key }}</kbd><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+{%- endmacro %}
+
+{% macro kn_links(sections, titles) -%}
+<ul class="kn-links">
+  {% for s in sections %}
+  <li class="kn-link">
+    {% set original = '/knowledge/' ~ s.slug ~ ('#p' ~ s.page_index if s.page_index else '') %}
+    <a class="kn-open js-kn-open" href="/knowledge/{{ s.slug }}?tab=text#{{ s.anchor }}" data-src="/knowledge/{{ s.slug }}?tab=text" data-anchor="{{ s.anchor }}" data-original="{{ original }}">
+      <span class="kn-chapter">{{ titles.get(s.slug, s.slug) }}</span>
+      <span class="kn-title">{{ s.label }}</span>
+    </a>
+    <a class="kn-page-link" href="{{ original }}" target="_blank" rel="noopener">{% if s.page_index %}原版第 {{ s.page_index }} 页{% else %}原版{% endif %}</a>
+  </li>
+  {% endfor %}
+</ul>
+{%- endmacro %}
+
+{% macro knowledge_panel(q, sections, knowledge, titles) -%}
+<p class="kn-kp">书上的考点 <b>{{ q.kp }}</b> <span class="muted">{{ q.path|join(' / ') }}</span></p>
+{% if sections %}
+{{ kn_links(sections, titles) }}
+{% else %}
+<p class="muted">这道题还没有逐题标注，先看整章：{% for k in knowledge if k %}{% if not loop.first %}、{% endif %}<a href="/knowledge/{{ k.slug }}?tab=text">{{ k.title }}</a>{% endfor %}</p>
+{% endif %}
+{%- endmacro %}
+
+{% macro section_questions(nums, state, label='本节题目') -%}
+{% set open_nums = nums|reject('in', state.excluded)|list %}
+<div class="section-qs">
+  <span class="section-qs-label">{{ label }}</span>
+  <span class="chips">{% for n in nums %}<a class="chip chip-{{ state.status(n) }}" href="/q/{{ n }}">{{ '%03d' % n }}</a>{% endfor %}</span>
+  {% if open_nums %}{{ start('练这 %d 题' % open_nums|length, 'single', cls='btn btn-small', nums=open_nums|join(',')) }}{% endif %}
+</div>
+{%- endmacro %}

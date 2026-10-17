@@ -59,6 +59,8 @@ def show(request: Request, sid: int, conn=Depends(get_conn)):
         status=state.status(q.num),
         history=db.history_for(conn, q.num)[-5:],
         knowledge=[content.knowledge_entry(s) for s in content.chapter_links.get(q.chapter, [])],
+        sections=content.sections_for(q.num),
+        titles=content.knowledge_titles(),
     )
 
 

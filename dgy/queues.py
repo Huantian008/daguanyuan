@@ -9,6 +9,7 @@ from .db import Review
 from .srs import CardState
 
 WEAK_GRADES = ("shaky", "unknown")
+SINGLE_TITLE_MAX = 5  # a hand-picked list longer than this is titled by its first question and the count
 
 
 @dataclass(frozen=True)
@@ -51,6 +52,8 @@ def build_queue(spec: QueueSpec, content: Content, cards: dict[int, CardState], 
         return "到期复习", stats.due_queue(cards, active, today)
     if spec.mode == "single":
         nums = [n for n in spec.nums if n in content.questions]
+        if len(nums) > SINGLE_TITLE_MAX:
+            return f"#{nums[0]:03d} 等 {len(nums)} 题", nums
         return ("#" + "、#".join(f"{n:03d}" for n in nums)), nums
     if spec.mode == "random":
         pool = sorted(n for n in active if _keep(n, spec.only, cards))

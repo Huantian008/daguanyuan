@@ -11,7 +11,7 @@ import { addDays, daysBetween, studyDay } from "./studyday";
 import { bankPage, chapterPage, questionPage, searchPage } from "./views/bank";
 import { dashboardPage } from "./views/dashboard";
 import { historyPage, settingsPage, type HistoryDay } from "./views/history";
-import { knowledgeIndexPage, knowledgePage } from "./views/knowledge";
+import { injectSectionQuestions, knowledgeIndexPage, knowledgePage } from "./views/knowledge";
 import { practiceDonePage, practicePage } from "./views/practice";
 import { safeBack } from "./views/util";
 
@@ -98,6 +98,8 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
       next: nextNum ? content.questions.get(nextNum) : undefined,
       history: (await db.historyFor(DB, uid, num)).slice(-5),
       knowledge: content.knowledgeFor(q.chapter),
+      sections: content.sectionsFor(q.num),
+      titles: content.knowledgeTitles(),
     }));
   });
 
@@ -174,7 +176,8 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     const [state, history] = await Promise.all([loadState(DB, uid, content), db.historyFor(DB, uid, q.num)]);
     return c.html(questionPage(meta, {
       q, chapter: content.chapter(q.chapter), card: state.cards.get(q.num), status: state.status(q.num), history,
-      knowledge: content.knowledgeFor(q.chapter), total: content.all().length,
+      knowledge: content.knowledgeFor(q.chapter), sections: content.sectionsFor(q.num), titles: content.knowledgeTitles(),
+      total: content.all().length,
     }));
   });
 
@@ -187,13 +190,19 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     return c.html(knowledgeIndexPage(meta, [...groups], (slug) => slug in knowledge.chapters, knowledge.overview));
   });
 
-  app.get("/knowledge/:slug", (c) => {
+  app.get("/knowledge/:slug", async (c) => {
     const slug = c.req.param("slug");
     const entry = content.knowledgeEntry(slug);
     if (!entry) return c.notFound();
     const text = knowledge.chapters[slug];
+    const tab = c.req.query("tab") === "text" && text ? "text" : "original";
+    const state = await loadState(c.env.DB, c.get("user").id, content);
     const chapters = content.chapters.filter((ch) => (content.chapterLinks[ch.code] ?? []).includes(slug));
-    return c.html(knowledgePage(meta, { entry, tab: c.req.query("tab") === "text" && text ? "text" : "original", text, chapters }));
+    return c.html(knowledgePage(meta, {
+      entry, tab, chapters, state,
+      text: text && { html: injectSectionQuestions(text.html, slug, content, state), toc: text.toc },
+      pageQuestions: entry.pages.map((_, i) => content.questionsOnPage(slug, i + 1)),
+    }));
   });
 
   app.get("/history", async (c) => {

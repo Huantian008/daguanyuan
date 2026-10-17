@@ -1,7 +1,8 @@
 {% extends "base.html" %}
-{% from "_macros.html" import qmeta, images, start, exclude_toggle, status_label %}
+{% from "_macros.html" import qmeta, images, start, exclude_toggle, status_label, reveal_toggle, kn_links %}
 {% block title %}#{{ '%03d' % q.num }} {{ q.kp }}{% endblock %}
 {% block content %}
+<div data-shortcuts>
 <header class="page-head">
   <div>
     <p class="eyebrow"><a href="/bank/{{ chapter.code }}">{{ chapter.name }}</a> / {{ q.path|join(' / ') }}</p>
@@ -20,20 +21,29 @@
 
 <article class="sheet">
   {{ qmeta(q) }}
-  <div class="qbody">{{ images([q.img], 'qimg', '题目 #%03d' % q.num, 1.6, lazy=false) }}</div>
+  <div class="qbody paper">{{ images([q.img], 'qimg', '题目 #%03d' % q.num, 1.6, lazy=false) }}</div>
 </article>
-<details class="reveal answer">
-  <summary>显示答案</summary>
-  <div class="reveal-body">{{ images([q.answer], 'aimg', '答案', 2.2) }}</div>
-</details>
-<details class="reveal solution">
-  <summary>看解析 <span class="muted">{{ q.solution|length }} 张图</span></summary>
-  <div class="reveal-body">{{ images(q.solution, 'simg', '解析', 2) }}</div>
-</details>
+<div class="reveal-bar reveal-bar-single">
+  {{ reveal_toggle('answer', '答案与解析', '空格') }}
+</div>
+<section id="answer" class="reveal-panel" aria-label="答案与解析">
+  <h2 class="panel-label">答案</h2>
+  <div class="paper">{{ images([q.answer], 'aimg', '答案', 2.2) }}</div>
+  <h2 class="panel-label">解析 <span class="muted">{{ q.solution|length }} 张图</span></h2>
+  <div class="paper">{{ images(q.solution, 'simg', '解析', 2) }}</div>
+</section>
 
 <div class="grid grid-2">
   <section class="card">
-    <h2>做题记录</h2>
+    <h2 class="card-title">相关知识点</h2>
+    {% if sections %}
+    {{ kn_links(sections, titles) }}
+    {% else %}
+    <p class="muted">这道题还没有逐题标注，先看整章：{% for k in knowledge if k %}{% if not loop.first %}、{% endif %}<a href="/knowledge/{{ k.slug }}?tab=text">{{ k.title }}</a>{% endfor %}</p>
+    {% endif %}
+  </section>
+  <section class="card">
+    <h2 class="card-title">做题记录</h2>
     {% if history %}
     <ul class="plain">
       {% for r in history|reverse %}
@@ -44,16 +54,12 @@
     <p class="empty">还没做过这道题。</p>
     {% endif %}
   </section>
-  <section class="card">
-    <h2>相关</h2>
-    <ul class="plain">
-      {% for k in knowledge if k %}<li><a href="/knowledge/{{ k.slug }}">知识点：{{ k.title }}</a></li>{% endfor %}
-      <li>答案速查编号 {{ q.quick_id }} · 原稿第 {{ q.orig_page }} 页</li>
-      <li class="pager">
-        {% if q.num > 1 %}<a href="/q/{{ q.num - 1 }}">← #{{ '%03d' % (q.num - 1) }}</a>{% endif %}
-        {% if q.num < 613 %}<a href="/q/{{ q.num + 1 }}">#{{ '%03d' % (q.num + 1) }} →</a>{% endif %}
-      </li>
-    </ul>
-  </section>
+</div>
+
+<p class="side-info">答案速查编号 {{ q.quick_id }} · 原稿第 {{ q.orig_page }} 页</p>
+<nav class="pager" aria-label="翻题">
+  {% if q.num > 1 %}<a class="btn btn-small" href="/q/{{ q.num - 1 }}">← #{{ '%03d' % (q.num - 1) }}</a>{% else %}<span></span>{% endif %}
+  {% if q.num < 613 %}<a class="btn btn-small" href="/q/{{ q.num + 1 }}">#{{ '%03d' % (q.num + 1) }} →</a>{% endif %}
+</nav>
 </div>
 {% endblock %}

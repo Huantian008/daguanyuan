@@ -3,15 +3,17 @@
     .venv\\Scripts\\python -m pipeline.export_edge
 
 Copies the images, CSS/JS and knowledge diagrams into edge/public/ (served as Workers Static Assets) and writes
-edge/src/generated/: the question manifest, the knowledge Markdown pre-rendered to HTML, and URL version stamps.
+edge/src/generated/: the question manifest, the knowledge Markdown pre-rendered to HTML, the knowledge sections with
+the questions tagged with them, and URL version stamps.
 """
 import json
 import shutil
 import sys
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from dgy.markdown import render_markdown
+from dgy.sections import load_links, load_sections
 
 from . import sources
 
@@ -93,6 +95,13 @@ def export_edge(content_dir: Path = sources.CONTENT_DIR, static_dir: Path = STAT
     overview_md = markdown_dir / "00_总目录.md"
     overview = render_markdown(overview_md.read_text(encoding="utf-8"))[0] if overview_md.exists() else ""
     _write_json(generated / "knowledge.json", {"chapters": chapters, "overview": overview})
+
+    sections = load_sections(markdown_dir) if markdown_dir.exists() else {}
+    links = load_links(markdown_dir, sections) if sections else {}
+    _write_json(generated / "sections.json", {
+        "sections": [asdict(s) for s in sections.values()],
+        "links": {str(num): list(keys) for num, keys in sorted(links.items())},
+    })
 
     _write_json(generated / "meta.json", {
         "content_v": "".join(ch for ch in manifest.get("built_at", "") if ch.isdigit()),

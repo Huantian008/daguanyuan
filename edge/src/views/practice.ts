@@ -1,12 +1,12 @@
 // Port of dgy/templates/practice.html and practice_done.html.
 import { html } from "hono/html";
-import type { KnowledgeEntry, Question } from "../content";
+import type { KnowledgeEntry, Question, Section } from "../content";
 import type { PracticeSession } from "../db";
 import type { Meta } from "../env";
 import { GRADE_LABELS } from "../srs";
 import type { Review } from "../stats";
 import { layout } from "./layout";
-import { images, qmeta } from "./parts";
+import { images, knowledgePanel, qmeta, revealToggle } from "./parts";
 import { contentUrl, pad3 } from "./util";
 
 export interface PracticeData {
@@ -15,6 +15,8 @@ export interface PracticeData {
   next: Question | undefined;
   history: Review[];
   knowledge: KnowledgeEntry[];
+  sections: Section[];
+  titles: Record<string, string>;
 }
 
 export function practicePage(meta: Meta, d: PracticeData) {
@@ -25,32 +27,34 @@ export function practicePage(meta: Meta, d: PracticeData) {
     title: `#${pad3(q.num)} ${q.kp}`,
     pageClass: "page-practice",
     head: d.next ? html`<link rel="prefetch" href="${contentUrl(meta, d.next.img.src)}" as="image">` : "",
-    body: html`<div class="practice" data-practice>
+    body: html`<div class="practice" data-practice data-shortcuts>
   <header class="practice-head">
-    <div>
-      <p class="eyebrow">${session.title}</p>
-      <p class="muted">第 ${session.position + 1} / ${session.queue.length} 题</p>
-    </div>
+    <p class="practice-title">${session.title}</p>
+    <p class="practice-count">第 <b>${session.position + 1}</b> / ${session.queue.length} 题</p>
   </header>
   <div class="track" aria-hidden="true"><span style="width: ${Math.round((100 * session.position) / session.queue.length)}%"></span></div>
 
   <article class="sheet">
     ${qmeta(q)}
-    <div class="qbody">${images(meta, [q.img], "qimg", `题目 #${pad3(q.num)}`, 1.6, false)}</div>
+    <div class="qbody paper">${images(meta, [q.img], "qimg", `题目 #${pad3(q.num)}`, 1.6, false)}</div>
   </article>
 
-  <details class="reveal answer">
-    <summary>显示答案 <kbd>空格</kbd></summary>
-    <div class="reveal-body">${images(meta, [q.answer], "aimg", "答案", 2.2)}</div>
-  </details>
-  <details class="reveal solution">
-    <summary>看解析 <kbd>S</kbd> <span class="muted">${q.solution.length} 张图</span></summary>
-    <div class="reveal-body">${images(meta, q.solution, "simg", "解析", 2)}</div>
-  </details>
+  <div class="reveal-bar">
+    ${revealToggle("answer", "答案与解析", "空格")}
+    ${revealToggle("knowledge", "知识点", "K")}
+  </div>
+  <section id="answer" class="reveal-panel" aria-label="答案与解析">
+    <h2 class="panel-label">答案</h2>
+    <div class="paper">${images(meta, [q.answer], "aimg", "答案", 2.2)}</div>
+    <h2 class="panel-label">解析 <span class="muted">${q.solution.length} 张图</span></h2>
+    <div class="paper">${images(meta, q.solution, "simg", "解析", 2)}</div>
+  </section>
+  <section id="knowledge" class="reveal-panel" aria-label="知识点">
+    ${knowledgePanel(q, d.sections, d.knowledge, d.titles)}
+  </section>
 
   <p class="side-info">
     ${last && lastDay ? `上次自评：${GRADE_LABELS[last.grade]}（${lastDay.getUTCMonth() + 1}月${lastDay.getUTCDate()}日）` : "第一次做这道题"}
-    ${d.knowledge.map((k) => html` · <a href="/knowledge/${k.slug}" target="_blank" rel="noopener">知识点：${k.title}</a>`)}
     · <a href="/q/${q.num}" target="_blank" rel="noopener">题目详情</a>
   </p>
 </div>

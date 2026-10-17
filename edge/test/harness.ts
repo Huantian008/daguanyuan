@@ -1,7 +1,7 @@
 // Test helpers: a fake static-assets binding, an env with an in-memory D1, a cookie-keeping client, a settable clock.
 import type { Hono } from "hono";
 import { createApp } from "../src/app";
-import { Content, type Manifest } from "../src/content";
+import { Content, type Linking, type Manifest } from "../src/content";
 import type { Env } from "../src/env";
 import { memoryD1 } from "./d1";
 import { smallBank } from "./fixtures";
@@ -78,13 +78,19 @@ export const ACCOUNTS = [
   { id: 2, name: "pal", password_secret: "FRIEND_PASSWORD" },
 ];
 
+/** Questions #001 and #003 tagged with section 01/1, which starts on the chapter's first original page. */
+export const LINKING: Linking = {
+  sections: [{ key: "01/1", slug: "01", number: "1", level: 2, title: "函数基础", anchor: "1-函数基础", pdf_page: 10, page_index: 1, parent: null }],
+  links: { "1": ["01/1"], "3": ["01/1"] },
+};
+
 export function setup(options: {
-  password?: string; friendPassword?: string; secret?: string; users?: unknown; bank?: Manifest;
+  password?: string; friendPassword?: string; secret?: string; users?: unknown; bank?: Manifest; linking?: Linking;
 } = {}) {
   const bank = options.bank ?? smallBank();
   const clock = new Clock(new Date("2026-10-16T21:00:00+08:00"));
   const app = createApp({
-    content: new Content(bank),
+    content: new Content(bank, options.linking),
     knowledge: KNOWLEDGE,
     meta: { content_v: "20261016120000", asset_v: "1760000000" },
     now: clock.now,

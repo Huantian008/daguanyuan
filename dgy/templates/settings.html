@@ -15,7 +15,7 @@
 <section class="card">
   <h2>数据</h2>
   <ul class="plain">
-    <li>学习数据：<code>{{ data_dir }}\app.db</code></li>
+    <li>学习数据：<code>{{ db_path }}</code></li>
     <li>自动备份：{% if latest_backup %}最近一次 <code>{{ latest_backup }}</code>，保留 14 份{% else %}还没有备份{% endif %}</li>
     <li>题库生成时间：{{ built_at }}</li>
     <li>登录密码：{% if password_on %}已开启{% else %}未开启（只在本机用不需要；放到服务器前要设置环境变量 APP_PASSWORD）{% endif %}</li>

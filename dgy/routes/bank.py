@@ -68,4 +68,6 @@ def question(request: Request, num: int, conn=Depends(get_conn)):
         status=state.status(num),
         history=db.history_for(conn, num),
         knowledge=[content.knowledge_entry(s) for s in content.chapter_links.get(q.chapter, [])],
+        sections=content.sections_for(num),
+        titles=content.knowledge_titles(),
     )

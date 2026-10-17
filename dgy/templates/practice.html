@@ -1,34 +1,36 @@
 {% extends "base.html" %}
-{% from "_macros.html" import qmeta, images %}
+{% from "_macros.html" import qmeta, images, reveal_toggle, knowledge_panel %}
 {% block title %}#{{ '%03d' % q.num }} {{ q.kp }}{% endblock %}
 {% block page_class %}page-practice{% endblock %}
 {% block content %}
-<div class="practice" data-practice>
+<div class="practice" data-practice data-shortcuts>
   <header class="practice-head">
-    <div>
-      <p class="eyebrow">{{ session.title }}</p>
-      <p class="muted">第 {{ session.position + 1 }} / {{ session.queue|length }} 题</p>
-    </div>
+    <p class="practice-title">{{ session.title }}</p>
+    <p class="practice-count">第 <b>{{ session.position + 1 }}</b> / {{ session.queue|length }} 题</p>
   </header>
   <div class="track" aria-hidden="true"><span style="width: {{ (100 * session.position / session.queue|length)|round|int }}%"></span></div>
 
   <article class="sheet">
     {{ qmeta(q) }}
-    <div class="qbody">{{ images([q.img], 'qimg', '题目 #%03d' % q.num, 1.6, lazy=false) }}</div>
+    <div class="qbody paper">{{ images([q.img], 'qimg', '题目 #%03d' % q.num, 1.6, lazy=false) }}</div>
   </article>
 
-  <details class="reveal answer">
-    <summary>显示答案 <kbd>空格</kbd></summary>
-    <div class="reveal-body">{{ images([q.answer], 'aimg', '答案', 2.2) }}</div>
-  </details>
-  <details class="reveal solution">
-    <summary>看解析 <kbd>S</kbd> <span class="muted">{{ q.solution|length }} 张图</span></summary>
-    <div class="reveal-body">{{ images(q.solution, 'simg', '解析', 2) }}</div>
-  </details>
+  <div class="reveal-bar">
+    {{ reveal_toggle('answer', '答案与解析', '空格') }}
+    {{ reveal_toggle('knowledge', '知识点', 'K') }}
+  </div>
+  <section id="answer" class="reveal-panel" aria-label="答案与解析">
+    <h2 class="panel-label">答案</h2>
+    <div class="paper">{{ images([q.answer], 'aimg', '答案', 2.2) }}</div>
+    <h2 class="panel-label">解析 <span class="muted">{{ q.solution|length }} 张图</span></h2>
+    <div class="paper">{{ images(q.solution, 'simg', '解析', 2) }}</div>
+  </section>
+  <section id="knowledge" class="reveal-panel" aria-label="知识点">
+    {{ knowledge_panel(q, sections, knowledge, titles) }}
+  </section>
 
   <p class="side-info">
     {% if history %}上次自评：{{ history[-1].grade|grade_label }}（{{ history[-1].study_day.month }}月{{ history[-1].study_day.day }}日）{% else %}第一次做这道题{% endif %}
-    {% for k in knowledge if k %} · <a href="/knowledge/{{ k.slug }}" target="_blank" rel="noopener">知识点：{{ k.title }}</a>{% endfor %}
     · <a href="/q/{{ q.num }}" target="_blank" rel="noopener">题目详情</a>
   </p>
 </div>

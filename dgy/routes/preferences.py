@@ -14,7 +14,7 @@ def settings_form(request: Request, saved: int = 0, conn=Depends(get_conn)):
     backups = sorted(settings.backup_dir.glob("app-*.db")) if settings.backup_dir.exists() else []
     return render(request, "settings.html", nav="settings", exam_date=exam_date(conn),
                   warmup_days=warmup_days(conn), saved=saved, password_on=bool(settings.password),
-                  data_dir=settings.data_dir, latest_backup=backups[-1].name if backups else None,
+                  db_path=settings.db_path, latest_backup=backups[-1].name if backups else None,
                   built_at=request.app.state.content.built_at)
 
 

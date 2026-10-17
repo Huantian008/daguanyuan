@@ -1,9 +1,9 @@
 // Port of tests/test_app.py: the same user-visible behaviour, now against the Worker and D1.
 import { describe, expect, it } from "vitest";
-import { Client, setup, visible } from "./harness";
+import { Client, LINKING, setup, visible } from "./harness";
 
-async function loggedIn() {
-  const ctx = setup();
+async function loggedIn(options: Parameters<typeof setup>[0] = {}) {
+  const ctx = setup(options);
   await ctx.client.login();
   return ctx;
 }
@@ -21,6 +21,16 @@ async function grade(client: Client, url: string, num: number, value: string) {
 
 const text = async (client: Client, path: string) => (await client.get(path)).text();
 
+describe("layout", () => {
+  it("has a theme switch that JavaScript shows", async () => {
+    const { client } = await loggedIn();
+    const page = await text(client, "/");
+    expect(page).toMatch(/class="theme-toggle js-theme"[^>]*hidden/);
+    expect(page).toContain('classList.add("js")');
+    expect(page).toContain('localStorage.getItem("dgy-theme")');
+  });
+});
+
 describe("dashboard", () => {
   it("shows the exam countdown and empty queues", async () => {
     const { client } = await loggedIn();
@@ -37,6 +47,30 @@ describe("practice", () => {
     const page = await text(client, await start(client, { mode: "group", chapter: "A" }));
     expect(page).not.toContain("timer");
     expect(page).not.toContain('name="elapsed"');
+  });
+
+  it("has answer and knowledge switches whose panels show without JavaScript", async () => {
+    const { client } = await loggedIn();
+    const page = await text(client, await start(client, { mode: "group", chapter: "A" }));
+    expect(page).toContain('<button type="button" class="reveal-toggle js-reveal" aria-expanded="false" aria-controls="answer">');
+    expect(page).toContain('aria-controls="knowledge"');
+    expect(page).toContain('<section id="answer" class="reveal-panel"');
+    expect(page).toContain('<section id="knowledge" class="reveal-panel"');
+    expect(page).toContain("这道题还没有逐题标注");
+    expect(page).toContain('href="/knowledge/01?tab=text"');
+  });
+
+  it("links a tagged question to its knowledge section", async () => {
+    const { client } = await loggedIn({ linking: LINKING });
+    const page = await text(client, await start(client, { mode: "group", chapter: "A" }));
+    expect(page).toContain('href="/knowledge/01?tab=text#1-函数基础"');
+    expect(page).toContain('data-anchor="1-函数基础"');
+    expect(page).toContain('href="/knowledge/01#p1"');
+    expect(page).toContain("原版第 1 页");
+    expect(page).not.toContain("这道题还没有逐题标注");
+    const detail = visible(await text(client, "/q/1"));
+    expect(detail).toContain("相关知识点");
+    expect(detail).toContain("1 函数基础");
   });
 
   it("grades a question and moves to the next one", async () => {
@@ -137,6 +171,25 @@ describe("bank", () => {
 });
 
 describe("knowledge", () => {
+  it("lists the questions of each section under its heading", async () => {
+    const { client } = await loggedIn({ linking: LINKING });
+    await grade(client, await start(client, { mode: "group", chapter: "A" }), 1, "shaky");
+    const block = (await text(client, "/knowledge/01?tab=text")).split('id="1-函数基础"')[1];
+    expect(block).toContain('class="section-qs"');
+    expect(block).toContain('<a class="chip chip-shaky" href="/q/1">001</a>');
+    expect(block).toContain('href="/q/3"');
+    expect(block).toContain('name="nums" value="1,3"');
+    expect(block).toContain("练这 2 题");
+  });
+
+  it("lists the questions on each original page", async () => {
+    const { client } = await loggedIn({ linking: LINKING });
+    const page = await text(client, "/knowledge/01");
+    expect(page).toContain('<figure class="kn-figure" id="p1">');
+    expect(page).toContain("这一页的题目");
+    expect(page).toContain('href="/q/3"');
+  });
+
   it("shows the original pages and the text version", async () => {
     const { client } = await loggedIn();
     const index = await text(client, "/knowledge");

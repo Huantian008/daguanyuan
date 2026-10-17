@@ -28,7 +28,7 @@ class Clock:
         return self.at
 
 
-def _make_env(tmp_path, password=None):
+def _make_env(tmp_path, password=None, links=None):
     content = tmp_path / "content"
     bank = small_bank()
     bank["knowledge"] = KNOWLEDGE
@@ -41,8 +41,12 @@ def _make_env(tmp_path, password=None):
         (content / src).write_bytes(b"img")
     md = tmp_path / "md"
     (md / "assets").mkdir(parents=True)
-    (md / "00_总目录.md").write_text("# 总目录\n\n核对说明\n", encoding="utf-8")
-    (md / "01_函数极限连续.md").write_text("# 函数、极限与连续\n\n## 1. 函数基础\n\n若 $f'(x)$ 有界\n", encoding="utf-8")
+    (md / "00_总目录.md").write_text("# 总目录\n\n核对说明\n\n| 10–10 | [01 函数](./01_函数极限连续.md) | 转写 |\n",
+                                   encoding="utf-8")
+    (md / "01_函数极限连续.md").write_text("# 函数、极限与连续\n\n## 1. 函数基础\n\n<!-- p.10 -->\n若 $f'(x)$ 有界\n",
+                                       encoding="utf-8")
+    if links:
+        (md / "question_links.json").write_text(json.dumps({"version": 1, "links": links}), encoding="utf-8")
     settings = Settings(content_dir=content, data_dir=tmp_path / "data", knowledge_md_dir=md,
                         password=password, secret_key="test-secret")
     clock = Clock(datetime(2026, 10, 16, 21, 0, tzinfo=TZ))
@@ -91,6 +95,51 @@ def test_practice_by_chapter_grades_and_moves_to_next_question(env):
 def test_practice_page_has_no_timer(env):
     page = env.client.get(start(env, mode="group", chapter="A")).text
     assert "timer" not in page and 'name="elapsed"' not in page
+
+
+def test_practice_page_switches_work_without_javascript(env):
+    page = env.client.get(start(env, mode="group", chapter="A")).text
+    assert ('<button type="button" class="reveal-toggle js-reveal" aria-expanded="false" aria-controls="answer">'
+            in page)
+    assert 'aria-controls="knowledge"' in page
+    # Both panels are in the page and not hidden: without JavaScript they simply show.
+    assert '<section id="answer" class="reveal-panel"' in page
+    assert '<section id="knowledge" class="reveal-panel"' in page
+    assert "这道题还没有逐题标注" in page and 'href="/knowledge/01?tab=text"' in page
+
+
+@pytest.fixture
+def tagged(tmp_path):
+    return _make_env(tmp_path, links={"1": ["01/1"], "3": ["01/1"]})
+
+
+def test_tagged_question_links_to_its_knowledge_section(tagged):
+    page = tagged.client.get(start(tagged, mode="group", chapter="A")).text
+    assert 'href="/knowledge/01?tab=text#1-函数基础"' in page and 'data-anchor="1-函数基础"' in page
+    assert 'href="/knowledge/01#p1"' in page and "原版第 1 页" in page
+    assert "这道题还没有逐题标注" not in page
+    detail = visible(tagged.client.get("/q/1").text)
+    assert "相关知识点" in detail and "1 函数基础" in detail
+
+
+def test_knowledge_text_lists_the_questions_of_each_section(tagged):
+    grade(tagged, start(tagged, mode="group", chapter="A"), 1, "shaky")
+    block = tagged.client.get("/knowledge/01?tab=text").text.split('id="1-函数基础"', 1)[1]
+    assert 'class="section-qs"' in block
+    assert '<a class="chip chip-shaky" href="/q/1">001</a>' in block and 'href="/q/3"' in block
+    assert 'name="nums" value="1,3"' in block and "练这 2 题" in block
+
+
+def test_original_pages_list_the_questions_on_them(tagged):
+    page = tagged.client.get("/knowledge/01").text
+    assert '<figure class="kn-figure" id="p1">' in page
+    assert "这一页的题目" in page and 'href="/q/3"' in page
+
+
+def test_top_bar_has_a_theme_switch_shown_by_javascript(env):
+    page = env.client.get("/").text
+    assert re.search(r'class="theme-toggle js-theme"[^>]*hidden', page)
+    assert 'classList.add("js")' in page and 'localStorage.getItem("dgy-theme")' in page
 
 
 def test_grading_a_question_that_is_not_current_is_ignored(env):

@@ -35,7 +35,9 @@ def dirs(tmp_path):
     (md / "assets" / "diagrams").mkdir(parents=True)
     (md / "assets" / "diagrams" / "d.png").write_bytes(b"png")
     (md / "00_总目录.md").write_text("# 总目录\n\n核对说明\n", encoding="utf-8")
-    (md / "01_x.md").write_text("# 函数\n\n## 1. 函数基础\n\n若 $f'(x)$ 有界\n", encoding="utf-8")
+    (md / "01_x.md").write_text("# 函数\n\n## 1. 函数基础\n\n<!-- p.10 -->\n若 $f'(x)$ 有界\n", encoding="utf-8")
+    (md / "question_links.json").write_text(json.dumps({"version": 1, "links": {"3": ["01/1"], "4": ["99/9"]}}),
+                                            encoding="utf-8")
     return content, static, md, tmp_path / "edge"
 
 
@@ -61,6 +63,15 @@ def test_writes_manifest_and_prerendered_knowledge(dirs):
     assert knowledge["chapters"]["01"]["toc"] == [["1-函数基础", "1. 函数基础"]]
     assert "xiandai" not in knowledge["chapters"]
     assert "核对说明" in knowledge["overview"]
+
+
+def test_writes_sections_and_question_links(dirs):
+    content, static, md, edge = dirs
+    export_edge(content, static, md, edge)
+    data = json.loads((edge / "src" / "generated" / "sections.json").read_text(encoding="utf-8"))
+    assert data["sections"] == [{"key": "01/1", "slug": "01", "number": "1", "level": 2, "title": "函数基础",
+                                 "anchor": "1-函数基础", "pdf_page": 10, "page_index": None, "parent": None}]
+    assert data["links"] == {"3": ["01/1"]}  # unknown sections are dropped
 
 
 def test_report_counts_files_and_versions(dirs):

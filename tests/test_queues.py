@@ -56,6 +56,11 @@ def test_single_mode_allows_an_excluded_question_on_purpose():
     assert build(QueueSpec(mode="single", nums=(6,))) == ("#006", [6])
 
 
+def test_single_mode_shortens_the_title_of_a_long_list():
+    assert build(QueueSpec(mode="single", nums=(1, 2, 3)))[0] == "#001、#002、#003"
+    assert build(QueueSpec(mode="single", nums=(1, 2, 3, 4, 5, 6))) == ("#001 等 6 题", [1, 2, 3, 4, 5, 6])
+
+
 def test_random_mode_picks_distinct_active_questions():
     _title, nums = build(QueueSpec(mode="random", count=3))
     assert len(nums) == 3 and len(set(nums)) == 3 and 6 not in nums

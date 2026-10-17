@@ -5,6 +5,9 @@ import { dueQueue, warmupQueue, type Review } from "./stats";
 import type { Day } from "./studyday";
 
 export type Mode = "warmup" | "due" | "group" | "single" | "random";
+
+/** A hand-picked list longer than this is titled by its first question and the count. */
+const SINGLE_TITLE_MAX = 5;
 export type Only = "all" | "new" | "weak";
 
 export interface QueueSpec {
@@ -44,7 +47,8 @@ export function buildQueue(spec: QueueSpec, content: Content, cards: Map<number,
       return { title: "到期复习", nums: dueQueue(cards, active, today) };
     case "single": {
       const nums = spec.nums.filter((n) => content.questions.has(n));
-      return { title: nums.map((n) => `#${pad(n)}`).join("、"), nums };
+      const title = nums.length > SINGLE_TITLE_MAX ? `#${pad(nums[0])} 等 ${nums.length} 题` : nums.map((n) => `#${pad(n)}`).join("、");
+      return { title, nums };
     }
     case "random": {
       const pool = [...active].filter((n) => keep(n, spec.only, cards)).sort((a, b) => a - b);

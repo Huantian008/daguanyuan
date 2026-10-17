@@ -3,6 +3,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from .sections import Section, load_links, load_sections
+
 
 @dataclass(frozen=True)
 class Image:
@@ -61,12 +63,19 @@ def _question(d: dict) -> Question:
 
 
 class Content:
-    def __init__(self, manifest: dict):
+    def __init__(self, manifest: dict, sections: dict[str, Section] | None = None,
+                 links: dict[int, tuple[str, ...]] | None = None):
         self.chapters = [ChapterInfo(**c) for c in manifest["chapters"]]
         self.questions = {q["num"]: _question(q) for q in manifest["questions"]}
         self.knowledge = list(manifest.get("knowledge", []))
         self.chapter_links = dict(manifest.get("chapter_links", {}))
         self.built_at = manifest.get("built_at", "")
+        self.sections = dict(sections or {})
+        self.links = {num: keys for num, keys in (links or {}).items() if num in self.questions}
+        self._linked: dict[str, list[int]] = {}
+        for num in sorted(self.links):
+            for key in self.links[num]:
+                self._linked.setdefault(key, []).append(num)
 
     def chapter(self, code: str) -> ChapterInfo:
         return next(c for c in self.chapters if c.code == code)
@@ -87,6 +96,27 @@ class Content:
     def knowledge_entry(self, slug: str) -> dict | None:
         return next((k for k in self.knowledge if k["slug"] == slug), None)
 
+    def knowledge_titles(self) -> dict[str, str]:
+        return {k["slug"]: k["title"] for k in self.knowledge}
 
-def load_content(content_dir: Path) -> Content:
-    return Content(json.loads((content_dir / "manifest.json").read_text(encoding="utf-8")))
+    def sections_for(self, num: int) -> list[Section]:
+        """The knowledge sections a question is tagged with, main one first."""
+        return [self.sections[key] for key in self.links.get(num, ())]
+
+    def questions_for(self, key: str) -> list[int]:
+        """Questions tagged with a section, in number order."""
+        return self._linked.get(key, [])
+
+    def questions_on_page(self, slug: str, page_index: int) -> list[int]:
+        """Questions tagged with any section that starts on this 原版 page of a chapter."""
+        nums = {n for s in self.sections.values() if s.slug == slug and s.page_index == page_index
+                for n in self.questions_for(s.key)}
+        return sorted(nums)
+
+
+def load_content(content_dir: Path, knowledge_md_dir: Path | None = None) -> Content:
+    manifest = json.loads((content_dir / "manifest.json").read_text(encoding="utf-8"))
+    if knowledge_md_dir is None or not knowledge_md_dir.exists():
+        return Content(manifest)
+    sections = load_sections(knowledge_md_dir)
+    return Content(manifest, sections, load_links(knowledge_md_dir, sections))

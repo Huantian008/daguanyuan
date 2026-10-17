@@ -2,7 +2,16 @@ import { html, raw } from "hono/html";
 import type { Meta } from "../env";
 import { staticUrl, type Html } from "./util";
 
-const FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232c63e0'/%3E%3Cpath d='M9 11h14M9 16h14M9 21h9' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E";
+const FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234361ee'/%3E%3Cpath d='M9 11h14M9 16h14M9 21h9' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E";
+
+// Same markup as dgy/templates/_theme_head.html and _theme_toggle.html. The head script runs before the first paint,
+// so a page never flashes the wrong theme; app.js shows the toggle and handles it.
+const THEME_HEAD = raw(`<script>document.documentElement.classList.add("js");try{var t=localStorage.getItem("dgy-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>`);
+const THEME_TOGGLE = raw(`<button type="button" class="theme-toggle js-theme" data-mode="auto" aria-label="主题：跟随系统" title="主题：跟随系统" hidden>
+        <svg class="icon-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 0 0 17z" fill="currentColor" stroke="none"/></svg>
+        <svg class="icon-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></svg>
+        <svg class="icon-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+      </button>`);
 
 const NAV: [href: string, label: string, key: string][] = [
   ["/", "首页", "home"],
@@ -29,9 +38,11 @@ export function layout(meta: Meta, o: PageOptions): Html {
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
   <title>${o.title} · 数二刷题</title>
   <link rel="icon" href="${raw(FAVICON)}">
+  ${THEME_HEAD}
   <link rel="stylesheet" href="${staticUrl(meta, "css/app.css")}">
   ${o.head ?? ""}
 </head>
@@ -39,8 +50,9 @@ export function layout(meta: Meta, o: PageOptions): Html {
   <a class="skip-link" href="#main">跳到正文</a>
   <header class="topbar">
     <div class="topbar-inner">
-      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span>大观园</a>
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-text">大观园</span></a>
       <nav class="nav" aria-label="主导航">${links}</nav>
+      ${THEME_TOGGLE}
     </div>
   </header>
   <main id="main" class="page ${o.pageClass ?? ""}">

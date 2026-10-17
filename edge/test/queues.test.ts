@@ -57,6 +57,11 @@ describe("buildQueue", () => {
     expect(build({ mode: "single", nums: [6] })).toEqual({ title: "#006", nums: [6] });
   });
 
+  it("shortens the title of a long hand-picked list", () => {
+    expect(build({ mode: "single", nums: [1, 2, 3] }).title).toBe("#001、#002、#003");
+    expect(build({ mode: "single", nums: [1, 2, 3, 4, 5, 6] })).toEqual({ title: "#001 等 6 题", nums: [1, 2, 3, 4, 5, 6] });
+  });
+
   it("picks distinct active questions at random", () => {
     const { nums } = build({ mode: "random", count: 3 });
     expect(nums).toHaveLength(3);
