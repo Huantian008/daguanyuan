@@ -6,13 +6,12 @@ import { GRADE_LABELS } from "../srs";
 import type { Review } from "../stats";
 import { clockOf, cnDate, type Day } from "../studyday";
 import { layout } from "./layout";
-import { duration, minutes, pad3 } from "./util";
+import { pad3 } from "./util";
 
 export interface HistoryDay {
   day: Day;
   items: Review[];
   count: number;
-  seconds: number;
 }
 
 export function historyPage(meta: Meta, days: HistoryDay[], questions: Map<number, Question>) {
@@ -22,13 +21,12 @@ export function historyPage(meta: Meta, days: HistoryDay[], questions: Map<numbe
     body: html`<header class="page-head"><h1>学习记录</h1><span class="muted">最近 60 天，凌晨 4 点前做的题算前一天</span></header>
 ${days.length
     ? days.map((d) => html`<section class="card day">
-  <header class="card-head"><h2>${cnDate(d.day)}</h2><span class="muted">${d.count} 题 · ${minutes(d.seconds)} 分钟</span></header>
+  <header class="card-head"><h2>${cnDate(d.day)}</h2><span class="muted">${d.count} 题</span></header>
   <ul class="history">
     ${d.items.map((r) => html`<li>
       <span class="muted time">${clockOf(r.reviewedAt)}</span>
       <a href="/q/${r.num}"><span class="qnum">#${pad3(r.num)}</span> ${questions.get(r.num)?.kp ?? ""}</a>
       <span class="chip chip-${r.grade}">${GRADE_LABELS[r.grade]}</span>
-      ${r.elapsedSec ? html`<span class="muted">${duration(r.elapsedSec)}</span>` : ""}
     </li>`)}
   </ul>
 </section>`)

@@ -14,8 +14,8 @@ async function start(client: Client, form: Record<string, string>) {
   return res.headers.get("location")!;
 }
 
-async function grade(client: Client, url: string, num: number, value: string, elapsed = "90") {
-  const res = await client.post(`${url}/grade`, { num: String(num), grade: value, elapsed });
+async function grade(client: Client, url: string, num: number, value: string) {
+  const res = await client.post(`${url}/grade`, { num: String(num), grade: value });
   expect(res.status).toBe(303);
 }
 
@@ -32,13 +32,11 @@ describe("dashboard", () => {
 });
 
 describe("practice", () => {
-  it("keeps the timer controls hidden without JavaScript and uses non-submit buttons", async () => {
+  it("has no timer", async () => {
     const { client } = await loggedIn();
     const page = await text(client, await start(client, { mode: "group", chapter: "A" }));
-    expect(page).toMatch(/class="timer-controls js-timer-controls" hidden/);
-    expect(page).toMatch(/id="practice-time"[^>]*hidden/);
-    expect(page).toMatch(/type="button"[^>]*js-timer-toggle[^>]*aria-expanded="false"/);
-    expect(page).toMatch(/type="button"[^>]*js-timer-pause/);
+    expect(page).not.toContain("timer");
+    expect(page).not.toContain('name="elapsed"');
   });
 
   it("grades a question and moves to the next one", async () => {
@@ -161,7 +159,7 @@ describe("history and settings", () => {
     const page = await text(client, "/history");
     expect(page).toContain("10月16日");
     expect(page).toContain("#001");
-    expect(page).toContain("2 分钟"); // 90 s rounds half up to 2 minutes, like the Python version
+    expect(page).toContain("1 题");
   });
 
   it("shows who is logged in on the settings page", async () => {

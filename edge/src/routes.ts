@@ -110,7 +110,7 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     const num = intOrNull(form.num);
     const grade = str(form.grade);
     if (num !== null && db.current(session) === num && isGrade(grade)) {
-      await db.recordReview(DB, uid, { num, grade, at: now(), elapsedSec: intOrNull(form.elapsed), mode: session.mode, session });
+      await db.recordReview(DB, uid, { num, grade, at: now(), mode: session.mode, session });
     }
     return c.redirect(`/practice/${session.id}`, 303);
   });
@@ -202,15 +202,12 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     for (const r of reviews) {
       let last = days[days.length - 1];
       if (!last || last.day !== r.studyDay) {
-        last = { day: r.studyDay, items: [], count: 0, seconds: 0 };
+        last = { day: r.studyDay, items: [], count: 0 };
         days.push(last);
       }
       last.items.push(r);
     }
-    for (const d of days) {
-      d.count = new Set(d.items.map((r) => r.num)).size;
-      d.seconds = d.items.reduce((sum, r) => sum + Math.min(r.elapsedSec ?? 0, stats.TIMER_CAP_SEC), 0);
-    }
+    for (const d of days) d.count = new Set(d.items.map((r) => r.num)).size;
     return c.html(historyPage(meta, days, content.questions));
   });
 

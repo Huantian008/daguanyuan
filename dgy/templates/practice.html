@@ -9,13 +9,6 @@
       <p class="eyebrow">{{ session.title }}</p>
       <p class="muted">第 {{ session.position + 1 }} / {{ session.queue|length }} 题</p>
     </div>
-    <div class="timer-controls js-timer-controls" hidden>
-      <span id="practice-time" class="timer js-timer-display" hidden>用时 <span class="js-timer">00:00</span> <span aria-hidden="true">·</span></span>
-      <button type="button" class="timer-action js-timer-toggle" aria-expanded="false" aria-controls="practice-time">查看用时</button>
-      <span aria-hidden="true">·</span>
-      <span class="timer-status js-timer-status" role="status" hidden></span>
-      <button type="button" class="timer-action js-timer-pause" aria-label="暂停计时">暂停</button>
-    </div>
   </header>
   <div class="track" aria-hidden="true"><span style="width: {{ (100 * session.position / session.queue|length)|round|int }}%"></span></div>
 
@@ -44,7 +37,6 @@
   <div class="gradebar-inner">
     <form method="post" action="/practice/{{ session.id }}/grade" class="grades">
       <input type="hidden" name="num" value="{{ q.num }}">
-      <input type="hidden" name="elapsed" value="" class="js-elapsed">
       <button name="grade" value="mastered" class="grade grade-mastered" data-key="1"><kbd>1</kbd>完全掌握</button>
       <button name="grade" value="shaky" class="grade grade-shaky" data-key="2"><kbd>2</kbd>不熟练/错误</button>
       <button name="grade" value="unknown" class="grade grade-unknown" data-key="3"><kbd>3</kbd>完全不会</button>

@@ -19,13 +19,13 @@ export interface PracticeSession {
 export const current = (s: PracticeSession): number | null => (s.position < s.queue.length ? s.queue[s.position] : null);
 
 type CardRow = { num: number; level: number; due: string | null; last_grade: string | null; reps: number; lapses: number };
-type ReviewRow = { num: number; grade: Grade; reviewed_at: string; study_day: string; elapsed_sec: number | null; mode: string };
+type ReviewRow = { num: number; grade: Grade; reviewed_at: string; study_day: string; mode: string };
 type SessionRow = { id: number; title: string; mode: string; queue: string; position: number; created_at: string; finished_at: string | null };
 
 const toCard = (r: CardRow): CardState =>
   ({ level: r.level, due: r.due, lastGrade: r.last_grade as Grade | null, reps: r.reps, lapses: r.lapses });
 const toReview = (r: ReviewRow): Review =>
-  ({ num: r.num, grade: r.grade, reviewedAt: r.reviewed_at, studyDay: r.study_day, elapsedSec: r.elapsed_sec, mode: r.mode });
+  ({ num: r.num, grade: r.grade, reviewedAt: r.reviewed_at, studyDay: r.study_day, mode: r.mode });
 const toSession = (r: SessionRow): PracticeSession => ({
   id: r.id, title: r.title, mode: r.mode, queue: JSON.parse(r.queue), position: r.position,
   createdAt: r.created_at, finishedAt: r.finished_at,
@@ -45,7 +45,6 @@ export interface ReviewInput {
   num: number;
   grade: Grade;
   at: Date;
-  elapsedSec: number | null;
   mode: string;
   /** When given, the session moves on to its next question in the same batch. */
   session?: PracticeSession;
@@ -62,8 +61,8 @@ export async function recordReview(db: D1Database, uid: number, input: ReviewInp
   const day = studyDay(input.at);
   const card = schedule(await getCard(db, uid, input.num), input.grade, day);
   const statements = [
-    db.prepare("INSERT INTO reviews (user_id, num, grade, reviewed_at, study_day, elapsed_sec, mode, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-      .bind(uid, input.num, input.grade, shanghaiIso(input.at), day, input.elapsedSec, input.mode, input.session?.id ?? null),
+    db.prepare("INSERT INTO reviews (user_id, num, grade, reviewed_at, study_day, mode, session_id) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .bind(uid, input.num, input.grade, shanghaiIso(input.at), day, input.mode, input.session?.id ?? null),
     db.prepare("INSERT INTO cards (user_id, num, level, due, last_grade, reps, lapses) VALUES (?, ?, ?, ?, ?, ?, ?) "
       + "ON CONFLICT (user_id, num) DO UPDATE SET level = excluded.level, due = excluded.due, "
       + "last_grade = excluded.last_grade, reps = excluded.reps, lapses = excluded.lapses")

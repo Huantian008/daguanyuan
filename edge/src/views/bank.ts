@@ -8,7 +8,7 @@ import type { ChapterProgress, Distribution, Review } from "../stats";
 import { cnDate } from "../studyday";
 import { layout } from "./layout";
 import { STATUS_LABELS, distBar, excludeToggle, images, qmeta, startForm, type Status } from "./parts";
-import { duration, pad3 } from "./util";
+import { pad3 } from "./util";
 
 const searchForm = (q = "", placeholder = "题号、年份或考点，如 123、2019数二、拐点") => html`<form class="search" action="/bank/search" method="get" role="search">
     <label class="visually-hidden" for="q">搜索题目</label>
@@ -153,7 +153,7 @@ export function questionPage(meta: Meta, d: QuestionData) {
   <section class="card">
     <h2>做题记录</h2>
     ${d.history.length
-      ? html`<ul class="plain">${[...d.history].reverse().map((r) => html`<li><span class="muted">${cnDate(r.studyDay)}</span> <span class="chip chip-${r.grade}">${GRADE_LABELS[r.grade]}</span>${r.elapsedSec ? html` <span class="muted">${duration(r.elapsedSec)}</span>` : ""}</li>`)}</ul>`
+      ? html`<ul class="plain">${[...d.history].reverse().map((r) => html`<li><span class="muted">${cnDate(r.studyDay)}</span> <span class="chip chip-${r.grade}">${GRADE_LABELS[r.grade]}</span></li>`)}</ul>`
       : html`<p class="empty">还没做过这道题。</p>`}
   </section>
   <section class="card">

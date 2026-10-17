@@ -7,7 +7,6 @@ from .content import Content
 from .db import Review
 from .srs import CardState
 
-TIMER_CAP_SEC = 3600  # a tab left open for hours should not count as study time
 
 
 @dataclass(frozen=True)
@@ -35,7 +34,6 @@ class WeakSpot:
 class DayTotal:
     day: date
     count: int
-    seconds: int
 
 
 def excluded_set(content: Content, overrides: dict[int, bool]) -> set[int]:
@@ -108,9 +106,7 @@ def streak(days: set[date], today: date) -> int:
 
 def daily_totals(reviews: list[Review], today: date, days: int = 30) -> list[DayTotal]:
     nums: dict[date, set[int]] = defaultdict(set)
-    seconds: dict[date, int] = defaultdict(int)
     for r in reviews:
         nums[r.study_day].add(r.num)
-        seconds[r.study_day] += min(r.elapsed_sec or 0, TIMER_CAP_SEC)
     span = [today - timedelta(days=i) for i in range(days - 1, -1, -1)]
-    return [DayTotal(day, len(nums[day]), seconds[day]) for day in span]
+    return [DayTotal(day, len(nums[day])) for day in span]

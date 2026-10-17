@@ -3,9 +3,9 @@
 {% block content %}
 <header class="page-head"><h1>学习记录</h1><span class="muted">最近 60 天，凌晨 4 点前做的题算前一天</span></header>
 {% if days %}
-{% for day, items, count, seconds in days %}
+{% for day, items, count in days %}
 <section class="card day">
-  <header class="card-head"><h2>{{ day|cn_date }}</h2><span class="muted">{{ count }} 题 · {{ seconds|minutes }} 分钟</span></header>
+  <header class="card-head"><h2>{{ day|cn_date }}</h2><span class="muted">{{ count }} 题</span></header>
   <ul class="history">
     {% for r in items %}
     {% set q = questions.get(r.num) %}
@@ -13,7 +13,6 @@
       <span class="muted time">{{ r.reviewed_at.strftime('%H:%M') }}</span>
       <a href="/q/{{ r.num }}"><span class="qnum">#{{ '%03d' % r.num }}</span> {{ q.kp if q else '' }}</a>
       <span class="chip chip-{{ r.grade }}">{{ r.grade|grade_label }}</span>
-      {% if r.elapsed_sec %}<span class="muted">{{ r.elapsed_sec|duration }}</span>{% endif %}
     </li>
     {% endfor %}
   </ul>

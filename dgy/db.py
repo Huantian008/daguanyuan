@@ -62,7 +62,6 @@ class Review:
     grade: str
     reviewed_at: datetime
     study_day: date
-    elapsed_sec: int | None
     mode: str
 
 
@@ -114,15 +113,14 @@ def all_cards(conn: sqlite3.Connection) -> dict[int, CardState]:
 
 
 def record_review(conn: sqlite3.Connection, num: int, grade: str, at: datetime,
-                  elapsed_sec: int | None, mode: str, session_id: int | None = None) -> CardState:
+                  mode: str, session_id: int | None = None) -> CardState:
     at = at.astimezone(TZ)
     day = study_day(at)
     card = schedule(get_card(conn, num), grade, day)
     with conn:
         conn.execute(
-            "INSERT INTO reviews (num, grade, reviewed_at, study_day, elapsed_sec, mode, session_id) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (num, grade, at.isoformat(), day.isoformat(), elapsed_sec, mode, session_id),
+            "INSERT INTO reviews (num, grade, reviewed_at, study_day, mode, session_id) VALUES (?, ?, ?, ?, ?, ?)",
+            (num, grade, at.isoformat(), day.isoformat(), mode, session_id),
         )
         conn.execute(
             "INSERT INTO cards (num, level, due, last_grade, reps, lapses) VALUES (?, ?, ?, ?, ?, ?) "
@@ -140,7 +138,7 @@ def review_log(conn: sqlite3.Connection, since: date | None = None) -> list[Revi
     rows = conn.execute(sql + " ORDER BY reviewed_at, id", args)
     return [
         Review(row["num"], row["grade"], datetime.fromisoformat(row["reviewed_at"]),
-               date.fromisoformat(row["study_day"]), row["elapsed_sec"], row["mode"])
+               date.fromisoformat(row["study_day"]), row["mode"])
         for row in rows
     ]
 

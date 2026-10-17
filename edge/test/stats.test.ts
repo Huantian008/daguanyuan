@@ -10,8 +10,8 @@ import { smallBank } from "./fixtures";
 const TODAY = "2026-10-16";
 const day = (n: number) => addDays(TODAY, n);
 
-function review(num: number, studyDay: string, grade: Grade = "mastered", hour = 21, elapsed: number | null = 600): Review {
-  return { num, grade, reviewedAt: `${studyDay}T${String(hour).padStart(2, "0")}:00:00+08:00`, studyDay, elapsedSec: elapsed, mode: "kp" };
+function review(num: number, studyDay: string, grade: Grade = "mastered", hour = 21): Review {
+  return { num, grade, reviewedAt: `${studyDay}T${String(hour).padStart(2, "0")}:00:00+08:00`, studyDay, mode: "kp" };
 }
 
 const card = (level: number, due: string, lastGrade: Grade): CardState => ({ ...NEW_CARD, level, due, lastGrade, reps: 1 });
@@ -74,13 +74,12 @@ describe("stats", () => {
     expect(streak(new Set([day(-3)]), TODAY)).toBe(0);
   });
 
-  it("counts distinct questions per day and caps long timers", () => {
-    const reviews = [review(1, TODAY, "mastered", 21, 600), review(1, TODAY, "mastered", 22, 300),
-      review(2, TODAY, "mastered", 23, 5 * 3600), review(3, day(-2), "mastered", 21, null)];
+  it("counts distinct questions per day", () => {
+    const reviews = [review(1, TODAY), review(1, TODAY, "mastered", 22), review(2, TODAY, "mastered", 23), review(3, day(-2))];
     expect(dailyTotals(reviews, TODAY, 3)).toEqual([
-      { day: day(-2), count: 1, seconds: 0 },
-      { day: day(-1), count: 0, seconds: 0 },
-      { day: TODAY, count: 2, seconds: 600 + 300 + 3600 },
+      { day: day(-2), count: 1 },
+      { day: day(-1), count: 0 },
+      { day: TODAY, count: 2 },
     ]);
   });
 });

@@ -14,30 +14,29 @@ beforeEach(() => {
 
 describe("reviews and cards", () => {
   it("updates the card and the log", async () => {
-    const card = await db.recordReview(d1, ME, { num: 5, grade: "shaky", at: EVENING, elapsedSec: 300, mode: "kp" });
+    const card = await db.recordReview(d1, ME, { num: 5, grade: "shaky", at: EVENING, mode: "kp" });
     expect([card.level, card.due]).toEqual([1, "2026-10-17"]);
     expect(await db.getCard(d1, ME, 5)).toEqual(card);
     const [entry] = await db.reviewLog(d1, ME);
-    expect([entry.num, entry.grade, entry.studyDay, entry.elapsedSec, entry.mode, entry.reviewedAt])
-      .toEqual([5, "shaky", "2026-10-16", 300, "kp", "2026-10-16T22:00:00+08:00"]);
+    expect([entry.num, entry.grade, entry.studyDay, entry.mode, entry.reviewedAt])
+      .toEqual([5, "shaky", "2026-10-16", "kp", "2026-10-16T22:00:00+08:00"]);
   });
 
   it("logs after-midnight reviews on the previous study day", async () => {
-    await db.recordReview(d1, ME, { num: 7, grade: "mastered", at: AFTER_MIDNIGHT, elapsedSec: null, mode: "due" });
+    await db.recordReview(d1, ME, { num: 7, grade: "mastered", at: AFTER_MIDNIGHT, mode: "due" });
     expect((await db.reviewLog(d1, ME))[0].studyDay).toBe("2026-10-16");
   });
 
   it("builds on the existing card", async () => {
-    await db.recordReview(d1, ME, { num: 9, grade: "mastered", at: EVENING, elapsedSec: null, mode: "kp" });
-    const card = await db.recordReview(d1, ME, { num: 9, grade: "mastered", at: new Date("2026-10-23T21:00:00+08:00"),
-      elapsedSec: null, mode: "due" });
+    await db.recordReview(d1, ME, { num: 9, grade: "mastered", at: EVENING, mode: "kp" });
+    const card = await db.recordReview(d1, ME, { num: 9, grade: "mastered", at: new Date("2026-10-23T21:00:00+08:00"), mode: "due" });
     expect([card.level, card.reps]).toEqual([4, 2]);
     expect([...(await db.allCards(d1, ME)).keys()]).toEqual([9]);
   });
 
   it("filters the log by study day", async () => {
-    await db.recordReview(d1, ME, { num: 1, grade: "mastered", at: EVENING, elapsedSec: null, mode: "kp" });
-    await db.recordReview(d1, ME, { num: 2, grade: "mastered", at: new Date("2026-10-18T21:00:00+08:00"), elapsedSec: null, mode: "kp" });
+    await db.recordReview(d1, ME, { num: 1, grade: "mastered", at: EVENING, mode: "kp" });
+    await db.recordReview(d1, ME, { num: 2, grade: "mastered", at: new Date("2026-10-18T21:00:00+08:00"), mode: "kp" });
     expect((await db.reviewLog(d1, ME, "2026-10-17")).map((r) => r.num)).toEqual([2]);
     expect((await db.historyFor(d1, ME, 1)).map((r) => r.num)).toEqual([1]);
   });
@@ -63,7 +62,7 @@ describe("practice sessions", () => {
     let s = (await db.getSession(d1, ME, sid))!;
     expect([s.queue, s.position, db.current(s), s.finishedAt]).toEqual([[3, 1, 2], 0, 3, null]);
     expect((await db.latestOpenSession(d1, ME))!.id).toBe(sid);
-    await db.recordReview(d1, ME, { num: 3, grade: "unknown", at: EVENING, elapsedSec: 60, mode: "due", session: s });
+    await db.recordReview(d1, ME, { num: 3, grade: "unknown", at: EVENING, mode: "due", session: s });
     s = (await db.getSession(d1, ME, sid))!;
     expect(db.current(s)).toBe(1);
     await db.advanceSession(d1, ME, s, EVENING);
@@ -84,7 +83,7 @@ describe("practice sessions", () => {
 
 describe("exportAll", () => {
   it("dumps every table for backup, without the internal user id", async () => {
-    await db.recordReview(d1, ME, { num: 1, grade: "mastered", at: EVENING, elapsedSec: 30, mode: "kp" });
+    await db.recordReview(d1, ME, { num: 1, grade: "mastered", at: EVENING, mode: "kp" });
     await db.setSetting(d1, ME, "exam_date", "2026-12-19");
     const dump = await db.exportAll(d1, ME);
     expect(Object.keys(dump.tables)).toEqual(["reviews", "cards", "exclusions", "sessions", "settings"]);
@@ -96,19 +95,19 @@ describe("exportAll", () => {
 
 describe("two users sharing one database", () => {
   it("keep separate cards and review logs for the same question", async () => {
-    await db.recordReview(d1, ME, { num: 5, grade: "mastered", at: EVENING, elapsedSec: 30, mode: "kp" });
-    await db.recordReview(d1, PAL, { num: 5, grade: "unknown", at: EVENING, elapsedSec: 60, mode: "kp" });
+    await db.recordReview(d1, ME, { num: 5, grade: "mastered", at: EVENING, mode: "kp" });
+    await db.recordReview(d1, PAL, { num: 5, grade: "unknown", at: EVENING, mode: "kp" });
     expect((await db.getCard(d1, ME, 5)).lastGrade).toBe("mastered");
     expect((await db.getCard(d1, PAL, 5)).lastGrade).toBe("unknown");
     expect([...(await db.allCards(d1, ME)).values()].map((c) => c.lastGrade)).toEqual(["mastered"]);
     expect((await db.reviewLog(d1, ME)).map((r) => r.grade)).toEqual(["mastered"]);
     expect((await db.reviewLog(d1, PAL)).map((r) => r.grade)).toEqual(["unknown"]);
-    expect((await db.historyFor(d1, PAL, 5)).map((r) => r.elapsedSec)).toEqual([60]);
+    expect((await db.historyFor(d1, PAL, 5)).map((r) => r.grade)).toEqual(["unknown"]);
     expect(await db.reviewLog(d1, 3)).toEqual([]);
   });
 
   it("a user nobody has recorded anything for starts empty", async () => {
-    await db.recordReview(d1, ME, { num: 5, grade: "mastered", at: EVENING, elapsedSec: 30, mode: "kp" });
+    await db.recordReview(d1, ME, { num: 5, grade: "mastered", at: EVENING, mode: "kp" });
     await db.setExcluded(d1, ME, [5], true);
     await db.setSetting(d1, ME, "exam_date", "2026-12-20");
     await db.createSession(d1, ME, "t", "due", [1], EVENING);
@@ -132,7 +131,7 @@ describe("two users sharing one database", () => {
   it("cannot see, advance or count in each other's practice sessions", async () => {
     const sid = await db.createSession(d1, ME, "到期复习", "due", [1, 2], EVENING);
     const mine = (await db.getSession(d1, ME, sid))!;
-    await db.recordReview(d1, ME, { num: 1, grade: "mastered", at: EVENING, elapsedSec: 30, mode: "due", session: mine });
+    await db.recordReview(d1, ME, { num: 1, grade: "mastered", at: EVENING, mode: "due", session: mine });
     expect(await db.getSession(d1, PAL, sid)).toBeNull();
     expect(await db.latestOpenSession(d1, PAL)).toBeNull();
     expect(await db.sessionGrades(d1, PAL, sid)).toEqual({});
@@ -141,7 +140,7 @@ describe("two users sharing one database", () => {
   });
 
   it("export only their own rows", async () => {
-    await db.recordReview(d1, ME, { num: 5, grade: "mastered", at: EVENING, elapsedSec: 30, mode: "kp" });
+    await db.recordReview(d1, ME, { num: 5, grade: "mastered", at: EVENING, mode: "kp" });
     await db.setSetting(d1, ME, "exam_date", "2026-12-20");
     await db.createSession(d1, ME, "t", "due", [1], EVENING);
     const theirs = await db.exportAll(d1, PAL);

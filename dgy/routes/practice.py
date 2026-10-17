@@ -63,13 +63,12 @@ def show(request: Request, sid: int, conn=Depends(get_conn)):
 
 
 @router.post("/practice/{sid}/grade")
-def grade(request: Request, sid: int, num: int = Form(...), grade: str = Form(...), elapsed: str = Form(""),
-          conn=Depends(get_conn)):
+def grade(request: Request, sid: int, num: int = Form(...), grade: str = Form(...), conn=Depends(get_conn)):
     session = db.get_session(conn, sid)
     if session is None:
         raise HTTPException(404, "没有这组练习")
     if session.current == num and grade in GRADES:
-        db.record_review(conn, num, grade, now(request), _int_or_none(elapsed), session.mode, session_id=sid)
+        db.record_review(conn, num, grade, now(request), session.mode, session_id=sid)
         db.advance_session(conn, sid, now(request))
     return redirect(f"/practice/{sid}")
 

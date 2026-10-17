@@ -11,9 +11,9 @@ from .factories import small_bank
 TODAY = date(2026, 10, 16)
 
 
-def review(num, day, grade="mastered", hour=21, elapsed=600):
+def review(num, day, grade="mastered", hour=21):
     at = datetime(day.year, day.month, day.day, hour, 0, tzinfo=TZ)
-    return Review(num, grade, at, day, elapsed, "kp")
+    return Review(num, grade, at, day, "kp")
 
 
 def card(level, due, last_grade):
@@ -78,16 +78,11 @@ def test_streak_counts_back_from_today_or_yesterday():
     assert stats.streak({TODAY - timedelta(days=3)}, TODAY) == 0
 
 
-def test_daily_totals_count_distinct_questions_and_cap_long_timers():
-    reviews = [
-        review(1, TODAY, elapsed=600),
-        review(1, TODAY, elapsed=300),
-        review(2, TODAY, elapsed=5 * 3600),
-        review(3, TODAY - timedelta(days=2), elapsed=None),
-    ]
+def test_daily_totals_count_distinct_questions():
+    reviews = [review(1, TODAY), review(1, TODAY, hour=22), review(2, TODAY), review(3, TODAY - timedelta(days=2))]
     totals = stats.daily_totals(reviews, TODAY, days=3)
-    assert [(t.day, t.count, t.seconds) for t in totals] == [
-        (TODAY - timedelta(days=2), 1, 0),
-        (TODAY - timedelta(days=1), 0, 0),
-        (TODAY, 2, 600 + 300 + 3600),
+    assert [(t.day, t.count) for t in totals] == [
+        (TODAY - timedelta(days=2), 1),
+        (TODAY - timedelta(days=1), 0),
+        (TODAY, 2),
     ]

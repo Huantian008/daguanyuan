@@ -3,14 +3,11 @@ import type { Content } from "./content";
 import type { CardState, Grade } from "./srs";
 import { addDays, type Day } from "./studyday";
 
-export const TIMER_CAP_SEC = 3600; // a tab left open for hours should not count as study time
-
 export interface Review {
   num: number;
   grade: Grade;
   reviewedAt: string;
   studyDay: Day;
-  elapsedSec: number | null;
   mode: string;
 }
 
@@ -35,7 +32,6 @@ export interface WeakSpot {
 export interface DayTotal {
   day: Day;
   count: number;
-  seconds: number;
 }
 
 export function excludedSet(content: Content, overrides: Map<number, boolean>): Set<number> {
@@ -111,13 +107,11 @@ export function streak(days: Set<Day>, today: Day): number {
 
 export function dailyTotals(reviews: Review[], today: Day, days = 30): DayTotal[] {
   const nums = new Map<Day, Set<number>>();
-  const seconds = new Map<Day, number>();
   for (const r of reviews) {
     if (!nums.has(r.studyDay)) nums.set(r.studyDay, new Set());
     nums.get(r.studyDay)!.add(r.num);
-    seconds.set(r.studyDay, (seconds.get(r.studyDay) ?? 0) + Math.min(r.elapsedSec ?? 0, TIMER_CAP_SEC));
   }
   return Array.from({ length: days }, (_, i) => addDays(today, i - days + 1)).map((day) => ({
-    day, count: nums.get(day)?.size ?? 0, seconds: seconds.get(day) ?? 0,
+    day, count: nums.get(day)?.size ?? 0,
   }));
 }

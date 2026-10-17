@@ -48,7 +48,7 @@ def test_due_mode():
 
 def test_warmup_mode():
     at = datetime(2026, 10, 15, 21, 0, tzinfo=TZ)
-    reviews = [Review(2, "mastered", at, date(2026, 10, 15), 300, "group")]
+    reviews = [Review(2, "mastered", at, date(2026, 10, 15), "group")]
     assert build(QueueSpec(mode="warmup"), reviews=reviews) == ("热身 · 重做前几天的题", [2])
 
 

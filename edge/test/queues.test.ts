@@ -49,7 +49,7 @@ describe("buildQueue", () => {
 
   it("builds the warm-up queue", () => {
     const reviews: Review[] = [{ num: 2, grade: "mastered", reviewedAt: "2026-10-15T21:00:00+08:00",
-      studyDay: "2026-10-15", elapsedSec: 300, mode: "group" }];
+      studyDay: "2026-10-15", mode: "group" }];
     expect(build({ mode: "warmup" }, new Map(), reviews)).toEqual({ title: "热身 · 重做前几天的题", nums: [2] });
   });
 

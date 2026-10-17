@@ -12,7 +12,9 @@ def _local_db(path):
     conn = db.connect(path)
     db.init_db(conn)
     sid = db.create_session(conn, "到期复习", "due", [5, 6], EVENING)
-    db.record_review(conn, 5, "shaky", EVENING, elapsed_sec=300, mode="due", session_id=sid)
+    db.record_review(conn, 5, "shaky", EVENING, mode="due", session_id=sid)
+    with conn:  # reviews from before the timer was removed still carry their time; it is copied as is
+        conn.execute("UPDATE reviews SET elapsed_sec = 300")
     db.set_excluded(conn, [7], True)
     db.set_setting(conn, "exam_date", "2026-12-19")
     db.set_setting(conn, "note", "it's fine")

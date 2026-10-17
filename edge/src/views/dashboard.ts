@@ -6,7 +6,6 @@ import type { ChapterProgress, DayTotal, Distribution, WeakSpot } from "../stats
 import { cnDate, type Day } from "../studyday";
 import { layout } from "./layout";
 import { distBar, legend, startForm } from "./parts";
-import { minutes } from "./util";
 
 export interface DashboardData {
   today: Day;
@@ -101,7 +100,6 @@ export function dashboardPage(meta: Meta, d: DashboardData) {
     <header class="card-head"><h2>学习趋势</h2><a href="/history">学习记录</a></header>
     <div class="kpis">
       <div><b>${today.count}</b><span>今日题数</span></div>
-      <div><b>${minutes(today.seconds)}</b><span>今日分钟</span></div>
       <div><b>${d.streak}</b><span>连续学习天数</span></div>
     </div>
     <div class="spark" role="img" aria-label="近 30 天每天做的题数">${d.totals.map((t) => html`<span title="${cnDate(t.day)}：${t.count} 题" style="height: ${Math.round((100 * t.count) / maxCount)}%"></span>`)}</div>

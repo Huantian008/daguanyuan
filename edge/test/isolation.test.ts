@@ -19,7 +19,7 @@ async function start(client: Client, form: Record<string, string>) {
 }
 
 async function grade(client: Client, url: string, num: number, value: string) {
-  expect((await client.post(`${url}/grade`, { num: String(num), grade: value, elapsed: "90" })).status).toBe(303);
+  expect((await client.post(`${url}/grade`, { num: String(num), grade: value })).status).toBe(303);
 }
 
 describe("two users on one site", () => {
