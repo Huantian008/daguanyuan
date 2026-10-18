@@ -102,7 +102,7 @@ def type_hint(text: str) -> str:
     return "solve"
 
 
-def _save_png(src: Path, out_dir: Path, name: str) -> list[str]:
+def _save_png(src: Path, out_dir: Path, name: str, rel_dir: str = "content/transcribe/img") -> list[str]:
     from .imaging import trim_whitespace
 
     img = trim_whitespace(Image.open(src).convert("RGB"))
@@ -111,7 +111,7 @@ def _save_png(src: Path, out_dir: Path, name: str) -> list[str]:
     for i, band in enumerate(bands, start=1):
         filename = f"{name}.png" if len(bands) == 1 else f"{name}-{i}.png"
         band.save(out_dir / filename)
-        paths.append(f"content/transcribe/img/{filename}")
+        paths.append(f"{rel_dir}/{filename}")
     return paths
 
 
@@ -270,21 +270,30 @@ def normalize_tex(text: str) -> str:
     return re.sub(r"[\s{}]", "", text)
 
 
-def check_probe(entries: dict[int, dict], report: Report) -> None:
-    for num, expect in PROBE.items():
+def check_probe(entries: dict[int, dict], report: Report, spec: dict[int, dict] = PROBE) -> None:
+    """Each test question needs its type, and pieces of TeX in its text; optionally pieces of its answer and other fields."""
+    for num, expect in spec.items():
         entry = entries.get(num)
         if entry is None:
             report.errors.append(f"测验 #{num:03d}：没有结果")
             continue
         written = normalize_tex(" ".join(text for _part, text in _texts(entry)))
         missing = [p for p in expect["pieces"] if normalize_tex(p) not in written]
+        answer = normalize_tex(entry.get("answer") or "")
+        wrong_answer = [p for p in expect.get("answer", []) if normalize_tex(p) not in answer]
+        before = len(report.errors)
         if entry.get("type") != expect["type"]:
             report.errors.append(f"测验 #{num:03d}：题型应为 {expect['type']}")
         if "figure" in expect and entry.get("figure") is not expect["figure"]:
             report.errors.append(f"测验 #{num:03d}：这题带图，figure 应为 true")
+        for field in ("answer_basis",):
+            if field in expect and entry.get(field) != expect[field]:
+                report.errors.append(f"测验 #{num:03d}：{field} 应为 {expect[field]}")
         if missing:
             report.errors.append(f"测验 #{num:03d}：没转出这些内容 {missing}，模型可能没看到或没看清图片")
-        else:
+        if wrong_answer:
+            report.errors.append(f"测验 #{num:03d}：答案里没有 {wrong_answer}，模型可能没看到或没看清解析图")
+        if len(report.errors) == before:
             report.info.append(f"测验 #{num:03d}：关键内容都对上了")
 
 
@@ -312,7 +321,9 @@ def load_results(work_dir: Path, report: Report, probe: bool = False, probe_file
     return entries
 
 
-def check(work_dir: Path = WORK_DIR, probe: bool = False, probe_file: str = PROBE_FILE) -> tuple[Report, dict[int, dict]]:
+def check(work_dir: Path = WORK_DIR, probe: bool = False, probe_file: str = PROBE_FILE, spec: dict[int, dict] = PROBE,
+          extra=None) -> tuple[Report, dict[int, dict]]:
+    """`extra(where, entry, report)` adds the checks of another book (pipeline.transcribe_xiandai)."""
     report = Report()
     questions = load_questions(work_dir)
     entries = load_results(work_dir, report, probe, probe_file)
@@ -327,12 +338,14 @@ def check(work_dir: Path = WORK_DIR, probe: bool = False, probe_file: str = PROB
             continue
         by_num[num] = entry
         check_entry(where, entry, report)
+        if extra:
+            extra(where, entry, report)
         ratio = coverage(questions[num]["pdf_text"], entry)
         if ratio < COVERAGE_MIN:
             report.warnings.append(f"{where}：PDF 文字里的数字和字母只找回 {ratio:.0%}，可能漏了内容")
     check_formulas(entries, report)
     if probe:
-        check_probe(by_num, report)
+        check_probe(by_num, report, spec)
         return report, by_num
     missing = sorted(set(questions) - set(by_num))
     if missing:
@@ -350,9 +363,9 @@ def check(work_dir: Path = WORK_DIR, probe: bool = False, probe_file: str = PROB
     return report, by_num
 
 
-def write_bank(entries: dict[int, dict], bank_dir: Path = BANK_DIR) -> Path:
+def write_bank(entries: dict[int, dict], bank_dir: Path = BANK_DIR, bank_file: str = BANK_FILE) -> Path:
     bank_dir.mkdir(parents=True, exist_ok=True)
-    path = bank_dir / BANK_FILE
+    path = bank_dir / bank_file
     # One question per line, so correcting one question is a one-line diff.
     keep = lambda e: {k: e[k] for k in FIELDS + OPTIONAL_FIELDS if k in e}  # noqa: E731
     rows = ",\n".join("  " + json.dumps(keep(entries[n]), ensure_ascii=False) for n in sorted(entries))
@@ -362,6 +375,8 @@ def write_bank(entries: dict[int, dict], bank_dir: Path = BANK_DIR) -> Path:
 
 # ---------- review ----------
 
+BASIS_LABELS = {"label": " · 答案照原书", "derived": " · 答案从解析推出"}
+
 REVIEW_STYLE = """
 body { font: 15px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; margin: 24px; color: #12151c; background: #f5f6f8; }
 .row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; background: #fff; border: 1px solid #e6e8ed;
@@ -370,6 +385,7 @@ body { font: 15px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", sans-seri
 .row h2 small { color: #7d8595; font-weight: 400; margin-left: 8px; }
 .row img { max-width: 100%; height: auto; display: block; margin-bottom: 8px; }
 .row img.answer-img { max-height: 96px; width: auto; border-top: 1px dashed #d3d8e0; padding-top: 8px; }
+.row img.solution-img { border-top: 1px dashed #d3d8e0; padding-top: 8px; }
 @media (max-width: 900px) { .row { grid-template-columns: minmax(0, 1fr); } }
 .opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 16px; }
 .ans { margin-top: 10px; padding: 8px 12px; background: #eef1fe; border-radius: 8px; }
@@ -378,44 +394,49 @@ body { font: 15px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", sans-seri
 """
 
 
-def review_page(nums: list[int], entries: dict[int, dict], questions: dict[int, dict]) -> str:
+def review_page(nums: list[int], entries: dict[int, dict], questions: dict[int, dict], prefix: str = "../../") -> str:
+    """`prefix` leads from the page to the repository root, which the image paths are relative to."""
     from dgy.markdown import render_markdown
 
     md = lambda text: render_markdown(text or "")[0]  # noqa: E731
     rows = []
     for n in nums:
         e, q = entries[n], questions[n]
-        imgs = "".join(f'<img src="../../{html.escape(p)}" alt="题图">' for p in q["question_images"])
-        imgs += "".join(f'<img class="answer-img" src="../../{html.escape(p)}" alt="答案图">' for p in q["answer_images"])
+        imgs = "".join(f'<img src="{prefix}{html.escape(p)}" alt="题图">' for p in q["question_images"])
+        imgs += "".join(f'<img class="answer-img" src="{prefix}{html.escape(p)}" alt="答案图">' for p in q.get("answer_images", []))
+        imgs += "".join(f'<img class="solution-img" src="{prefix}{html.escape(p)}" alt="解析图">' for p in q.get("solution_images", []))
         opts = "".join(f"<div>{k}. {md(v)}</div>" for k, v in (e.get("options") or {}).items())
         rows.append(f"""<section class="row" id="q{n}">
-  <h2>#{n:03d}<small>{html.escape(q['chapter_name'])} / {html.escape(' / '.join(q['path']))} · {e.get('type')} · {e.get('confidence')}{' · 带图' if e.get('figure') else ''}</small></h2>
+  <h2>#{n:03d}<small>{html.escape(q['chapter_name'])} / {html.escape(' / '.join(q['path']))} · {e.get('type')} · {e.get('confidence')}{' · 带图' if e.get('figure') else ''}{BASIS_LABELS.get(e.get('answer_basis'), '')}</small></h2>
   <div>{imgs}</div>
   <div>{md(e.get('stem'))}{f'<div class="opts">{opts}</div>' if opts else ''}<div class="ans">答案：{md(e.get('answer'))}{f'<p class="note">勘误：{md(e["erratum"])}</p>' if e.get('erratum') else ''}</div>
+  {f'<p class="note">题目本与原书不同：{html.escape(e["mismatch"])}</p>' if e.get('mismatch') else ''}
   {f'<p class="note">{html.escape(e["note"])}</p>' if e.get('note') else ''}</div>
 </section>""")
     return f"""<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><title>转写对照</title>
-<link rel="stylesheet" href="../../dgy/static/vendor/katex/katex.min.css"><style>{REVIEW_STYLE}</style></head>
+<link rel="stylesheet" href="{prefix}dgy/static/vendor/katex/katex.min.css"><style>{REVIEW_STYLE}</style></head>
 <body><h1>转写对照（{len(nums)} 题）</h1>
 {''.join(rows)}
-<script src="../../dgy/static/vendor/katex/katex.min.js"></script>
+<script src="{prefix}dgy/static/vendor/katex/katex.min.js"></script>
 <script>document.querySelectorAll(".math.inline, .math.block").forEach((el) => katex.render(el.textContent, el,
   {{ displayMode: el.classList.contains("block"), throwOnError: false, strict: "ignore" }}));</script>
 </body></html>
 """
 
 
-def review(work_dir: Path = WORK_DIR, nums: list[int] | None = None) -> Path:
-    report, entries = check(work_dir)
+def review(work_dir: Path = WORK_DIR, nums: list[int] | None = None, check_fn=None, prefix: str = "../../",
+           also=lambda entry: False) -> Path:
+    """By default the flagged, low-confidence and sampled questions, and those `also(entry)` picks."""
+    report, entries = (check_fn or check)(work_dir)
     questions = load_questions(work_dir)
     if nums is None:
         flagged = {int(m) for line in report.warnings + report.errors for m in re.findall(r"#(\d{3})", line)}
-        flagged |= {n for n, e in entries.items() if e.get("confidence") == "low"}
+        flagged |= {n for n, e in entries.items() if e.get("confidence") == "low" or also(e)}
         sample = {int(m) for line in report.info if line.startswith("抽查") for m in re.findall(r"#(\d{3})", line)}
         nums = sorted((flagged | sample) & set(entries))
     path = work_dir / "review.html"
-    path.write_text(review_page([n for n in nums if n in entries], entries, questions), encoding="utf-8")
+    path.write_text(review_page([n for n in nums if n in entries], entries, questions, prefix), encoding="utf-8")
     return path
 
 

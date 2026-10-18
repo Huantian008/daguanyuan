@@ -4,7 +4,9 @@ from pipeline import sources
 
 
 def _missing_pdfs():
-    return [p for p in (sources.QUESTIONS_PDF, sources.ANSWERS_PDF, sources.SOLUTIONS_PDF) if not p.exists()]
+    books = (sources.QUESTIONS_PDF, sources.ANSWERS_PDF, sources.SOLUTIONS_PDF,
+             sources.XIANDAI_QUESTIONS_PDF, sources.XIANDAI_SOLUTIONS_PDF, sources.XIANDAI_PDF)
+    return [p for p in books if not p.exists()]
 
 
 def pytest_collection_modifyitems(config, items):

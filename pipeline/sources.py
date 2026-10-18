@@ -13,4 +13,12 @@ SOLUTIONS_PDF = SOURCE_DIR / "大观严选题答案.pdf"
 KNOWLEDGE_DIR = SOURCE_DIR / "【合集】A4版知识点"
 GAOSHU_PDF = KNOWLEDGE_DIR / "【高数合集】大观知识点.pdf"
 XIANDAI_PDF = KNOWLEDGE_DIR / "框图版（@南门朔制作）" / "线代大观知识点.pdf"
+# 线代臻选题: the 数二 question book (its file name really ends in a space) and the answer book with the solutions.
+XIANDAI_QUESTIONS_PDF = KNOWLEDGE_DIR / "【A4紧凑】数二线代臻选题 .pdf"
+XIANDAI_SOLUTIONS_PDF = KNOWLEDGE_DIR / "【通用答案】线代臻选题.pdf"
+XIANDAI_CONTENT_DIR = CONTENT_DIR / "xiandai"
+
+# 线代臻选题: the 数二 question book (the space before .pdf is in the real file name) and its answer book.
+XIANDAI_QUESTIONS_PDF = KNOWLEDGE_DIR / "【A4紧凑】数二线代臻选题 .pdf"
+XIANDAI_SOLUTIONS_PDF = KNOWLEDGE_DIR / "【通用答案】线代臻选题.pdf"
 MARKDOWN_DIR = KNOWLEDGE_DIR / "数学二Markdown复习资料"
