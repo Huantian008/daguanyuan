@@ -102,5 +102,7 @@ def test_real_links_file_only_uses_known_sections():
     sections = load_sections(MARKDOWN_DIR)
     data = json.loads(path.read_text(encoding="utf-8"))
     for num, keys in data["links"].items():
-        assert 1 <= int(num) <= 613
-        assert 1 <= len(keys) <= 3 and all(k in sections for k in keys), num
+        # 高数 #001–#613 take sections of the 高数 notes 01–09, 线代 1001–1355 those of the mind map 10–15.
+        notes = "0" if 1 <= int(num) <= 613 else "1" if 1001 <= int(num) <= 1355 else None
+        assert notes is not None, num
+        assert 1 <= len(keys) <= 3 and all(k in sections and k.startswith(notes) for k in keys), num
