@@ -13,14 +13,15 @@ export interface ManifestQuestion {
   path: string[];
   source: string;
   source_full: string;
-  orig_page: number;
-  difficulty: number;
-  stars: number;
-  minutes: number;
-  quick_id: string;
+  // Only the 高数 做题本 has these; the 线代 book has no difficulty, minutes or 答案速查 (answer image).
+  orig_page: number | null;
+  difficulty: number | null;
+  stars: number | null;
+  minutes: number | null;
+  quick_id: string | null;
   flags: string[];
   img: Img;
-  answer: Img;
+  answer: Img | null;
   solution: Img[];
 }
 
@@ -31,6 +32,27 @@ export interface ChapterInfo {
   name: string;
   first: number;
   last: number;
+  /** 高等数学 or 线性代数; a chapter without one is 高数. */
+  group?: string;
+}
+
+/** 线代 #001 is question 1001 on the site, so the two books never share a number (dgy/bank.py XIANDAI_OFFSET). */
+export const XIANDAI_OFFSET = 1000;
+
+export const chapterGroup = (c: ChapterInfo) => c.group ?? "高等数学";
+
+/** How a question is named on the site: #001 for 高数, 线001 for 线代. */
+export const qlabel = (num: number) =>
+  num > XIANDAI_OFFSET ? `线${String(num - XIANDAI_OFFSET).padStart(3, "0")}` : `#${String(num).padStart(3, "0")}`;
+
+/** The short form on number chips: 001, 线001. */
+export const qshort = (num: number) => qlabel(num).replace(/^#/, "");
+
+/** The question number a search term names: 123 or #123 for 高数, 线12 or 线012 for 线代. */
+export function parseLabel(term: string): number | null {
+  const t = term.trim().replace(/^#+/, "");
+  if (/^线\d+$/.test(t)) return Number(t.slice(1)) + XIANDAI_OFFSET;
+  return /^\d+$/.test(t) ? Number(t) : null;
 }
 
 export interface KnowledgeEntry {
@@ -133,6 +155,23 @@ export class Content {
 
   hasChapter(code: string): boolean {
     return this.chapters.some((c) => c.code === code);
+  }
+
+  /** The chapters under their subject (高等数学, 线性代数), in book order. */
+  groups(): [string, ChapterInfo[]][] {
+    const out: [string, ChapterInfo[]][] = [];
+    for (const c of this.chapters) {
+      if (!out.length || out[out.length - 1][0] !== chapterGroup(c)) out.push([chapterGroup(c), []]);
+      out[out.length - 1][1].push(c);
+    }
+    return out;
+  }
+
+  /** The previous and next question in the same book. */
+  neighbors(num: number): [number | null, number | null] {
+    const book = this.ordered.map((q) => q.num).filter((n) => (n > XIANDAI_OFFSET) === (num > XIANDAI_OFFSET));
+    const at = book.indexOf(num);
+    return [at > 0 ? book[at - 1] : null, at >= 0 && at + 1 < book.length ? book[at + 1] : null];
   }
 
   chapter(code: string): ChapterInfo {

@@ -1,20 +1,20 @@
 // Port of dgy/templates/_macros.html.
 import { html, raw } from "hono/html";
-import { sectionLabel, type Img, type KnowledgeEntry, type Question, type QuestionText, type Section } from "../content";
+import { qlabel, qshort, sectionLabel, type Img, type KnowledgeEntry, type Question, type QuestionText, type Section } from "../content";
 import type { Meta } from "../env";
 import { GRADE_LABELS, type CardState, type Grade } from "../srs";
 import type { UserState } from "../state";
 import type { Distribution, Review } from "../stats";
 import { cnDate } from "../studyday";
-import { contentUrl, pad3, staticUrl, stars, type Html } from "./util";
+import { contentUrl, staticUrl, stars, type Html } from "./util";
 
 export function qmeta(q: Question, text?: QuestionText): Html {
   return html`<div class="qmeta">
-  <span class="qnum">#${pad3(q.num)}</span>
+  <span class="qnum">${qlabel(q.num)}</span>
   <span class="qkp">${q.kp}</span>
   <span class="qsrc">${q.source_full}</span>
-  <span class="qdiff" title="原书得分率 ${q.difficulty}">${stars(q.stars)}</span>
-  <span class="qmins">建议 ${q.minutes} 分钟</span>
+  ${q.stars !== null ? html`<span class="qdiff" title="原书得分率 ${q.difficulty}">${stars(q.stars)}</span>
+  <span class="qmins">建议 ${q.minutes} 分钟</span>` : ""}
   ${q.flags.map((flag) => html`<span class="flag">${flag}</span>`)}
   ${text ? html`<button type="button" class="qview-toggle js-qview" aria-pressed="false" title="在文字和原图之间切换（V）" hidden>原图</button>` : ""}
 </div>`;
@@ -28,18 +28,20 @@ export function questionBody(meta: Meta, q: Question, text?: QuestionText, o: { 
     ${raw(text.stem)}
     ${text.options.length ? html`<ul class="qopts${text.options_wide ? " qopts-wide" : ""}">${text.options.map(([key, opt]) => html`<li${o.dataCorrect && key === text.answer_key ? raw(" data-correct") : ""}><b>${key}.</b> ${raw(opt)}</li>`)}</ul>` : ""}
   </div>` : ""}
-  <div class="qimage paper">${images(meta, [q.img], "qimg", `题目 #${pad3(q.num)}`, 1.6, view === "text" || !!o.forceLazy)}</div>
+  <div class="qimage paper">${images(meta, [q.img], "qimg", `题目 ${qlabel(q.num)}`, 1.6, view === "text" || !!o.forceLazy)}</div>
 </div>`;
 }
 
-/** The answer as text with any erratum below it, then the 答案速查 image folded away. */
+/** The answer as text with any erratum below it, then the 答案速查 image folded away.
+ *  The 线代 book has no 答案速查: its answer is text only, or the solution until the text version is in. */
 export function answerPart(meta: Meta, q: Question, text?: QuestionText): Html {
   const option = text?.answer_key ? text.options.find(([key]) => key === text.answer_key)?.[1] : undefined;
   const answer = text
     ? html`<div class="qanswer">${text.answer_key ? html`<p><b>${text.answer_key}.</b> ${raw(option ?? "")}</p>` : raw(text.answer)}</div>
 ${text.erratum ? html`<p class="erratum"><b>勘误</b>${raw(text.erratum)}</p>` : ""}
-<details class="raw-img"><summary>答案原图</summary><div class="paper">${images(meta, [q.answer], "aimg", "答案", 2.2)}</div></details>`
-    : html`<div class="paper">${images(meta, [q.answer], "aimg", "答案", 2.2)}</div>`;
+${q.answer ? html`<details class="raw-img"><summary>答案原图</summary><div class="paper">${images(meta, [q.answer], "aimg", "答案", 2.2)}</div></details>` : ""}`
+    : q.answer ? html`<div class="paper">${images(meta, [q.answer], "aimg", "答案", 2.2)}</div>`
+    : html`<p class="muted no-answer">答案见解析。</p>`;
   return html`<h2 class="panel-label">答案</h2>
 ${answer}`;
 }
@@ -70,10 +72,10 @@ export function questionCard(
     html`<button name="grade" value="${grade}" class="qc-grade qc-grade-${grade}${graded === grade ? " is-picked" : ""}"${graded ? raw(" disabled") : ""}>${label}</button>`;
   return html`<article class="qcard${excluded ? " is-excluded" : ""}" id="q-${q.num}"${text?.answer_key ? raw(" data-choice") : ""}>
   <header class="qc-head">
-    <strong class="qc-num" title="#${pad3(q.num)}">${index}</strong>
+    <strong class="qc-num" title="${qlabel(q.num)}">${index}</strong>
     <span class="qc-src">${q.source_full}</span>
     <span class="qc-path">${q.path.join(" / ")}</span>
-    <span class="qc-meta"><span class="qdiff" title="原书得分率 ${q.difficulty}">${stars(q.stars)}</span> 建议 ${q.minutes} 分钟${q.flags.map((flag) => html` <span class="flag">${flag}</span>`)}</span>
+    ${q.stars !== null || q.flags.length ? html`<span class="qc-meta">${q.stars !== null ? html`<span class="qdiff" title="原书得分率 ${q.difficulty}">${stars(q.stars)}</span> 建议 ${q.minutes} 分钟` : ""}${q.flags.map((flag) => html` <span class="flag">${flag}</span>`)}</span>` : ""}
     ${text && !excluded ? html`<button type="button" class="qview-toggle js-qview" aria-pressed="false" title="在文字和原图之间切换" hidden>原图</button>` : ""}
     <span class="qc-tools">${excludeToggle(excluded, back, { nums: String(q.num) })}</span>
   </header>
@@ -175,7 +177,7 @@ export const reviewHistory = (history: Review[]): Html => history.length
 export function sectionQuestions(nums: number[], state: UserState, label = "本节题目"): Html {
   return html`<div class="section-qs">
   <span class="section-qs-label">${label}</span>
-  <span class="chips">${nums.map((n) => html`<a class="chip chip-${state.status(n)}" href="/q/${n}">${pad3(n)}</a>`)}</span>
+  <span class="chips">${nums.map((n) => html`<a class="chip chip-${state.status(n)}" href="/q/${n}">${qshort(n)}</a>`)}</span>
 </div>`;
 }
 

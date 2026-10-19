@@ -1,6 +1,6 @@
 // Port of dgy/templates/bank.html, bank_chapter.html, search.html and question.html.
 import { html, raw } from "hono/html";
-import type { ChapterInfo, KnowledgeEntry, Question, QuestionText, Section } from "../content";
+import { qlabel, type ChapterInfo, type KnowledgeEntry, type Question, type QuestionText, type Section } from "../content";
 import type { DrillKp } from "../drill";
 import type { Meta } from "../env";
 import type { CardState, Grade } from "../srs";
@@ -9,15 +9,15 @@ import type { ChapterProgress, Distribution, Review } from "../stats";
 import { cnDate } from "../studyday";
 import { layout } from "./layout";
 import { STATUS_LABELS, answerBody, distBar, excludeToggle, katexCss, katexJs, qmeta, questionBody, questionCard, relatedKnowledge, revealToggle, reviewHistory, type Status } from "./parts";
-import { pad3 } from "./util";
 
-const searchForm = (q = "", placeholder = "题号、年份、考点或题干文字，如 123、2019数二、拐点") => html`<form class="search" action="/bank/search" method="get" role="search">
+const searchForm = (q = "", placeholder = "题号、年份、考点或题干文字，如 123、线12、2019数二、拐点") => html`<form class="search" action="/bank/search" method="get" role="search">
     <label class="visually-hidden" for="q">搜索题目</label>
     <input id="q" name="q" type="search" value="${q}" placeholder="${placeholder}">
     <button class="btn">搜索</button>
   </form>`;
 
-export function bankPage(meta: Meta, rows: [ChapterProgress, Distribution][]) {
+/** The chapters under their subject (高等数学, 线性代数), each with its progress. */
+export function bankPage(meta: Meta, groups: [string, [ChapterProgress, Distribution][]][]) {
   return layout(meta, {
     title: "题库",
     nav: "bank",
@@ -25,6 +25,7 @@ export function bankPage(meta: Meta, rows: [ChapterProgress, Distribution][]) {
   <h1>题库</h1>
   ${searchForm()}
 </header>
+${groups.map(([group, rows]) => html`<h2 class="group-title">${group}</h2>
 <ul class="chapters">
   ${rows.map(([p, dist]) => html`<li class="card chapter-card">
     <a class="chapter-link" href="/bank/${p.code}">
@@ -33,7 +34,7 @@ export function bankPage(meta: Meta, rows: [ChapterProgress, Distribution][]) {
     </a>
     ${distBar(dist)}
   </li>`)}
-</ul>`,
+</ul>`)}`,
   });
 }
 
@@ -128,13 +129,13 @@ ${found.length
     ? html`<p class="muted">找到 ${found.length} 题</p>
 <ul class="card result-list">
   ${found.map((item) => html`<li>
-    <a href="/q/${item.num}"><span class="qnum">#${pad3(item.num)}</span> ${item.section} / ${item.kp}</a>
+    <a href="/q/${item.num}"><span class="qnum">${qlabel(item.num)}</span> ${item.section} / ${item.kp}</a>
     <span class="muted">${item.source_full}</span>
     <span class="chip chip-${state.status(item.num)}">${STATUS_LABELS[state.status(item.num)]}</span>
     ${texts.has(item.num) ? html`<p class="snippet">${snippet(texts.get(item.num)!.search)}</p>` : ""}
   </li>`)}
 </ul>`
-    : html`<p class="empty">没有找到。可以输入题号（如 123）、年份和卷别（如 2019数二）、考点名称（如 拐点），或题干里的文字。</p>`}`,
+    : html`<p class="empty">没有找到。可以输入题号（高数如 123，线代如 线12）、年份和卷别（如 2019数二）、考点名称（如 拐点），或题干里的文字。</p>`}`,
   });
 }
 
@@ -148,7 +149,9 @@ export interface QuestionData {
   sections: Section[];
   titles: Record<string, string>;
   text: QuestionText | undefined;
-  total: number;
+  /** The previous and next question in the same book. */
+  prev: number | null;
+  next: number | null;
   /** The 考点 of the chapter page that has this question, for the link back to its card. */
   kpIndex: number;
 }
@@ -156,7 +159,7 @@ export interface QuestionData {
 export function questionPage(meta: Meta, d: QuestionData) {
   const { q } = d;
   return layout(meta, {
-    title: `#${pad3(q.num)} ${q.kp}`,
+    title: `${qlabel(q.num)} ${q.kp}`,
     nav: "bank",
     head: d.text ? katexCss(meta) : "",
     scripts: d.text ? katexJs(meta) : "",
@@ -164,7 +167,7 @@ export function questionPage(meta: Meta, d: QuestionData) {
 <header class="page-head">
   <div>
     <p class="eyebrow"><a href="/bank/${d.chapter.code}?kp=${d.kpIndex}#q-${q.num}">${d.chapter.name}</a> / ${q.path.join(" / ")}</p>
-    <h1>#${pad3(q.num)} ${q.kp}</h1>
+    <h1>${qlabel(q.num)} ${q.kp}</h1>
   </div>
   <div class="head-actions">
     ${excludeToggle(d.status === "excluded", `/q/${q.num}`, { nums: String(q.num) })}
@@ -198,10 +201,10 @@ export function questionPage(meta: Meta, d: QuestionData) {
   </section>
 </div>
 
-<p class="side-info">答案速查编号 ${q.quick_id} · 原稿第 ${q.orig_page} 页</p>
+${q.quick_id ? html`<p class="side-info">答案速查编号 ${q.quick_id} · 原稿第 ${q.orig_page} 页</p>` : ""}
 <nav class="pager" aria-label="翻题">
-  ${q.num > 1 ? html`<a class="btn btn-small" href="/q/${q.num - 1}">← #${pad3(q.num - 1)}</a>` : html`<span></span>`}
-  ${q.num < d.total ? html`<a class="btn btn-small" href="/q/${q.num + 1}">#${pad3(q.num + 1)} →</a>` : ""}
+  ${d.prev !== null ? html`<a class="btn btn-small" href="/q/${d.prev}">← ${qlabel(d.prev)}</a>` : html`<span></span>`}
+  ${d.next !== null ? html`<a class="btn btn-small" href="/q/${d.next}">${qlabel(d.next)} →</a>` : ""}
 </nav>
 </div>`,
   });

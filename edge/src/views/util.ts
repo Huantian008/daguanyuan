@@ -3,7 +3,6 @@ import type { Meta } from "../env";
 
 export type Html = HtmlEscapedString | Promise<HtmlEscapedString>;
 
-export const pad3 = (n: number) => String(n).padStart(3, "0");
 export const stars = (n: number) => "★".repeat(n) + "☆".repeat(5 - n);
 
 export const contentUrl = (meta: Meta, src: string) => `/content/${src}?v=${meta.content_v}`;

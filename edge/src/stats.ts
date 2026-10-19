@@ -1,5 +1,5 @@
 /** Dashboard numbers: pure functions over the question bank, card states and the review log. */
-import type { Content } from "./content";
+import { chapterGroup, type Content } from "./content";
 import type { CardState, Grade } from "./srs";
 import { addDays, type Day } from "./studyday";
 
@@ -19,6 +19,8 @@ export interface ChapterProgress {
   done: number;
   total: number;
   percent: number;
+  /** 高等数学 or 线性代数 */
+  group: string;
 }
 
 export interface WeakSpot {
@@ -83,7 +85,10 @@ export function chapterProgress(content: Content, cards: Map<number, CardState>,
   return content.chapters.map((ch) => {
     const nums = content.inChapter(ch.code).map((q) => q.num).filter((n) => !excluded.has(n));
     const done = nums.filter((n) => (cards.get(n)?.reps ?? 0) > 0).length;
-    return { code: ch.code, name: ch.name, done, total: nums.length, percent: nums.length ? Math.round((100 * done) / nums.length) : 0 };
+    return {
+      code: ch.code, name: ch.name, done, total: nums.length, percent: nums.length ? Math.round((100 * done) / nums.length) : 0,
+      group: chapterGroup(ch),
+    };
   });
 }
 

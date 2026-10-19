@@ -16,7 +16,7 @@ export const KNOWLEDGE = {
 function assetFiles(bank: Manifest): Record<string, string> {
   const files: Record<string, string> = { "/static/css/app.css": "body{}", "/static/js/app.js": "//" };
   for (const q of bank.questions) {
-    for (const img of [q.img, q.answer, ...q.solution]) files[`/content/${img.src}`] = "img";
+    for (const img of [q.img, q.answer, ...q.solution]) if (img) files[`/content/${img.src}`] = "img";
   }
   for (const k of bank.knowledge) for (const p of k.pages) files[`/content/${p.src}`] = "page";
   return files;

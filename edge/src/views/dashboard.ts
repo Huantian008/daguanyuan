@@ -82,7 +82,7 @@ export function dashboardPage(meta: Meta, d: DashboardData) {
   <section class="card">
     <header class="card-head"><h2>进度</h2><span class="muted">做过的题 / 要做的题</span></header>
     <ul class="progress">
-      ${d.progress.map((p) => html`<li>
+      ${d.progress.map((p, i) => html`${i === 0 || p.group !== d.progress[i - 1].group ? html`<li class="progress-group">${p.group}</li>` : ""}<li>
         <a class="progress-name" href="/bank/${p.code}">${p.name}</a>
         <span class="bar" aria-hidden="true"><span style="width: ${p.percent}%"></span></span>
         <span class="progress-num">${p.done}/${p.total}</span>

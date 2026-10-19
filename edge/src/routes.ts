@@ -1,6 +1,6 @@
 /** Page routes, ported from dgy/routes/*.py. */
 import type { Hono } from "hono";
-import type { Content, KnowledgeEntry } from "./content";
+import { parseLabel, type Content, type KnowledgeEntry } from "./content";
 import * as db from "./db";
 import { defaultKp, drillKps, kpIndexOf, kpTree, onwardKp } from "./drill";
 import type { AppEnv, KnowledgeData, Meta } from "./env";
@@ -77,16 +77,20 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
 
   app.get("/bank", async (c) => {
     const state = await loadState(c.env.DB, c.get("user").id, content);
-    const rows = stats.chapterProgress(content, state.cards, state.excluded).map((p) => [
-      p, stats.masteryDistribution(content.inChapter(p.code).map((q) => q.num).filter((n) => state.active.has(n)), state.cards),
-    ] as [stats.ChapterProgress, stats.Distribution]);
-    return c.html(bankPage(meta, rows));
+    const groups: [string, [stats.ChapterProgress, stats.Distribution][]][] = [];
+    for (const p of stats.chapterProgress(content, state.cards, state.excluded)) {
+      if (!groups.length || groups[groups.length - 1][0] !== p.group) groups.push([p.group, []]);
+      groups[groups.length - 1][1].push(
+        [p, stats.masteryDistribution(content.inChapter(p.code).map((q) => q.num).filter((n) => state.active.has(n)), state.cards)]);
+    }
+    return c.html(bankPage(meta, groups));
   });
 
   app.get("/bank/search", async (c) => {
     const q = c.req.query("q") ?? "";
     const term = q.trim().replace(/^#/, "");
-    if (/^\d+$/.test(term) && content.questions.has(Number(term))) return c.redirect(`/q/${Number(term)}`, 303);
+    const num = parseLabel(term);
+    if (num !== null && content.questions.has(num)) return c.redirect(`/q/${num}`, 303);
     const found = term
       ? content.all().filter((x) => x.source_full.includes(term) || x.source.includes(term) || x.kp.includes(term) || x.section.includes(term)
         || (content.text(x.num)?.search.includes(term) ?? false))
@@ -155,11 +159,12 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     const q = num === null ? undefined : content.questions.get(num);
     if (!q) return c.notFound();
     const [state, history] = await Promise.all([loadState(DB, uid, content), db.historyFor(DB, uid, q.num)]);
+    const [prev, next] = content.neighbors(q.num);
     return c.html(questionPage(meta, {
       q, chapter: content.chapter(q.chapter), card: state.cards.get(q.num), status: state.status(q.num), history,
       knowledge: content.knowledgeFor(q.chapter), sections: content.sectionsFor(q.num), titles: content.knowledgeTitles(),
       text: content.text(q.num),
-      total: content.all().length,
+      prev, next,
       kpIndex: drillKps(content, q.chapter, state.status).find((k) => k.questions.includes(q))!.index,
     }));
   });
@@ -175,6 +180,8 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
 
   app.get("/knowledge/:slug", async (c) => {
     const slug = c.req.param("slug");
+    // The 线代 mind map used to be one page; it is now one per chapter, 10–15.
+    if (slug === "xiandai" && content.knowledgeEntry("10")) return c.redirect("/knowledge/10", 303);
     const entry = content.knowledgeEntry(slug);
     if (!entry) return c.notFound();
     const text = knowledge.chapters[slug];

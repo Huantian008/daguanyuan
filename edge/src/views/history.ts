@@ -1,12 +1,11 @@
 // Port of dgy/templates/history.html and settings.html.
 import { html } from "hono/html";
-import type { Question } from "../content";
+import { qlabel, type Question } from "../content";
 import type { Meta } from "../env";
 import { GRADE_LABELS } from "../srs";
 import type { Review } from "../stats";
 import { clockOf, cnDate, type Day } from "../studyday";
 import { layout } from "./layout";
-import { pad3 } from "./util";
 
 export interface HistoryDay {
   day: Day;
@@ -25,7 +24,7 @@ ${days.length
   <ul class="history">
     ${d.items.map((r) => html`<li>
       <span class="muted time">${clockOf(r.reviewedAt)}</span>
-      <a href="/q/${r.num}"><span class="qnum">#${pad3(r.num)}</span> ${questions.get(r.num)?.kp ?? ""}</a>
+      <a href="/q/${r.num}"><span class="qnum">${qlabel(r.num)}</span> ${questions.get(r.num)?.kp ?? ""}</a>
       <span class="chip chip-${r.grade}">${GRADE_LABELS[r.grade]}</span>
     </li>`)}
   </ul>
