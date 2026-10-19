@@ -61,6 +61,13 @@ def test_a_heading_inside_display_math_is_not_a_heading():
     assert [t for _i, _l, t in parsed.headings] == ["1. 乘法"]
 
 
+def test_formula_slips_katex_accepts_are_errors():
+    report = Report()
+    xk.check_math("f", "设 $Q=\\begin{pmatrix}1&0\\\\dfrac{1}{2}&1\\end{pmatrix}$，且 $x，y$\n", report)
+    assert any("\\dfrac 少了反斜杠" in e for e in report.errors)
+    assert any("全角标点「，」" in e for e in report.errors)
+
+
 def test_page_segments_and_missing_hints():
     segments = xk.page_segments("<!-- p.3 -->\n矩阵乘法\n<!-- p.4 -->\n矩阵逆 伴随矩阵")
     assert segments[3].strip() == "矩阵乘法" and segments[4].strip() == "矩阵逆 伴随矩阵"

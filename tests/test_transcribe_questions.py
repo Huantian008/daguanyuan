@@ -146,6 +146,17 @@ def test_full_width_punctuation_inside_a_formula_is_an_error():
     assert not any("全角" in e for e in report.errors)
 
 
+def test_a_row_break_that_swallowed_a_backslash_is_an_error():
+    # \\dfrac is a row break and the letters "dfrac"; KaTeX renders it without complaint.
+    assert tq.math_slips(r"\begin{pmatrix}1&\dfrac{1}{2}\\dfrac{2}{3}&0\end{pmatrix}") == [
+        r"换行符后面的 \dfrac 少了反斜杠（写成了 \\dfrac，应为 \\\dfrac）"]
+    for fine in (r"1&2\\\dfrac{1}{2}&0", r"a&b\\c&d", r"c&d\\\end{pmatrix}", r"\begin{cases}x\\y\end{cases}"):
+        assert tq.math_slips(fine) == []
+    report = Report()
+    tq.check_formulas([("#t", dict(GOOD_CHOICE, answer=r"$\begin{pmatrix}1\\sqrt{2}\end{pmatrix}$"))], report)
+    assert any("\\sqrt 少了反斜杠" in e for e in report.errors)
+
+
 def test_a_second_probe_file_for_a_new_model(tmp_path):
     (tmp_path / "out").mkdir()
     (tmp_path / "questions.jsonl").write_text(json.dumps({"num": 1, "pdf_text": PDF_TEXT_1}, ensure_ascii=False), encoding="utf-8")

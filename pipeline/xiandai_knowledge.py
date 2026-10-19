@@ -248,8 +248,7 @@ def check_math(where: str, text: str, report: Report) -> list[dict]:
             report.errors.append(f"{where} 第 {k} 段（「{paragraph.strip()[:20]}…」）：$ 没有成对")
         for i, (display, tex) in enumerate(tq.math_segments(paragraph)):
             formulas.append({"id": f"{where} 第 {k} 段第 {i + 1} 个公式", "tex": tex, "display": display})
-            if found := tq.FULL_WIDTH_IN_MATH.search(tex):
-                report.errors.append(f"{where} 第 {k} 段：公式里有全角标点「{found.group(0)}」，公式内一律用半角")
+            report.errors += [f"{where} 第 {k} 段：{slip}" for slip in tq.math_slips(tex)]
     if _IMAGE.search(text):
         report.errors.append(f"{where}：不要插图片，导图里的公式和图都转成文字")
     return formulas

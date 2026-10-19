@@ -41,6 +41,10 @@ COVERAGE_MIN = 0.8
 SAMPLE_SIZE = 40
 PROBE_FILE = "probe.json"
 FULL_WIDTH_IN_MATH = re.compile(r"[，；。：、]")
+# A row break that swallowed the backslash of the command after it: \\dfrac is a row break and then the letters
+# "dfrac", which KaTeX prints without complaint (it happened in matrices of fractions).
+SWALLOWED_BACKSLASH = re.compile(r"(?<!\\)\\\\(d?frac|tfrac|sqrt|alpha|beta|gamma|delta|lambda|mu|xi|eta|theta|varepsilon"
+                                 r"|cdots|vdots|ddots|ldots|left|right|quad|qquad|text|cdot|times|mathrm|boldsymbol)(?![a-zA-Z])")
 
 # Book numbering left at the start of a stem: (5)  （5）  【11】  【例 6.12】  4.  4、
 BOOK_LABEL = re.compile(r"^\s*(\(\s*\d+\s*\)|（\s*\d+\s*）|【[^】]{0,12}】|\d+\s*[.．、])")
@@ -244,6 +248,18 @@ def katex_errors(formulas: list[dict]) -> list[dict] | None:
     return json.loads(result.stdout)
 
 
+def math_slips(tex: str) -> list[str]:
+    """Mistakes in a formula that KaTeX still renders, so its compile check cannot catch them."""
+    slips = []
+    # A stray ， only ever gets into math by a bulk find-and-replace.
+    if found := FULL_WIDTH_IN_MATH.search(tex):
+        slips.append(f"公式里有全角标点「{found.group(0)}」，公式内一律用半角")
+    if found := SWALLOWED_BACKSLASH.search(tex):
+        name = found.group(1)
+        slips.append(f"换行符后面的 \\{name} 少了反斜杠（写成了 \\\\{name}，应为 \\\\\\{name}）")
+    return slips
+
+
 def check_formulas(entries: list[tuple[str, dict]], report: Report) -> None:
     formulas = []
     for where, entry in entries:
@@ -251,9 +267,7 @@ def check_formulas(entries: list[tuple[str, dict]], report: Report) -> None:
             for i, (display, tex) in enumerate(math_segments(text)):
                 formulas.append({"id": f"{where} {part} 第{i + 1}个公式", "tex": tex, "display": display})
     for f in formulas:
-        # KaTeX renders a stray ， inside math without complaint; it only ever gets there by a bulk find-and-replace.
-        if found := FULL_WIDTH_IN_MATH.search(f["tex"]):
-            report.errors.append(f"{f['id']}：公式里有全角标点「{found.group(0)}」，公式内一律用半角")
+        report.errors += [f"{f['id']}：{slip}" for slip in math_slips(f["tex"])]
     errors = katex_errors(formulas)
     if errors is None:
         report.warnings.append("没有找到 node，跳过公式编译检查")
