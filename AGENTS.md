@@ -1,42 +1,87 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
+大观园 is a 数二 (Math II) practice site built from local 《大观严选》 PDFs. The same content and behavior live in two implementations, and progress does **not** sync between them:
 
-Math II practice runs on a Cloudflare Worker and offline Python fallback; progress does not synchronize.
+- `edge/` — Cloudflare Worker + D1, the daily online site.
+- `dgy/` — FastAPI + SQLite, the offline fallback.
 
-- `dgy/`: FastAPI routes, Jinja templates, and static CSS/JavaScript.
-- `pipeline/`: PDF extraction, validation, and Worker exports. Source PDFs default to the parent directory; override with `DGY_SOURCE_DIR`.
-- `edge/src/`: TypeScript Worker, views, authentication, and D1 persistence; `edge/migrations/` contains numbered SQL migrations.
-- `knowledge-md/`: maintained Chinese notes/diagrams; `docs/`: implementation plans.
-- `tests/` and `edge/test/`: Python and Worker tests.
-- `content/`, `edge/public/`, and `edge/src/generated/`: generated outputs; regenerate rather than edit. `data/` stores personal SQLite progress/backups.
+Behavior changes (scheduling, review queues, drill, stats) must land in **both** implementations, each with its own tests.
 
-## Build, Test, and Development Commands
+## Layout
 
-From the repository root, run `python -m venv --system-site-packages .venv`, then `.venv\Scripts\python -m pip install -r requirements.txt`.
+- `pipeline/` — extraction and export entrypoints: `pipeline.build` (source PDFs → `content/`, validates 613 questions), `pipeline.validate` (check an existing `content/`), `pipeline.export_edge` (`content/` + `bank-md/` + `knowledge-md/` → `edge/public/` and `edge/src/generated/`), `pipeline.export_progress`, `pipeline.transcribe_questions`, `pipeline.link_questions`.
+- `dgy/` — FastAPI app, Jinja templates, and the only copy of the front-end CSS/JS (`static/css/app.css`, `static/js/app.js`).
+- `edge/` — Worker. `src/index.ts` bundles `src/generated/*.json`, pages are in `src/views/`, routes in `src/routes.ts`; numbered SQL in `migrations/`, Vitest in `test/`.
+- `knowledge-md/` — maintained Chinese notes; `question_links.json` maps questions to knowledge sections (tracked).
+- `bank-md/questions.json` — text stems/answers, one question per line (tracked).
+- `docs/` — feature plans in `docs/superpowers/plans/`, release records in `docs/releases/`, cross-platform setup in `docs/跨平台开发.md`.
+- Generated and gitignored, never hand-edit: `content/`, `edge/public/`, `edge/src/generated/`, `edge/worker-configuration.d.ts`. `data/` is the real progress database.
 
-| Command | Purpose |
+## Commands
+
+macOS uses `.venv/bin/python`, Windows uses `.venv\Scripts\python` (same arguments below).
+
+```bash
+python -m venv --system-site-packages .venv          # reuses globally installed PyMuPDF/Pillow
+.venv/bin/python -m pip install -r requirements.txt  # Python >= 3.11
+.venv/bin/python -m pipeline.build       # needs the source PDFs in the project's parent dir (DGY_SOURCE_DIR overrides)
+.venv/bin/python -m pipeline.validate    # verify existing content/ without rebuilding
+.venv/bin/python -m pipeline.export_edge # regenerate edge/public + edge/src/generated
+.venv/bin/python -m dgy --reload --data-dir <tmp>    # local site at 127.0.0.1:8000
+.venv/bin/python -m pytest               # pdf-marked tests auto-skip when the PDFs are missing
+.venv/bin/python -m pytest tests/test_srs.py::<case> # one test
+```
+
+```bash
+cd edge
+npm ci
+npm test                                      # Vitest (Node 22.12+; 24 recommended); needs no generated artifacts
+npx vitest run test/srs.test.ts -t "<case>"   # one test
+npm run types                     # writes the gitignored worker-configuration.d.ts
+npm run check                     # tsc; run pipeline.export_edge and npm run types first
+npm run dev                       # wrangler dev; copy .dev.vars.example to .dev.vars and apply local migrations once
+```
+
+Neither the PDFs nor `content/`/`edge/public/` are in git — a prebuilt `content/` snapshot is provided for development, so rerun `pipeline.build` only when extraction logic or the PDFs change.
+
+## Keeping the two implementations in sync
+
+| Python (`dgy/`) | Worker (`edge/src/`) |
 | --- | --- |
-| `.venv\Scripts\python -m pipeline.build` | Extract PDFs and validate the 613-question bank. |
-| `.venv\Scripts\python -m dgy --reload` | Serve at `127.0.0.1:8000` with reload. |
-| `.venv\Scripts\python -m pytest` | Run Python tests. |
-| `.venv\Scripts\python -m pytest -m "not pdf"` | Skip PDF-dependent tests. |
-| `.venv\Scripts\python -m pipeline.export_edge` | Generate Worker assets and content modules. |
+| `srs.py`, `studyday.py`, `drill.py`, `stats.py`, `db.py` | same-named `.ts` files |
+| `templates/*.html` (Jinja) | `views/*.ts` (same tags and classes) |
+| `static/css/app.css`, `static/js/app.js` | copied by `export_edge`; edit only in `dgy/static/` |
+| `markdown.py`, `bank.py` | pre-rendered into `generated/*.json` by `export_edge` |
 
-In `edge/`, install with `npm ci`; generate bindings with `npm run types`. Run `npm test` (Vitest), `npm run check` (TypeScript), and `npm run dev` (Wrangler). First copy `.dev.vars.example` to `.dev.vars`, populate secrets, and run `npx wrangler d1 migrations apply dgy --local`.
+- `_theme_head.html`, `_qsize_toggle.html` and `_theme_toggle.html` must stay byte-identical to the constants in `edge/src/views/layout.ts`; `edge/test/content.test.ts` reads the Jinja files and fails on drift.
+- Local SQLite has no `user_id` and no migrations (`dgy/db.py` `SCHEMA`). D1 tables all have `user_id NOT NULL` with no default, so every query must be scoped by uid; schema changes are new numbered files in `edge/migrations/` only. `edge/test/d1.ts` runs every real migration in filename order, so new migrations are tested automatically.
+- Question content never enters either database; the databases store progress, card state, exclusions and settings only.
+- A study day runs Shanghai 04:00 → 04:00 (`studyday.py` / `studyday.ts`); timestamps are ISO strings with `+08:00`. SRS has five levels with 1/3/7/14/30-day intervals and the ratings `mastered` / `shaky` / `unknown`.
+- Grading happens only on question cards: `POST /q/<num>/grade` with `mode` = `warmup` | `due` (anything else is `browse`); a question is recorded once per study day, so a double click is one review.
 
-## Coding Style & Naming Conventions
+## Testing
 
-Use four-space Python indentation, type hints, `snake_case` functions/modules, and `PascalCase` classes. TypeScript uses two spaces, semicolons, double quotes, and `camelCase` functions. No formatter/linter is configured; match surrounding code. Align scheduling/queue behavior across implementations. Preserve Chinese filenames, mathematical notation, and source fidelity.
+- Python: `tests/factories.py` builds a fake content manifest, and `create_app(settings, clock)` injects settings and a fixed clock, so site tests need no PDFs.
+- Worker: `edge/test/harness.ts` `setup()` provides a tunable `Clock`, a cookie-keeping `Client`, fake assets and an in-memory D1 (`node:sqlite`) that runs all real migrations.
+- Add regression tests for authentication, per-user isolation and migrations.
+- No coverage threshold and no formatter or linter is configured; match surrounding code (Python: 4-space, type hints, `snake_case`; TS: 2-space, semicolons, double quotes, `camelCase`).
 
-## Testing Guidelines
+## Conventions
 
-Use pytest files named `test_*.py` and Vitest files named `*.test.ts`. Mark PDF-dependent tests with `pdf`; missing PDFs cause skips. Reuse fixtures with temporary databases and deterministic dates/randomness. Add regression tests for changed behavior, especially authentication, user isolation, and migrations. No coverage threshold is configured.
+- Conventional Commits: `feat(edge): ...`, `fix: ...`, `docs(knowledge): ...`. Keep commits focused; PRs report validation commands/results and include screenshots for UI changes.
+- Start feature work with a plan in `docs/superpowers/plans/YYYY-MM-DD-<topic>.md`; after deploying, record acceptance in `docs/releases/YYYY-MM-DD-<topic>.md`.
+- The repo is edited on both Windows and macOS: use `pathlib` (no drive letters, backslashes or `os.startfile`) and rely on the `tzdata` package, not the system timezone database.
+- Preserve Chinese filenames, mathematical notation and source fidelity.
 
-## Commit & Pull Request Guidelines
+## Ask first / do not touch
 
-Follow existing Conventional Commit subjects: `feat(edge): ...`, `fix: ...`, or `docs(knowledge): ...`. Keep commits focused. PRs should describe changes, link relevant issues, report validation commands/results, and include UI screenshots. Explain migration and content-regeneration steps when applicable.
+- Source PDFs and the `【合集】A4版知识点` folder above the repo are read-only pipeline inputs.
+- `data/` is the user's real progress. Develop with `--data-dir <tmp>`; tests must use temporary databases.
+- `npx wrangler deploy` and remote migrations are releases; ask the user first. Apply remote migrations and deploy back-to-back (`npx wrangler d1 migrations apply dgy --remote`, then `npx wrangler deploy`) — old code and new schema do not mix.
+- Keep secrets out of git. Set `APP_PASSWORD` and `SECRET_KEY` before exposing the Python app; account ids in `edge/wrangler.jsonc` must never change.
 
-## Security & Configuration
+## More docs
 
-Keep secrets, PDFs, generated outputs, and progress untracked. Use `--data-dir` for development. Preserve account IDs and user-scoped D1 queries. Set `APP_PASSWORD` and `SECRET_KEY` before exposing the Python application.
+- `README.md` (Chinese): day-to-day use, Cloudflare accounts, deploy/rollback, backups.
+- `CLAUDE.md`: Claude Code's notes with additional architecture detail (OpenCode does not load it).
+- `docs/跨平台开发.md`: Windows/macOS setup, dev material release, what must be copied by hand.
