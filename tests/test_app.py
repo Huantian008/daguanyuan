@@ -29,14 +29,14 @@ class Clock:
         return self.at
 
 
-def _make_env(tmp_path, password=None, links=None, texts=None):
+def _make_env(tmp_path, password=None, links=None, texts=None, bank=None, knowledge=KNOWLEDGE, xiandai_texts=None):
     content = tmp_path / "content"
-    bank = small_bank()
-    bank["knowledge"] = KNOWLEDGE
+    bank = bank or small_bank()
+    bank["knowledge"] = knowledge
     content.mkdir()
     (content / "manifest.json").write_text(json.dumps(bank, ensure_ascii=False), encoding="utf-8")
-    srcs = [q["img"]["src"] for q in bank["questions"]] + [q["answer"]["src"] for q in bank["questions"]]
-    srcs += [s["src"] for q in bank["questions"] for s in q["solution"]] + [p["src"] for k in KNOWLEDGE for p in k["pages"]]
+    srcs = [q["img"]["src"] for q in bank["questions"]] + [q["answer"]["src"] for q in bank["questions"] if q["answer"]]
+    srcs += [s["src"] for q in bank["questions"] for s in q["solution"]] + [p["src"] for k in knowledge for p in k["pages"]]
     for src in srcs:
         (content / src).parent.mkdir(parents=True, exist_ok=True)
         (content / src).write_bytes(b"img")
@@ -49,11 +49,11 @@ def _make_env(tmp_path, password=None, links=None, texts=None):
     if links:
         (md / "question_links.json").write_text(json.dumps({"version": 1, "links": links}), encoding="utf-8")
     bank_dir = None
-    if texts:
-        bank_dir = tmp_path / "bank"
-        bank_dir.mkdir()
-        (bank_dir / "questions.json").write_text(json.dumps({"version": 1, "questions": texts}, ensure_ascii=False),
-                                                 encoding="utf-8")
+    for name, rows in (("questions.json", texts), ("xiandai.json", xiandai_texts)):
+        if rows:
+            bank_dir = tmp_path / "bank"
+            bank_dir.mkdir(exist_ok=True)
+            (bank_dir / name).write_text(json.dumps({"version": 1, "questions": rows}, ensure_ascii=False), encoding="utf-8")
     settings = Settings(content_dir=content, data_dir=tmp_path / "data", knowledge_md_dir=md,
                         password=password, secret_key="test-secret", bank_dir=bank_dir)
     clock = Clock(datetime(2026, 10, 16, 21, 0, tzinfo=TZ))

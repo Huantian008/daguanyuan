@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 
 from .. import db, stats
+from ..content import parse_label
 from ..drill import default_kp, drill_kps, kp_tree
 from ..srs import GRADES
 from ..web import bank, get_conn, now, redirect, render, safe_back, today, user_state
@@ -13,19 +14,21 @@ router = APIRouter()
 def chapters(request: Request, conn=Depends(get_conn)):
     content = bank(request)
     state = user_state(conn, content)
-    rows = []
+    groups: list[tuple[str, list]] = []
     for p in stats.chapter_progress(content, state.cards, state.excluded):
         nums = [q.num for q in content.in_chapter(p.code) if q.num in state.active]
-        rows.append((p, stats.mastery_distribution(nums, state.cards)))
-    return render(request, "bank.html", nav="bank", rows=rows)
+        if not groups or groups[-1][0] != p.group:
+            groups.append((p.group, []))
+        groups[-1][1].append((p, stats.mastery_distribution(nums, state.cards)))
+    return render(request, "bank.html", nav="bank", groups=groups)
 
 
 @router.get("/bank/search")
 def search(request: Request, q: str = "", conn=Depends(get_conn)):
     content = bank(request)
     term = q.strip().lstrip("#")
-    if term.isdigit() and int(term) in content.questions:
-        return redirect(f"/q/{int(term)}")
+    if (num := parse_label(term)) in content.questions:
+        return redirect(f"/q/{num}")
     found = [
         question for num, question in sorted(content.questions.items())
         if term and (term in question.source_full or term in question.source
@@ -102,6 +105,7 @@ def question(request: Request, num: int, conn=Depends(get_conn)):
         raise HTTPException(404, "没有这道题")
     state = user_state(conn, content)
     kp_index = next(k.index for k in drill_kps(content, q.chapter, state.status) if q in k.questions)
+    prev, following = content.neighbors(num)
     return render(
         request, "question.html",
         nav="bank",
@@ -115,4 +119,6 @@ def question(request: Request, num: int, conn=Depends(get_conn)):
         sections=content.sections_for(num),
         titles=content.knowledge_titles(),
         text=content.text(num),
+        prev=prev,
+        next=following,
     )

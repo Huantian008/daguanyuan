@@ -15,6 +15,7 @@ class ChapterProgress:
     name: str
     done: int
     total: int
+    group: str = "高等数学"
 
     @property
     def percent(self) -> int:
@@ -90,7 +91,7 @@ def chapter_progress(content: Content, cards: dict[int, CardState], excluded: se
     for ch in content.chapters:
         nums = [q.num for q in content.in_chapter(ch.code) if q.num not in excluded]
         done = sum(1 for num in nums if num in cards and cards[num].reps > 0)
-        progress.append(ChapterProgress(ch.code, ch.name, done, len(nums)))
+        progress.append(ChapterProgress(ch.code, ch.name, done, len(nums), ch.group))
     return progress
 
 

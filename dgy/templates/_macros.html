@@ -1,10 +1,10 @@
 {% macro qmeta(q, text=none) -%}
 <div class="qmeta">
-  <span class="qnum">#{{ '%03d' % q.num }}</span>
+  <span class="qnum">{{ q.num|qlabel }}</span>
   <span class="qkp">{{ q.kp }}</span>
   <span class="qsrc">{{ q.source_full }}</span>
-  <span class="qdiff" title="原书得分率 {{ q.difficulty }}">{{ q.stars|stars }}</span>
-  <span class="qmins">建议 {{ q.minutes }} 分钟</span>
+  {% if q.stars is not none %}<span class="qdiff" title="原书得分率 {{ q.difficulty }}">{{ q.stars|stars }}</span>
+  <span class="qmins">建议 {{ q.minutes }} 分钟</span>{% endif %}
   {% for flag in q.flags %}<span class="flag">{{ flag }}</span>{% endfor %}
   {% if text %}<button type="button" class="qview-toggle js-qview" aria-pressed="false" title="在文字和原图之间切换（V）" hidden>原图</button>{% endif %}
 </div>
@@ -20,19 +20,22 @@
     {% if text.options %}<ul class="qopts{% if text.options_wide %} qopts-wide{% endif %}">{% for key, html in text.options %}<li{% if data_correct and key == text.answer_key %} data-correct{% endif %}><b>{{ key }}.</b> {{ html|safe }}</li>{% endfor %}</ul>{% endif %}
   </div>
   {% endif %}
-  <div class="qimage paper">{{ images([q.img], 'qimg', '题目 #%03d' % q.num, 1.6, lazy=(view == 'text' or force_lazy)) }}</div>
+  <div class="qimage paper">{{ images([q.img], 'qimg', '题目 ' ~ q.num|qlabel, 1.6, lazy=(view == 'text' or force_lazy)) }}</div>
 </div>
 {%- endmacro %}
 
-{# The answer as text with any erratum below it, then the 答案速查 image folded away. #}
+{# The answer as text with any erratum below it, then the 答案速查 image folded away.
+   The 线代 book has no 答案速查: its answer is text only, or the solution until the text version is in. #}
 {% macro answer_part(q, text) -%}
 <h2 class="panel-label">答案</h2>
 {% if text %}
 <div class="qanswer">{% if text.answer_key %}<p><b>{{ text.answer_key }}.</b> {{ text.option(text.answer_key)|safe }}</p>{% else %}{{ text.answer|safe }}{% endif %}</div>
 {% if text.erratum %}<p class="erratum"><b>勘误</b>{{ text.erratum|safe }}</p>{% endif %}
-<details class="raw-img"><summary>答案原图</summary><div class="paper">{{ images([q.answer], 'aimg', '答案', 2.2) }}</div></details>
-{% else %}
+{% if q.answer %}<details class="raw-img"><summary>答案原图</summary><div class="paper">{{ images([q.answer], 'aimg', '答案', 2.2) }}</div></details>{% endif %}
+{% elif q.answer %}
 <div class="paper">{{ images([q.answer], 'aimg', '答案', 2.2) }}</div>
+{% else %}
+<p class="muted no-answer">答案见解析。</p>
 {% endif %}
 {%- endmacro %}
 
@@ -51,10 +54,10 @@
 {% macro qcard(q, text, status, index, graded, back, sections, knowledge, titles, history, card, mode='') -%}
 <article class="qcard{% if status == 'excluded' %} is-excluded{% endif %}" id="q-{{ q.num }}"{% if text and text.answer_key %} data-choice{% endif %}>
   <header class="qc-head">
-    <strong class="qc-num" title="#{{ '%03d' % q.num }}">{{ index }}</strong>
+    <strong class="qc-num" title="{{ q.num|qlabel }}">{{ index }}</strong>
     <span class="qc-src">{{ q.source_full }}</span>
     <span class="qc-path">{{ q.path|join(' / ') }}</span>
-    <span class="qc-meta"><span class="qdiff" title="原书得分率 {{ q.difficulty }}">{{ q.stars|stars }}</span> 建议 {{ q.minutes }} 分钟{% for flag in q.flags %} <span class="flag">{{ flag }}</span>{% endfor %}</span>
+    {% if q.stars is not none or q.flags %}<span class="qc-meta">{% if q.stars is not none %}<span class="qdiff" title="原书得分率 {{ q.difficulty }}">{{ q.stars|stars }}</span> 建议 {{ q.minutes }} 分钟{% endif %}{% for flag in q.flags %} <span class="flag">{{ flag }}</span>{% endfor %}</span>{% endif %}
     {% if text and status != 'excluded' %}<button type="button" class="qview-toggle js-qview" aria-pressed="false" title="在文字和原图之间切换" hidden>原图</button>{% endif %}
     <span class="qc-tools">{{ exclude_toggle(status == 'excluded', back, nums=q.num) }}</span>
   </header>
@@ -170,6 +173,6 @@
 {% macro section_questions(nums, state, label='本节题目') -%}
 <div class="section-qs">
   <span class="section-qs-label">{{ label }}</span>
-  <span class="chips">{% for n in nums %}<a class="chip chip-{{ state.status(n) }}" href="/q/{{ n }}">{{ '%03d' % n }}</a>{% endfor %}</span>
+  <span class="chips">{% for n in nums %}<a class="chip chip-{{ state.status(n) }}" href="/q/{{ n }}">{{ n|qshort }}</a>{% endfor %}</span>
 </div>
 {%- endmacro %}

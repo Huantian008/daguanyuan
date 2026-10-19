@@ -20,7 +20,7 @@ from . import sources
 
 ASSET_LIMIT = 25 * 1024 * 1024  # Workers Static Assets: 25 MiB per file
 FILE_LIMIT = 20_000  # ... and 20,000 files per version on the Free plan
-CONTENT_SUBDIRS = ("q", "a", "s", "k")
+CONTENT_SUBDIRS = ("q", "a", "s", "k", "xiandai/q", "xiandai/s")  # not xiandai/transcribe or knowledge: work files
 EDGE_DIR = sources.PROJECT_ROOT / "edge"
 STATIC_DIR = sources.PROJECT_ROOT / "dgy" / "static"
 MARKDOWN_DIR = sources.PROJECT_ROOT / "knowledge-md"

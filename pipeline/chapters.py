@@ -5,6 +5,8 @@ are stored as 1000 + the book number (1001–1355) so they never clash with 高�
 """
 from dataclasses import dataclass
 
+from dgy.bank import XIANDAI_OFFSET
+
 
 @dataclass(frozen=True)
 class Chapter:
@@ -23,7 +25,6 @@ CHAPTERS = (
     Chapter("F", "微分方程", 525, 613),
 )
 
-XIANDAI_OFFSET = 1000
 XIANDAI_CHAPTERS = (
     Chapter("L1", "行列式", 1001, 1040),
     Chapter("L2", "矩阵", 1041, 1115),

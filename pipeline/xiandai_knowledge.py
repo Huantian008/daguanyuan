@@ -23,7 +23,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from dgy.sections import parse_markdown_index
+from dgy.sections import XIANDAI_INDEX_FILE, parse_markdown_index
 
 from . import sources
 from . import transcribe_questions as tq
@@ -33,7 +33,6 @@ from .xiandai import OUT_DIR
 
 WORK_DIR = OUT_DIR / "knowledge"
 MARKDOWN_DIR = sources.PROJECT_ROOT / "knowledge-md"
-INDEX_FILE = "线代总目录.md"
 REL_IMG_DIR = "content/xiandai/knowledge/img"
 REVIEW_PREFIX = "../../../"  # content/xiandai/knowledge/ -> repository root
 PROBE_FILE = "probe.md"
@@ -77,7 +76,7 @@ class KnowledgeFile:
 
 
 def knowledge_files(markdown_dir: Path = MARKDOWN_DIR) -> list[KnowledgeFile]:
-    index = parse_markdown_index((markdown_dir / INDEX_FILE).read_text(encoding="utf-8"))
+    index = parse_markdown_index((markdown_dir / XIANDAI_INDEX_FILE).read_text(encoding="utf-8"))
     return [KnowledgeFile(name, first, last) for name, first, last in index]
 
 

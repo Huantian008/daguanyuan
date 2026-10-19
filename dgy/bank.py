@@ -1,4 +1,5 @@
 """The text version of the question bank (bank-md/questions.json): stems, options and answers in Markdown + LaTeX.
+The 线代 questions are in bank-md/xiandai.json under their book numbers #001–#355; on the site they are 1001–1355.
 
 Rendered to HTML once, on load. Formulas stay as .math elements for KaTeX in the browser, as on the knowledge pages.
 The Worker gets the same HTML through pipeline.export_edge.
@@ -11,6 +12,8 @@ from pathlib import Path
 from .markdown import render_inline, render_markdown
 
 BANK_FILE = "questions.json"
+XIANDAI_FILE = "xiandai.json"
+XIANDAI_OFFSET = 1000  # 线代 #001 is question 1001 on the site, so the two books never share a number
 WIDE_OPTION = 24  # characters: with a longer option the options go one per line
 
 _FUNCTIONS = re.compile(r"\\(arcsin|arccos|arctan|sinh|cosh|sin|cos|tan|cot|sec|csc|ln|log|lim|max|min|exp)(?![a-zA-Z])")
@@ -60,8 +63,11 @@ def question_text(entry: dict) -> QuestionText:
 
 
 def load_bank(bank_dir: Path | None) -> dict[int, QuestionText]:
-    path = bank_dir / BANK_FILE if bank_dir else None
-    if path is None or not path.exists():
-        return {}
-    data = json.loads(path.read_text(encoding="utf-8"))
-    return {entry["num"]: question_text(entry) for entry in data["questions"]}
+    """Both books' text versions by site number; a missing file means that book shows images only."""
+    texts: dict[int, QuestionText] = {}
+    for name, offset in ((BANK_FILE, 0), (XIANDAI_FILE, XIANDAI_OFFSET)):
+        path = bank_dir / name if bank_dir else None
+        if path is not None and path.exists():
+            data = json.loads(path.read_text(encoding="utf-8"))
+            texts |= {entry["num"] + offset: question_text(entry) for entry in data["questions"]}
+    return texts

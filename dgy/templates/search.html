@@ -18,7 +18,7 @@
 <ul class="card result-list">
   {% for item in found %}
   <li>
-    <a href="/q/{{ item.num }}"><span class="qnum">#{{ '%03d' % item.num }}</span> {{ item.section }} / {{ item.kp }}</a>
+    <a href="/q/{{ item.num }}"><span class="qnum">{{ item.num|qlabel }}</span> {{ item.section }} / {{ item.kp }}</a>
     <span class="muted">{{ item.source_full }}</span>
     <span class="chip chip-{{ state.status(item.num) }}">{{ status_label(state.status(item.num)) }}</span>
     {% set t = texts.get(item.num) %}{% if t %}<p class="snippet">{{ t.search|truncate(60, true, '…', 0) }}</p>{% endif %}
@@ -26,6 +26,6 @@
   {% endfor %}
 </ul>
 {% else %}
-<p class="empty">没有找到。可以输入题号（如 123）、年份和卷别（如 2019数二）、考点名称（如 拐点），或题干里的文字。</p>
+<p class="empty">没有找到。可以输入题号（高数如 123，线代如 线12）、年份和卷别（如 2019数二）、考点名称（如 拐点），或题干里的文字。</p>
 {% endif %}
 {% endblock %}

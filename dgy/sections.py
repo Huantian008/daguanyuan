@@ -11,6 +11,9 @@ from pathlib import Path
 from .markdown import heading_ids
 
 LINKS_FILE = "question_links.json"
+# The page tables of the two sets of notes: 高数 (also the knowledge index page) and the 线代 mind map.
+INDEX_FILE = "00_总目录.md"
+XIANDAI_INDEX_FILE = "线代总目录.md"
 MAX_LINKS = 3
 
 # 00_总目录.md lists which PDF pages each Markdown chapter came from:  | 10–22 | [01 …](./01_函数极限连续.md) | …
@@ -85,10 +88,10 @@ def section_bodies(source: str) -> dict[str, str]:
 
 
 def load_sections(knowledge_md_dir: Path) -> dict[str, Section]:
-    index_md = knowledge_md_dir / "00_总目录.md"
     first_pages = {}
-    if index_md.exists():
-        first_pages = {name: first for name, first, _last in parse_markdown_index(index_md.read_text(encoding="utf-8"))}
+    for index_md in (knowledge_md_dir / INDEX_FILE, knowledge_md_dir / XIANDAI_INDEX_FILE):
+        if index_md.exists():
+            first_pages |= {name: first for name, first, _last in parse_markdown_index(index_md.read_text(encoding="utf-8"))}
     sections = {}
     for path in sorted(knowledge_md_dir.glob("[0-9][0-9]_*.md")):
         slug = path.name[:2]

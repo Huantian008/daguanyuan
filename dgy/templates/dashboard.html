@@ -49,6 +49,7 @@
     <header class="card-head"><h2>进度</h2><span class="muted">做过的题 / 要做的题</span></header>
     <ul class="progress">
       {% for p in progress %}
+      {% if loop.first or p.group != loop.previtem.group %}<li class="progress-group">{{ p.group }}</li>{% endif %}
       <li>
         <a class="progress-name" href="/bank/{{ p.code }}">{{ p.name }}</a>
         <span class="bar" aria-hidden="true"><span style="width: {{ p.percent }}%"></span></span>

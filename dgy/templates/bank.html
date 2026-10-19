@@ -6,10 +6,12 @@
   <h1>题库</h1>
   <form class="search" action="/bank/search" method="get" role="search">
     <label class="visually-hidden" for="q">搜索题目</label>
-    <input id="q" name="q" type="search" placeholder="题号、年份、考点或题干文字，如 123、2019数二、拐点">
+    <input id="q" name="q" type="search" placeholder="题号、年份、考点或题干文字，如 123、线12、2019数二、拐点">
     <button class="btn">搜索</button>
   </form>
 </header>
+{% for group, rows in groups %}
+<h2 class="group-title">{{ group }}</h2>
 <ul class="chapters">
   {% for p, dist in rows %}
   <li class="card chapter-card">
@@ -21,4 +23,5 @@
   </li>
   {% endfor %}
 </ul>
+{% endfor %}
 {% endblock %}

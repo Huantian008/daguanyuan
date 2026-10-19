@@ -1,6 +1,9 @@
 """Build content/ from the source PDFs.
 
-    .venv\\Scripts\\python -m pipeline.build
+    .venv/bin/python -m pipeline.build             # everything; the 线代 questions come from content/xiandai/
+    .venv/bin/python -m pipeline.build --xiandai   # only the 线代 questions and knowledge pages, 高数 left as it is
+
+The 线代 questions are extracted by `python -m pipeline.xiandai build` into content/xiandai/ and merged in here.
 """
 import json
 import shutil
@@ -14,9 +17,9 @@ from PIL import Image
 
 from . import sources
 from .answers import parse_answers
-from .chapters import CHAPTERS, chapter_of
+from .chapters import CHAPTERS, XIANDAI_CHAPTERS, XIANDAI_OFFSET, chapter_of
 from .imaging import extract_image, is_jpeg, render_clip, save_webp, trim_whitespace
-from .knowledge import QUESTION_CHAPTER_LINKS, parse_markdown_index, title_of
+from .knowledge import QUESTION_CHAPTER_LINKS, XIANDAI_CHAPTER_LINKS, parse_markdown_index, title_of
 from .questions import STATEMENT_FROM_SOLUTION, QuestionMeta, parse_questions, render_question
 from .solutions import ImageRef, align, parse_outline, solution_images
 from .validate import validate
@@ -132,18 +135,39 @@ def build_knowledge(content_dir: Path) -> list[dict]:
             "md": md_name,
             "pages": _render_pages(sources.GAOSHU_PDF, "gaoshu", range(first, last + 1), content_dir),
         })
-    with fitz.open(sources.XIANDAI_PDF) as doc:
-        count = doc.page_count
-        toc = [{"title": title, "page": page} for _level, title, page in doc.get_toc()]
-    entries.append({
-        "slug": "xiandai",
-        "title": "线性代数",
+    return entries + build_xiandai_knowledge(content_dir)
+
+
+def build_xiandai_knowledge(content_dir: Path) -> list[dict]:
+    """The 线代 mind map as six chapters, the files and page ranges of knowledge-md/线代总目录.md. A chapter whose
+    Markdown is not written yet shows only its original pages."""
+    from .xiandai_knowledge import knowledge_files
+
+    return [{
+        "slug": f.name[:2],
+        "title": f.title,
         "group": "线性代数",
-        "md": None,
-        "toc": toc,
-        "pages": _render_pages(sources.XIANDAI_PDF, "xiandai", range(1, count + 1), content_dir),
-    })
-    return entries
+        "md": f.name,
+        "pages": _render_pages(sources.XIANDAI_PDF, "xiandai", f.pages(), content_dir),
+    } for f in knowledge_files(MARKDOWN_DIR)]
+
+
+def merge_xiandai(manifest: dict, xiandai_dir: Path) -> dict:
+    """Put the 线代 chapters and questions built by pipeline.xiandai into the manifest, replacing any already there."""
+    codes = {c.code for c in XIANDAI_CHAPTERS}
+    manifest["chapters"] = [dict(c, group=c.get("group", "高等数学")) for c in manifest["chapters"] if c["code"] not in codes]
+    manifest["questions"] = [q for q in manifest["questions"] if q["num"] < XIANDAI_OFFSET]
+    manifest["chapter_links"] = {k: v for k, v in manifest["chapter_links"].items() if k not in codes}
+    manifest.pop("xiandai_alignment", None)
+    path = xiandai_dir / "manifest.json"
+    if not path.exists():
+        return manifest
+    xiandai = json.loads(path.read_text(encoding="utf-8"))
+    manifest["chapters"] += [dict(c, group="线性代数") for c in xiandai["chapters"]]
+    manifest["questions"] += xiandai["questions"]
+    manifest["chapter_links"] |= XIANDAI_CHAPTER_LINKS
+    manifest["xiandai_alignment"] = xiandai["alignment"]
+    return manifest
 
 
 def build(content_dir: Path = sources.CONTENT_DIR, only: set[int] | None = None, with_knowledge: bool = True) -> dict:
@@ -156,20 +180,41 @@ def build(content_dir: Path = sources.CONTENT_DIR, only: set[int] | None = None,
     manifest = {
         "version": 1,
         "built_at": datetime.now().isoformat(timespec="seconds"),
-        "chapters": [{"code": c.code, "name": c.name, "first": c.first, "last": c.last} for c in CHAPTERS],
-        "chapter_links": QUESTION_CHAPTER_LINKS,
+        "chapters": [{"code": c.code, "name": c.name, "first": c.first, "last": c.last, "group": "高等数学"} for c in CHAPTERS],
+        "chapter_links": dict(QUESTION_CHAPTER_LINKS),
         "questions": questions,
         "knowledge": knowledge,
         "alignment": alignment,
     }
-    (content_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
+    merge_xiandai(manifest, content_dir / "xiandai")
+    _write_manifest(manifest, content_dir)
     return manifest
 
 
-def main() -> int:
+def rebuild_xiandai(content_dir: Path = sources.CONTENT_DIR) -> dict:
+    """Refresh only the 线代 part of an existing content/: its questions (from content/xiandai/, built by
+    `python -m pipeline.xiandai build`) and its knowledge pages. The 高数 part is left as it is."""
+    manifest = json.loads((content_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest["knowledge"] = [k for k in manifest["knowledge"] if k["group"] != "线性代数"] + build_xiandai_knowledge(content_dir)
+    manifest["built_at"] = datetime.now().isoformat(timespec="seconds")
+    merge_xiandai(manifest, content_dir / "xiandai")
+    _write_manifest(manifest, content_dir)
+    return manifest
+
+
+def _write_manifest(manifest: dict, content_dir: Path) -> None:
+    (content_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
     started = time.time()
-    print(f"[大观园] 从 {sources.SOURCE_DIR} 提取内容到 {sources.CONTENT_DIR}", flush=True)
-    manifest = build()
+    if argv == ["--xiandai"]:
+        print(f"[大观园] 只更新 {sources.CONTENT_DIR} 里的线代部分", flush=True)
+        manifest = rebuild_xiandai()
+    else:
+        print(f"[大观园] 从 {sources.SOURCE_DIR} 提取内容到 {sources.CONTENT_DIR}", flush=True)
+        manifest = build()
     report = validate(manifest, sources.CONTENT_DIR)
     print(report.render())
     print(f"用时 {time.time() - started:.0f} 秒")

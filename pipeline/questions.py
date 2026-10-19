@@ -51,6 +51,14 @@ def _content_blocks(page: fitz.Page) -> list[tuple[int, fitz.Rect]]:
     return [(xref, fitz.Rect(bbox) * to_page) for xref, name, _invoker, bbox in page.get_xobjects() if name.startswith("fzFrm")]
 
 
+def form_below(page: fitz.Page, blocks: list[tuple[int, fitz.Rect]], bar_bottom: float, label: str) -> tuple[int, fitz.Rect]:
+    """The first content form under an info bar: the question it introduces."""
+    below = [b for b in blocks if b[1].y0 >= bar_bottom - 2]
+    if not below:
+        raise ValueError(f"page {page.number + 1}: no content block under #{label}")
+    return min(below, key=lambda b: b[1].y0)
+
+
 def _source_page(doc: fitz.Document, fullpage: int) -> fitz.Page:
     """A scratch page that draws a whole source page with no clip. Added in memory only; the PDF is never saved."""
     x0, y0, x1, y1 = _numbers(doc.xref_get_key(fullpage, "BBox")[1])
@@ -155,10 +163,7 @@ def parse_questions(pdf_path) -> list[QuestionMeta]:
                 meta = META.match(bar.group(3).replace("\n", " ").strip())
                 if not meta:
                     raise ValueError(f"page {page.number + 1}: unexpected info bar {text!r}")
-                below = [b for b in blocks if b[1].y0 >= bar_bottom - 2]
-                if not below:
-                    raise ValueError(f"page {page.number + 1}: no content block under #{bar.group(1)}")
-                form, rect = min(below, key=lambda b: b[1].y0)
+                form, rect = form_below(page, blocks, bar_bottom, bar.group(1))
                 found.append(QuestionMeta(
                     num=int(bar.group(1)),
                     kp=bar.group(2).strip(),

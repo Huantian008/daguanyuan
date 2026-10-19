@@ -10,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import db, stats
 from .config import DEFAULT_EXAM_DATE, DEFAULT_WARMUP_DAYS
-from .content import Content
+from .content import Content, qlabel, qshort
 from .srs import GRADE_LABELS, CardState
 from .studyday import study_day
 
@@ -30,6 +30,8 @@ TEMPLATES.env.filters.update(
     cn_date=cn_date,
     stars=stars,
     grade_label=lambda g: GRADE_LABELS.get(g, "未做"),
+    qlabel=qlabel,
+    qshort=qshort,
 )
 
 

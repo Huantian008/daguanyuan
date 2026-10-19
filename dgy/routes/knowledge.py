@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..content import Content
 from ..markdown import render_markdown
-from ..web import TEMPLATES, UserState, bank, get_conn, render, user_state
+from ..web import TEMPLATES, UserState, bank, get_conn, redirect, render, user_state
 
 router = APIRouter()
 
@@ -41,6 +41,8 @@ def index(request: Request):
 @router.get("/knowledge/{slug}")
 def page(request: Request, slug: str, tab: str = "original", conn=Depends(get_conn)):
     content = bank(request)
+    if slug == "xiandai" and content.knowledge_entry("10"):
+        return redirect("/knowledge/10")  # the 线代 mind map used to be one page; it is now one per chapter, 10–15
     entry = content.knowledge_entry(slug)
     if entry is None:
         raise HTTPException(404, "没有这一章知识点")

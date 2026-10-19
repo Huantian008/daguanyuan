@@ -29,8 +29,12 @@ class Report:
 
 
 def validate(manifest: dict, content_dir: Path, expected: int = 613) -> Report:
+    """The 高数 questions, the knowledge pages, and the 线代 questions when there are any (see pipeline.xiandai)."""
+    from .xiandai import XIANDAI_OFFSET, validate as validate_xiandai
+
     report = Report()
-    questions = manifest["questions"]
+    questions = [q for q in manifest["questions"] if q["num"] < XIANDAI_OFFSET]
+    xiandai = [q for q in manifest["questions"] if q["num"] >= XIANDAI_OFFSET]
     if [q["num"] for q in questions] != list(range(1, expected + 1)):
         report.errors.append(f"题号应为 1–{expected}，实际 {len(questions)} 题")
 
@@ -71,6 +75,13 @@ def validate(manifest: dict, content_dir: Path, expected: int = 613) -> Report:
     report.summary = (f"题面 {images}/{expected}，答案 {answers}/{expected}，"
                       f"解析 {solved}/{expected}（共 {solution_images} 张图），"
                       f"知识点 {len(manifest['knowledge'])} 章")
+    if xiandai:
+        alignment = manifest.get("xiandai_alignment", {"weak": [], "skipped": []})
+        part = validate_xiandai({"questions": xiandai, "alignment": {"weak": alignment["weak"], "skipped": []}},
+                                content_dir / "xiandai")
+        report.errors += part.errors
+        report.notes += part.notes
+        report.summary += "；" + part.summary
     return report
 
 

@@ -3,7 +3,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from .bank import QuestionText, load_bank
+from .bank import XIANDAI_OFFSET, QuestionText, load_bank
 from .sections import Section, load_links, load_sections
 
 
@@ -23,15 +23,20 @@ class Question:
     path: tuple[str, ...]
     source: str
     source_full: str
-    orig_page: int
-    difficulty: float
-    stars: int
-    minutes: int
-    quick_id: str
+    # Only the 高数 做题本 has these; the 线代 book has no difficulty, minutes or 答案速查 (answer image).
+    orig_page: int | None
+    difficulty: float | None
+    stars: int | None
+    minutes: int | None
+    quick_id: str | None
     flags: tuple[str, ...]
     img: Image
-    answer: Image
+    answer: Image | None
     solution: tuple[Image, ...]
+
+    @property
+    def label(self) -> str:
+        return qlabel(self.num)
 
 
 @dataclass(frozen=True)
@@ -40,6 +45,25 @@ class ChapterInfo:
     name: str
     first: int
     last: int
+    group: str = "高等数学"
+
+
+def qlabel(num: int) -> str:
+    """How a question is named on the site: #001 for 高数, 线001 for 线代."""
+    return f"线{num - XIANDAI_OFFSET:03d}" if num > XIANDAI_OFFSET else f"#{num:03d}"
+
+
+def qshort(num: int) -> str:
+    """The short form on number chips: 001, 线001."""
+    return qlabel(num).lstrip("#")
+
+
+def parse_label(term: str) -> int | None:
+    """The question number a search term names: 123 or #123 for 高数, 线12 or 线012 for 线代."""
+    term = term.strip().lstrip("#")
+    if term.startswith("线") and term[1:].isdigit():
+        return int(term[1:]) + XIANDAI_OFFSET
+    return int(term) if term.isdigit() else None
 
 
 def _question(d: dict) -> Question:
@@ -58,7 +82,7 @@ def _question(d: dict) -> Question:
         quick_id=d["quick_id"],
         flags=tuple(d["flags"]),
         img=Image(**d["img"]),
-        answer=Image(**d["answer"]),
+        answer=Image(**d["answer"]) if d["answer"] else None,
         solution=tuple(Image(**s) for s in d["solution"]),
     )
 
@@ -81,6 +105,21 @@ class Content:
 
     def chapter(self, code: str) -> ChapterInfo:
         return next(c for c in self.chapters if c.code == code)
+
+    def groups(self) -> list[tuple[str, list[ChapterInfo]]]:
+        """The chapters under their subject (高等数学, 线性代数), in book order."""
+        out: list[tuple[str, list[ChapterInfo]]] = []
+        for c in self.chapters:
+            if not out or out[-1][0] != c.group:
+                out.append((c.group, []))
+            out[-1][1].append(c)
+        return out
+
+    def neighbors(self, num: int) -> tuple[int | None, int | None]:
+        """The previous and next question in the same book."""
+        book = [n for n in sorted(self.questions) if (n > XIANDAI_OFFSET) == (num > XIANDAI_OFFSET)]
+        at = book.index(num)
+        return (book[at - 1] if at > 0 else None, book[at + 1] if at + 1 < len(book) else None)
 
     def in_chapter(self, code: str) -> list[Question]:
         return [q for _num, q in sorted(self.questions.items()) if q.chapter == code]

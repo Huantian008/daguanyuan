@@ -11,7 +11,7 @@
     {% set q = questions.get(r.num) %}
     <li>
       <span class="muted time">{{ r.reviewed_at.strftime('%H:%M') }}</span>
-      <a href="/q/{{ r.num }}"><span class="qnum">#{{ '%03d' % r.num }}</span> {{ q.kp if q else '' }}</a>
+      <a href="/q/{{ r.num }}"><span class="qnum">{{ r.num|qlabel }}</span> {{ q.kp if q else '' }}</a>
       <span class="chip chip-{{ r.grade }}">{{ r.grade|grade_label }}</span>
     </li>
     {% endfor %}
