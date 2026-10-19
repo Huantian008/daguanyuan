@@ -14,8 +14,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 这个项目是什么
 
-用户的考研数学二刷题站（2027 考研，2026 年 12 月 19 日初试）。题目、答案、解析都从用户本机的
-《大观严选》PDF 提取，不依赖外网。同一套内容有两份实现：
+用户的考研数学二刷题站（2027 考研，2026 年 12 月 19 日初试）。题目、答案、解析都从用户本机的 PDF 提取，不依赖外网：
+高数 613 题来自《大观严选》，线代 355 题来自《线代臻选题》（2026-10-19 上线，两本书的约定见 `AGENTS.md` 的
+「Two question books」）。同一套内容有两份实现：
 
 | 实现 | 位置 | 何时用 |
 |---|---|---|
@@ -32,10 +33,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 的知识点、`meta.json` 里的 URL 版本号）。Worker 打包时把 generated 里的 JSON 编进去，所以题库、知识点、CSS/JS
 改了之后都要重新 export 才会上线。题目内容从不进数据库，两边的数据库只存做题进度。
 
+**线代这本书**：`python -m pipeline.xiandai build` 从 `【合集】A4版知识点/` 里的题目本和答案本抽到 `content/xiandai/`：
+- 题图按信息条切；
+- 解析按答案本书签之间的区域逐页渲染，这样文字层的「答案（D）」也在图里；
+- 线代没有答案速查，所以没有答案图。
+
+`pipeline.build` 把它并进主 manifest（`--xiandai` 只重建线代部分），网站内部题号是 1001–1355，显示为「线001」。
+线代的知识点是 31 页框图导图，文字版在 `knowledge-md/10_行列式.md`–`15_二次型.md`，页码表在 `knowledge-md/线代总目录.md`；
+`/knowledge/xiandai` 跳到 `/knowledge/10`。
+
 **逐题知识点标注**：`dgy/sections.py` 把文字版带编号的 h2/h3 解析成小节（key 如 `01/7.3`，含页面 anchor 和原版页序号），
 `knowledge-md/question_links.json` 记每题 1–3 个小节 key（进 git）。export 时两者写进 `edge/src/generated/sections.json`。
-613 题已全部标注（由 DeepSeek 完成，`python -m pipeline.link_questions check --write`
-校验通过后写入；当时的交接文档已删，要重做可在 git 历史的 `docs/deepseek/` 里找）。文件缺失时页面退回整章链接。
+613 道高数题已全部标注（由 DeepSeek 完成，`python -m pipeline.link_questions check --write` 校验通过后写入；
+当时的交接文档已删，要重做可在 git 历史的 `docs/deepseek/` 里找）。
+
+355 道线代题由千问（Qoder）按 `docs/deepseek/线代知识点标注.md` 标注，经 `python -m pipeline.link_xiandai check --write`
+写入；线代题号用 1001–1355，小节只用 `10`–`15`。两个工具写入时都只替换自己那本书的条目。
+
+文件缺失时页面退回整章链接。
 
 **题目文字版**：题干和答案速查已由能看图的模型从图片转成 Markdown + LaTeX（交接文档同样已删，在 git 历史里），
 经 `python -m pipeline.transcribe_questions check --write` 校验后写入
@@ -44,6 +59,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 网站用 `dgy/bank.py` 读它：Python 版启动时渲染成 HTML（`DGY_BANK_DIR` 可改位置），Worker 版由 `export_edge` 写进
 `generated/bank.json`；公式在浏览器里用 KaTeX 渲染。题卡和题目页默认显示文字（带图的题默认原图，可切换，偏好存本机），
 文件缺失时退回纯图片。
+
+线代的文字版在 `bank-md/xiandai.json`（用书上题号，加载时加 1000），由 DeepSeek 和千问按 `docs/deepseek/线代题目转写.md` 转写，
+经 `python -m pipeline.transcribe_xiandai check --write` 写入。线代的答案是从解析里读出来的：
+- 结果文件里的 `answer_basis` 记 `label`（解析标了「答案」）或 `derived`（取解析结论，189 题，没有逐题验算）；
+- 题目本印得和原书不一样的 12 题，题干按原书写。
+
+两个转写校验都会拦下 KaTeX 能编译但显示错的写法：
+- 公式里的全角标点；
+- 矩阵换行后少了反斜杠的命令，例如 `\\dfrac`（见 `transcribe_questions.math_slips`）。
+
+导图转写由 `python -m pipeline.xiandai_knowledge check --write` 写进 `knowledge-md/`，里面还留着 10 处
+`<!-- 待核：… -->`，是看不清的手写字。
 
 **做题只在题卡上**：章节页 `/bank/<章>?kp=<序号>` 一个考点一页，热身和到期复习是 `/review/warmup`、`/review/due`，
 都用同一个题卡（`_macros.html` 的 `qcard` / `views/parts.ts` 的 `questionCard`），打分都走 `POST /q/<num>/grade`，
