@@ -5,7 +5,7 @@
     .venv/bin/python -m pipeline.link_questions check --write  # ... and, with no errors, write knowledge-md/question_links.json
 
 All 613 questions are tagged; the task description for DeepSeek (docs/deepseek/) was removed once the work
-was merged and is still in git history.
+was merged and is still in git history. The 线代 questions go through pipeline.link_xiandai, which reuses this.
 """
 import argparse
 import json
@@ -19,9 +19,13 @@ from pathlib import Path
 from dgy.sections import LINKS_FILE, MAX_LINKS, Section, load_sections, section_bodies
 
 from . import sources
+from .chapters import CHAPTERS
 from .knowledge import QUESTION_CHAPTER_LINKS
 
 WORK_DIR = sources.CONTENT_DIR / "linking"
+# The 高数 notes, 01–09; the 线代 mind map's chapters 10–15 are tagged separately.
+GAOSHU_SLUGS = frozenset(slug for slugs in QUESTION_CHAPTER_LINKS.values() for slug in slugs)
+GAOSHU_NUMS = range(CHAPTERS[0].first, CHAPTERS[-1].last + 1)
 MARKDOWN_DIR = sources.PROJECT_ROOT / "knowledge-md"
 EXCERPT_CHARS = 120
 SAMPLE_SIZE = 40
@@ -30,7 +34,8 @@ CONFIDENCE = ("high", "low")
 _COMMENT = re.compile(r"<!--.*?-->", re.S)
 _TAG = re.compile(r"</?[a-zA-Z][^<>]*>")  # HTML tags only, not the < and > of math
 _IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
-_LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
+# A link to another file, a page anchor or the web; [a+(n-1)b](a-b) in a formula is not one.
+_LINK = re.compile(r"\[([^\]]*)\]\((?:\.{0,2}/|#|https?:)[^)]*\)")
 _TABLE_RULE = re.compile(r"^\s*\|?(\s*:?-{3,}:?\s*\|)+\s*:?-*:?\s*$", re.M)
 # Bold, blockquote and list markers, and table cell bars (a bar at a line end or with spaces around it, unlike |x|).
 _MARKUP = re.compile(r"(\*\*|__|^>+|^\s*[-*+] |^\s*\d+\. |^\s*\||\|\s*$|\s\|\s)", re.M)
@@ -66,6 +71,11 @@ def catalog_markdown(sections: dict[str, Section], chapter_titles: dict[str, str
     return "\n".join(lines)
 
 
+def book_sections(markdown_dir: Path, slugs: frozenset[str]) -> dict[str, Section]:
+    """The sections of one book's notes: 高数 01–09 or 线代 10–15."""
+    return {key: s for key, s in load_sections(markdown_dir).items() if s.slug in slugs}
+
+
 def question_text(page, rect) -> str:
     return re.sub(r"\s+", " ", page.get_text("text", clip=rect)).strip()
 
@@ -78,7 +88,7 @@ def prepare(work_dir: Path = WORK_DIR, markdown_dir: Path = MARKDOWN_DIR, conten
     manifest = json.loads((content_dir / "manifest.json").read_text(encoding="utf-8"))
     chapter_names = {c["code"]: c["name"] for c in manifest["chapters"]}
     chapter_titles = {k["slug"]: k["title"] for k in manifest["knowledge"]}
-    sections = load_sections(markdown_dir)
+    sections = book_sections(markdown_dir, GAOSHU_SLUGS)
     bodies = {p.name[:2]: section_bodies(p.read_text(encoding="utf-8")) for p in markdown_dir.glob("0[1-9]_*.md")}
 
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -163,7 +173,8 @@ def check_defaults(defaults: dict, kp_groups: list[dict], sections: dict[str, Se
 
 
 def check_results(entries: list[tuple[str, dict]], questions: list[dict], sections: dict[str, Section],
-                  defaults: dict[str, list[str]], kp_groups: list[dict], report: Report) -> None:
+                  defaults: dict[str, list[str]], kp_groups: list[dict], report: Report,
+                  chapter_links: dict[str, list[str]] = QUESTION_CHAPTER_LINKS) -> None:
     by_num = {q["num"]: q for q in questions}
     group_of = {num: g["id"] for g in kp_groups for num in g["nums"]}
     seen: dict[int, str] = {}
@@ -187,7 +198,7 @@ def check_results(entries: list[tuple[str, dict]], questions: list[dict], sectio
             continue
         report.links[num] = keys
         q = by_num[num]
-        if sections[keys[0]].slug not in QUESTION_CHAPTER_LINKS.get(q["chapter"], []):
+        if sections[keys[0]].slug not in chapter_links.get(q["chapter"], []):
             report.warnings.append(f"#{num:03d}（{q['chapter_name']} / {q['kp']}）主小节 {keys[0]} 不在本章对应的知识点章节里")
         default = defaults.get(group_of.get(num, ""), [])
         if default and not set(keys) & set(default):
@@ -216,9 +227,10 @@ def _load_json(path: Path, report: Report):
         return None
 
 
-def check(work_dir: Path = WORK_DIR, markdown_dir: Path = MARKDOWN_DIR) -> Report:
+def check(work_dir: Path = WORK_DIR, markdown_dir: Path = MARKDOWN_DIR, slugs: frozenset[str] = GAOSHU_SLUGS,
+          chapter_links: dict[str, list[str]] = QUESTION_CHAPTER_LINKS) -> Report:
     report = Report()
-    sections = load_sections(markdown_dir)
+    sections = book_sections(markdown_dir, slugs)
     questions = [json.loads(line) for line in (work_dir / "questions.jsonl").read_text(encoding="utf-8").splitlines() if line]
     kp_groups = json.loads((work_dir / "kp_groups.json").read_text(encoding="utf-8"))
 
@@ -242,14 +254,18 @@ def check(work_dir: Path = WORK_DIR, markdown_dir: Path = MARKDOWN_DIR) -> Repor
             continue
         entries += [(path.name, item) for item in items if isinstance(item, dict)]
     if entries:
-        check_results(entries, questions, sections, defaults, kp_groups, report)
+        check_results(entries, questions, sections, defaults, kp_groups, report, chapter_links)
     else:
         report.errors.append("out/ 里还没有逐题结果（第二阶段）")
     return report
 
 
-def write_links(links: dict[int, list[str]], markdown_dir: Path = MARKDOWN_DIR) -> Path:
+def write_links(links: dict[int, list[str]], markdown_dir: Path = MARKDOWN_DIR, book: range = GAOSHU_NUMS) -> Path:
+    """Replace one book's links (`book` is its site numbers) and keep the other book's."""
     path = markdown_dir / LINKS_FILE
+    if path.exists():
+        kept = {int(num): keys for num, keys in json.loads(path.read_text(encoding="utf-8"))["links"].items() if int(num) not in book}
+        links = kept | links
     # One question per line, so a change to one question's tags is a one-line diff.
     rows = ",\n".join(f'  "{num}": {json.dumps(links[num], ensure_ascii=False)}' for num in sorted(links))
     path.write_text(f'{{\n "version": 1,\n "links": {{\n{rows}\n }}\n}}\n', encoding="utf-8")

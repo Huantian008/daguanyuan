@@ -26,6 +26,7 @@ def test_excerpt_keeps_math_and_drops_markup():
     body = "<!-- p.10 -->\n> **有界** 若 $0<|x-x_0|<\\delta$，见 [2.3](./01_x.md#23)\n| a | b |\n|---|---|\n| c | d |"
     assert lq.excerpt(body) == "有界 若 $0<|x-x_0|<\\delta$，见 2.3 a b c d"
     assert lq.excerpt("字" * 200, limit=5) == "字字字字字…"
+    assert lq.excerpt("$$=[a+(n-1)b](a-b)^{n-1}$$") == "$$=[a+(n-1)b](a-b)^{n-1}$$"
 
 
 def test_catalog_lists_keys_with_children():
@@ -88,3 +89,10 @@ def test_write_links_sorts_by_number(tmp_path):
     path = lq.write_links({10: ["01/7.3"], 2: ["01/7.2", "01/7.3"]}, tmp_path)
     data = json.loads(path.read_text(encoding="utf-8"))
     assert list(data["links"]) == ["2", "10"] and data["version"] == 1
+
+
+def test_write_links_replaces_one_book_and_keeps_the_other(tmp_path):
+    lq.write_links({2: ["01/7.2"], 1001: ["10/1.1"]}, tmp_path, book=range(1, 2000))
+    lq.write_links({3: ["01/7.3"]}, tmp_path)  # 高数 again: #002 goes, 线代 1001 stays
+    data = json.loads((tmp_path / "question_links.json").read_text(encoding="utf-8"))
+    assert data["links"] == {"3": ["01/7.3"], "1001": ["10/1.1"]}
