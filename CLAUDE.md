@@ -69,8 +69,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 公式里的全角标点；
 - 矩阵换行后少了反斜杠的命令，例如 `\\dfrac`（见 `transcribe_questions.math_slips`）。
 
-导图转写由 `python -m pipeline.xiandai_knowledge check --write` 写进 `knowledge-md/`，里面还留着 10 处
-`<!-- 待核：… -->`，是看不清的手写字。
+导图转写由 `python -m pipeline.xiandai_knowledge check --write` 写进 `knowledge-md/`。转写时留下的 10 处看不清的手写字
+（`<!-- 待核：… -->`）已由千问 3.8 Max 对照放大图核对、改定，注释已删。导图作者手写的 r 形似「Y」。
 
 **做题只在题卡上**：章节页 `/bank/<章>?kp=<序号>` 一个考点一页，热身和到期复习是 `/review/warmup`、`/review/due`，
 都用同一个题卡（`_macros.html` 的 `qcard` / `views/parts.ts` 的 `questionCard`），打分都走 `POST /q/<num>/grade`，
