@@ -6,6 +6,7 @@ content/
 data/
 *.pdf
 .claude/
+.workbuddy-ai/
 edge/node_modules/
 edge/public/
 edge/.wrangler/
