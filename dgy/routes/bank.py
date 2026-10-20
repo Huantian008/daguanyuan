@@ -87,12 +87,12 @@ def exclude(request: Request, excluded: str = Form(...), nums: str = Form(""), c
 def grade(request: Request, num: int, grade: str = Form(""), back: str = Form(""), mode: str = Form(""),
           conn=Depends(get_conn)):
     """Grade a question from the chapter page or a review page.
-    A question graded today is left alone, so a double click is one review."""
+    Grading it again the same study day changes that day's grade."""
     content = bank(request)
     q = content.questions.get(num)
     if q is None:
         raise HTTPException(404, "没有这道题")
-    if grade in GRADES and num not in db.graded_on(conn, today(request)):
+    if grade in GRADES:
         db.record_review(conn, num, grade, now(request), mode if mode in REVIEW_PAGES else "browse")
     return redirect(safe_back(back, f"/bank/{q.chapter}#q-{num}"))
 

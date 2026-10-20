@@ -69,7 +69,7 @@ export function questionCard(
 ): Html {
   const excluded = status === "excluded";
   const gradeButton = (grade: Grade, label: string) =>
-    html`<button name="grade" value="${grade}" class="qc-grade qc-grade-${grade}${graded === grade ? " is-picked" : ""}"${graded ? raw(" disabled") : ""}>${label}</button>`;
+    html`<button name="grade" value="${grade}" class="qc-grade qc-grade-${grade}${graded === grade ? " is-picked" : ""}">${label}</button>`;
   return html`<article class="qcard${excluded ? " is-excluded" : ""}" id="q-${q.num}"${text?.answer_key ? raw(" data-choice") : ""}>
   <header class="qc-head">
     <strong class="qc-num" title="${qlabel(q.num)}">${index}</strong>
@@ -89,7 +89,6 @@ export function questionCard(
     </div>
     <form method="post" action="/q/${q.num}/grade" class="qc-grades">
       <input type="hidden" name="back" value="${back}">${hidden("mode", x.mode)}
-      ${graded ? html`<span class="qc-graded">今天已评</span>` : ""}
       ${gradeButton("shaky", "不熟练")}
       ${gradeButton("unknown", "不会")}
       ${gradeButton("mastered", "掌握")}

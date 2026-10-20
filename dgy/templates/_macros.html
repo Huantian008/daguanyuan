@@ -72,10 +72,9 @@
     </div>
     <form method="post" action="/q/{{ q.num }}/grade" class="qc-grades">
       <input type="hidden" name="back" value="{{ back }}">{% if mode %}<input type="hidden" name="mode" value="{{ mode }}">{% endif %}
-      {% if graded %}<span class="qc-graded">今天已评</span>{% endif %}
-      <button name="grade" value="shaky" class="qc-grade qc-grade-shaky{% if graded == 'shaky' %} is-picked{% endif %}"{% if graded %} disabled{% endif %}>不熟练</button>
-      <button name="grade" value="unknown" class="qc-grade qc-grade-unknown{% if graded == 'unknown' %} is-picked{% endif %}"{% if graded %} disabled{% endif %}>不会</button>
-      <button name="grade" value="mastered" class="qc-grade qc-grade-mastered{% if graded == 'mastered' %} is-picked{% endif %}"{% if graded %} disabled{% endif %}>掌握</button>
+      <button name="grade" value="shaky" class="qc-grade qc-grade-shaky{% if graded == 'shaky' %} is-picked{% endif %}">不熟练</button>
+      <button name="grade" value="unknown" class="qc-grade qc-grade-unknown{% if graded == 'unknown' %} is-picked{% endif %}">不会</button>
+      <button name="grade" value="mastered" class="qc-grade qc-grade-mastered{% if graded == 'mastered' %} is-picked{% endif %}">掌握</button>
     </form>
   </div>
   <section class="qc-panel" id="qa-{{ q.num }}" data-panel="answer" aria-label="答案">{{ answer_part(q, text) }}</section>

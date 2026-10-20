@@ -3,7 +3,7 @@
  * of the one-by-one practice page, which is gone; their rows stay for the backup.
  * Every table has a user_id and every query below filters or writes by it, so users never see each other's rows.
  */
-import { NEW_CARD, schedule, type CardState, type Grade } from "./srs";
+import { cardFrom, NEW_CARD, schedule, type CardState, type Grade } from "./srs";
 import type { Review } from "./stats";
 import { shanghaiIso, studyDay, type Day } from "./studyday";
 
@@ -32,12 +32,35 @@ export interface ReviewInput {
   mode: string;
 }
 
+/**
+ * Grade a question. The first grade of a study day is a new review. Grading it again that day changes that review
+ * instead, so a misclick is put right rather than counted twice: the card is worked out again from the days before,
+ * and the review keeps its time and mode. The same grade again changes nothing, so a double click is one review.
+ */
 export async function recordReview(db: D1Database, uid: number, input: ReviewInput): Promise<CardState> {
   const day = studyDay(input.at);
-  const card = schedule(await getCard(db, uid, input.num), input.grade, day);
+  const [{ results: history }, current] = await Promise.all([
+    db.prepare("SELECT id, grade, study_day FROM reviews WHERE user_id = ? AND num = ? ORDER BY reviewed_at, id")
+      .bind(uid, input.num).all<{ id: number; grade: Grade; study_day: Day }>(),
+    getCard(db, uid, input.num),
+  ]);
+  const sameDay = history.filter((r) => r.study_day === day);
+  if (sameDay.length && sameDay[sameDay.length - 1].grade === input.grade) return current;
+  const card = sameDay.length
+    ? schedule(cardFrom(history.filter((r) => r.study_day < day).map((r): [Grade, Day] => [r.grade, r.study_day])), input.grade, day)
+    : schedule(current, input.grade, day);
+  const log = sameDay.length
+    ? [
+      db.prepare("UPDATE reviews SET grade = ? WHERE user_id = ? AND id = ?").bind(input.grade, uid, sameDay[0].id),
+      // a double click can leave two reviews of the day; the changed one is all that stays
+      db.prepare("DELETE FROM reviews WHERE user_id = ? AND num = ? AND study_day = ? AND id <> ?").bind(uid, input.num, day, sameDay[0].id),
+    ]
+    : [
+      db.prepare("INSERT INTO reviews (user_id, num, grade, reviewed_at, study_day, mode) VALUES (?, ?, ?, ?, ?, ?)")
+        .bind(uid, input.num, input.grade, shanghaiIso(input.at), day, input.mode),
+    ];
   await db.batch([
-    db.prepare("INSERT INTO reviews (user_id, num, grade, reviewed_at, study_day, mode) VALUES (?, ?, ?, ?, ?, ?)")
-      .bind(uid, input.num, input.grade, shanghaiIso(input.at), day, input.mode),
+    ...log,
     db.prepare("INSERT INTO cards (user_id, num, level, due, last_grade, reps, lapses) VALUES (?, ?, ?, ?, ?, ?, ?) "
       + "ON CONFLICT (user_id, num) DO UPDATE SET level = excluded.level, due = excluded.due, "
       + "last_grade = excluded.last_grade, reps = excluded.reps, lapses = excluded.lapses")

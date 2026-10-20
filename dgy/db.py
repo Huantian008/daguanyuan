@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 
-from .srs import CardState, schedule
+from .srs import CardState, card_from, schedule
 from .studyday import TZ, study_day
 
 SCHEMA = """
@@ -98,14 +98,29 @@ def all_cards(conn: sqlite3.Connection) -> dict[int, CardState]:
 
 
 def record_review(conn: sqlite3.Connection, num: int, grade: str, at: datetime, mode: str) -> CardState:
+    """Grade a question. The first grade of a study day is a new review. Grading it again that day changes that review
+    instead, so a misclick is put right rather than counted twice: the card is worked out again from the days before,
+    and the review keeps its time and mode. The same grade again changes nothing, so a double click is one review."""
     at = at.astimezone(TZ)
     day = study_day(at)
-    card = schedule(get_card(conn, num), grade, day)
+    history = conn.execute("SELECT id, grade, study_day FROM reviews WHERE num = ? ORDER BY reviewed_at, id", (num,)).fetchall()
+    same_day = [r for r in history if r["study_day"] == day.isoformat()]
+    if same_day and same_day[-1]["grade"] == grade:
+        return get_card(conn, num)
     with conn:
-        conn.execute(
-            "INSERT INTO reviews (num, grade, reviewed_at, study_day, mode) VALUES (?, ?, ?, ?, ?)",
-            (num, grade, at.isoformat(), day.isoformat(), mode),
-        )
+        if same_day:
+            earlier = [(r["grade"], date.fromisoformat(r["study_day"])) for r in history if r["study_day"] < day.isoformat()]
+            card = schedule(card_from(earlier), grade, day)
+            conn.execute("UPDATE reviews SET grade = ? WHERE id = ?", (grade, same_day[0]["id"]))
+            # a double click can leave two reviews of the day; the changed one is all that stays
+            conn.execute("DELETE FROM reviews WHERE num = ? AND study_day = ? AND id <> ?",
+                         (num, day.isoformat(), same_day[0]["id"]))
+        else:
+            card = schedule(get_card(conn, num), grade, day)
+            conn.execute(
+                "INSERT INTO reviews (num, grade, reviewed_at, study_day, mode) VALUES (?, ?, ?, ?, ?)",
+                (num, grade, at.isoformat(), day.isoformat(), mode),
+            )
         conn.execute(
             "INSERT INTO cards (num, level, due, last_grade, reps, lapses) VALUES (?, ?, ?, ?, ?, ?) "
             "ON CONFLICT (num) DO UPDATE SET level = excluded.level, due = excluded.due, "

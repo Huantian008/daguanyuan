@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from dgy.srs import CardState, schedule
+from dgy.srs import CardState, card_from, schedule
 
 TODAY = date(2026, 10, 16)
 
@@ -37,3 +37,13 @@ def test_unknown_resets_to_level_1_and_counts_a_lapse():
 def test_rejects_unknown_grade():
     with pytest.raises(ValueError):
         schedule(CardState(), "perfect", TODAY)
+
+
+def test_card_from_no_reviews_is_a_new_card():
+    assert card_from([]) == CardState()
+
+
+def test_card_from_schedules_each_review_in_turn_oldest_first():
+    later, last = date(2026, 10, 23), date(2026, 10, 26)
+    history = [("mastered", TODAY), ("shaky", later), ("unknown", last)]
+    assert card_from(history) == schedule(schedule(schedule(CardState(), "mastered", TODAY), "shaky", later), "unknown", last)

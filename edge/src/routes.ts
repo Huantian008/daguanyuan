@@ -136,18 +136,16 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     return c.redirect(safeBack(str(form.back), "/bank"), 303);
   });
 
-  // Grade a question from the chapter page or a review page. A question graded today is left alone, so a double click is one review.
+  // Grade a question from the chapter page or a review page. Grading it again the same study day changes that day's grade.
   app.post("/q/:num/grade", async (c) => {
-    const DB = c.env.DB;
-    const uid = c.get("user").id;
     const num = intOrNull(c.req.param("num"));
     const q = num === null ? undefined : content.questions.get(num);
     if (!q) return c.notFound();
     const form = await c.req.parseBody();
     const grade = str(form.grade);
     const mode = str(form.mode);
-    if (isGrade(grade) && !(await db.gradedOn(DB, uid, today())).has(q.num)) {
-      await db.recordReview(DB, uid, { num: q.num, grade, at: now(), mode: isReviewMode(mode) ? mode : "browse" });
+    if (isGrade(grade)) {
+      await db.recordReview(c.env.DB, c.get("user").id, { num: q.num, grade, at: now(), mode: isReviewMode(mode) ? mode : "browse" });
     }
     return c.redirect(safeBack(str(form.back), `/bank/${q.chapter}#q-${q.num}`), 303);
   });

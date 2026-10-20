@@ -38,3 +38,7 @@ export function schedule(state: CardState, grade: Grade, today: Day): CardState 
     lapses: state.lapses + (grade === "unknown" ? 1 : 0),
   };
 }
+
+/** The card a question's reviews lead to, oldest first, as [grade, study day]. Every stored card was built this way. */
+export const cardFrom = (history: [Grade, Day][]): CardState =>
+  history.reduce((card, [grade, day]) => schedule(card, grade, day), NEW_CARD);

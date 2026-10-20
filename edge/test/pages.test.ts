@@ -134,11 +134,15 @@ describe("warm-up and due review", () => {
     const res = await client.post("/q/1/grade", { grade: "mastered", mode: "warmup", back: "/review/warmup#q-1" });
     expect(res.headers.get("location")).toBe("/review/warmup#q-1");
     const cards = await text(client, "/review/warmup");
-    expect(cards).toMatch(/id="q-1"[\s\S]*今天已评[\s\S]*id="q-2"/);
+    expect(cards).toMatch(/id="q-1"[\s\S]*qc-grade-mastered is-picked[\s\S]*id="q-2"/);
     expect(cards).toContain("今天已评 1 / 2 题");
     expect(await text(client, "/")).toContain('data-warmup-count="1"');
     // #1 was due as well; graded today, it has left due review
     expect(await text(client, "/review/due")).toContain("今天没有到期的题。");
+    expect(await reviewModes(client)).toEqual([[1, "browse"], [2, "browse"], [1, "warmup"]]);
+    // changing the grade, even from the chapter page, keeps it a warm-up review on the warm-up page
+    await grade(client, 1, "unknown", { back: "/bank/A?kp=1#q-1" });
+    expect(await text(client, "/review/warmup")).toMatch(/id="q-1"[\s\S]*qc-grade-unknown is-picked[\s\S]*id="q-2"/);
     expect(await reviewModes(client)).toEqual([[1, "browse"], [2, "browse"], [1, "warmup"]]);
   });
 
@@ -313,25 +317,31 @@ describe("bank", () => {
     expect(nextChapter).toContain("上一章");
   });
 
-  it("grades from the chapter page once a study day", async () => {
+  it("grades from the chapter page, and the grade can be changed all day", async () => {
     const { client, clock } = await loggedIn();
     const res = await client.post("/q/4/grade", { grade: "mastered", back: "/bank/B?kp=1#q-4" });
     expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("/bank/B?kp=1#q-4");
     const page = await text(client, "/bank/B");
-    expect(page).toContain("今天已评");
-    expect(page).toMatch(/is-picked[^>]*disabled/);
+    expect(page).toContain('class="qc-grade qc-grade-mastered is-picked">掌握</button>');
+    expect(page).not.toMatch(/qc-grade[^>]*disabled/);
+    expect(page).not.toContain("今天已评");
     expect(await text(client, "/q/4")).toContain("chip-mastered");
-    // a second click the same study day changes nothing: the card would otherwise jump a level
-    await client.post("/q/4/grade", { grade: "mastered" });
-    await client.post("/q/4/grade", { grade: "unknown" });
-    const detail = await text(client, "/q/4");
-    expect(detail.match(/chip-mastered/g)).toHaveLength(2);
-    expect(visible(detail)).not.toContain("完全不会");
-    // the next study day it can be graded again
+    // a misclick is put right: the grade changes and it is still one review today
+    await grade(client, 4, "unknown");
+    const changed = await text(client, "/q/4");
+    expect(changed.match(/chip-unknown/g)).toHaveLength(2); // status chip and the one history row
+    expect(changed).not.toContain("chip-mastered");
+    expect(await text(client, "/bank/B")).toContain('class="qc-grade qc-grade-unknown is-picked">不会</button>');
+    // the picked grade again changes nothing
+    await grade(client, 4, "unknown");
+    expect((await text(client, "/q/4")).match(/chip-unknown/g)).toHaveLength(2);
+    // the next study day it is a new review
     clock.addDays(1);
-    await client.post("/q/4/grade", { grade: "shaky" });
-    expect(visible(await text(client, "/q/4"))).toContain("不熟练/错误");
+    await grade(client, 4, "shaky");
+    const detail = visible(await text(client, "/q/4"));
+    expect(detail).toContain("不熟练/错误");
+    expect(detail).toContain("完全不会");
   });
 
   it("ignores bad input when grading from the chapter page", async () => {
@@ -339,7 +349,7 @@ describe("bank", () => {
     const res = await client.post("/q/4/grade", { grade: "perfect" });
     expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("/bank/B#q-4");
-    expect(await text(client, "/bank/B")).not.toContain("今天已评");
+    expect(await text(client, "/bank/B")).not.toContain("is-picked");
     expect((await client.post("/q/999/grade", { grade: "mastered" })).status).toBe(404);
     const evil = await client.post("/q/4/grade", { grade: "shaky", back: "//evil.example" });
     expect(evil.headers.get("location")).toBe("/bank/B#q-4");

@@ -35,3 +35,11 @@ def schedule(state: CardState, grade: str, today: date) -> CardState:
         reps=state.reps + 1,
         lapses=state.lapses + (grade == "unknown"),
     )
+
+
+def card_from(history) -> CardState:
+    """The card a question's reviews lead to, oldest first, as (grade, study day). Every stored card was built this way."""
+    card = CardState()
+    for grade, day in history:
+        card = schedule(card, grade, day)
+    return card

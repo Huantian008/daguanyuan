@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NEW_CARD, schedule } from "../src/srs";
+import { cardFrom, NEW_CARD, schedule, type Grade } from "../src/srs";
 
 const TODAY = "2026-10-16";
 
@@ -29,5 +29,17 @@ describe("schedule", () => {
   it("resets unknown to level 1 and counts a lapse", () => {
     const s = schedule({ ...NEW_CARD, level: 5, reps: 6, lapses: 1 }, "unknown", TODAY);
     expect([s.level, s.due, s.lapses, s.reps]).toEqual([1, "2026-10-17", 2, 7]);
+  });
+});
+
+describe("cardFrom", () => {
+  it("is a new card before any review", () => {
+    expect(cardFrom([])).toEqual(NEW_CARD);
+  });
+
+  it("schedules each review in turn, oldest first", () => {
+    const history: [Grade, string][] = [["mastered", TODAY], ["shaky", "2026-10-23"], ["unknown", "2026-10-26"]];
+    expect(cardFrom(history))
+      .toEqual(schedule(schedule(schedule(NEW_CARD, "mastered", TODAY), "shaky", "2026-10-23"), "unknown", "2026-10-26"));
   });
 });

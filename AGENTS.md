@@ -75,7 +75,7 @@ Neither the PDFs nor `content/`/`edge/public/` are in git — a prebuilt `conten
 - Local SQLite has no `user_id` and no migrations (`dgy/db.py` `SCHEMA`). D1 tables all have `user_id NOT NULL` with no default, so every query must be scoped by uid; schema changes are new numbered files in `edge/migrations/` only. `edge/test/d1.ts` runs every real migration in filename order, so new migrations are tested automatically.
 - Question content never enters either database; the databases store progress, card state, exclusions and settings only.
 - A study day runs Shanghai 04:00 → 04:00 (`studyday.py` / `studyday.ts`); timestamps are ISO strings with `+08:00`. SRS has five levels with 1/3/7/14/30-day intervals and the ratings `mastered` / `shaky` / `unknown`.
-- Grading happens only on question cards: `POST /q/<num>/grade` with `mode` = `warmup` | `due` (anything else is `browse`); a question is recorded once per study day, so a double click is one review.
+- Grading happens only on question cards: `POST /q/<num>/grade` with `mode` = `warmup` | `due` (anything else is `browse`); a question has at most one review per study day. Grading it again that day changes that review's grade (it keeps its time and mode) and the card is worked out again from the earlier reviews (`card_from` / `cardFrom`), so a misclick is put right and a double click is one review; the buttons never lock.
 
 ## Testing
 

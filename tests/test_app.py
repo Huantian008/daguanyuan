@@ -154,10 +154,14 @@ def test_review_page_keeps_a_graded_card_and_records_the_mode(env):
                         follow_redirects=False)
     assert r.headers["location"] == "/review/warmup#q-1"
     cards = env.client.get("/review/warmup").text
-    assert re.search(r'id="q-1"[\s\S]*今天已评[\s\S]*id="q-2"', cards) and "今天已评 1 / 2 题" in cards
+    assert re.search(r'id="q-1"[\s\S]*qc-grade-mastered is-picked[\s\S]*id="q-2"', cards) and "今天已评 1 / 2 题" in cards
     assert 'data-warmup-count="1"' in env.client.get("/").text
     # #1 was due as well; graded today, it has left due review
     assert "今天没有到期的题。" in env.client.get("/review/due").text
+    assert review_modes(env) == [(1, "browse"), (2, "browse"), (1, "warmup")]
+    # changing the grade, even from the chapter page, keeps it a warm-up review on the warm-up page
+    grade(env, 1, "unknown", back="/bank/A?kp=1#q-1")
+    assert re.search(r'id="q-1"[\s\S]*qc-grade-unknown is-picked[\s\S]*id="q-2"', env.client.get("/review/warmup").text)
     assert review_modes(env) == [(1, "browse"), (2, "browse"), (1, "warmup")]
 
 
@@ -344,27 +348,33 @@ def test_chapter_page_steps_between_kps_and_chapters(env):
     assert "上一章" in env.client.get("/bank/B", params={"kp": "1"}).text
 
 
-def test_grading_from_the_chapter_page_is_recorded_once_a_day(env):
+def test_grading_from_the_chapter_page_can_be_changed_all_day(env):
     r = env.client.post("/q/4/grade", data={"grade": "mastered", "back": "/bank/B?kp=1#q-4"}, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/bank/B?kp=1#q-4"
     page = env.client.get("/bank/B").text
-    assert "今天已评" in page and re.search(r"is-picked[^>]*disabled", page)
+    assert 'class="qc-grade qc-grade-mastered is-picked">掌握</button>' in page
+    assert not re.search(r"qc-grade[^>]*disabled", page) and "今天已评" not in page
     assert "chip-mastered" in env.client.get("/q/4").text
-    # a second click the same study day changes nothing: the card would otherwise jump a level
-    env.client.post("/q/4/grade", data={"grade": "mastered"})
-    env.client.post("/q/4/grade", data={"grade": "unknown"})
-    assert len(re.findall(r"chip-mastered", env.client.get("/q/4").text)) == 2  # status chip and the one history row
-    assert "完全不会" not in visible(env.client.get("/q/4").text)
-    # the next study day it can be graded again
+    # a misclick is put right: the grade changes and it is still one review today
+    grade(env, 4, "unknown")
+    changed = env.client.get("/q/4").text
+    assert len(re.findall(r"chip-unknown", changed)) == 2  # status chip and the one history row
+    assert "chip-mastered" not in changed
+    assert 'class="qc-grade qc-grade-unknown is-picked">不会</button>' in env.client.get("/bank/B").text
+    # the picked grade again changes nothing
+    grade(env, 4, "unknown")
+    assert len(re.findall(r"chip-unknown", env.client.get("/q/4").text)) == 2
+    # the next study day it is a new review
     env.clock.at += timedelta(days=1)
-    env.client.post("/q/4/grade", data={"grade": "shaky"})
-    assert "不熟练/错误" in visible(env.client.get("/q/4").text)
+    grade(env, 4, "shaky")
+    detail = visible(env.client.get("/q/4").text)
+    assert "不熟练/错误" in detail and "完全不会" in detail
 
 
 def test_chapter_grade_ignores_bad_input(env):
     r = env.client.post("/q/4/grade", data={"grade": "perfect"}, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/bank/B#q-4"
-    assert "今天已评" not in env.client.get("/bank/B").text
+    assert "is-picked" not in env.client.get("/bank/B").text
     assert env.client.post("/q/999/grade", data={"grade": "mastered"}).status_code == 404
     r = env.client.post("/q/4/grade", data={"grade": "shaky", "back": "//evil.example"}, follow_redirects=False)
     assert r.headers["location"] == "/bank/B#q-4"
