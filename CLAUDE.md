@@ -75,7 +75,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **做题只在题卡上**：章节页 `/bank/<章>?kp=<序号>` 一个考点一页，热身和到期复习是 `/review/warmup`、`/review/due`，
 都用同一个题卡（`_macros.html` 的 `qcard` / `views/parts.ts` 的 `questionCard`），打分都走 `POST /q/<num>/grade`，
 表单里的 `mode`（`warmup` / `due`，其余记 `browse`）决定这条记录算在哪；一个学习日一题只有一条记录，当天再点别的评价是改掉这条
-（时间和 `mode` 不变，卡片按之前的记录重新推，`card_from` / `cardFrom`），按钮不会锁住。首页「继续往下做」
+（时间和 `mode` 不变，卡片按之前的记录重新推，`card_from` / `cardFrom`），按钮不会锁住。
+有脚本时评价在后台存、页面不刷新：`app.js` 带 `Accept: application/json` 提交，路由回这张卡的做题记录面板
+（`history_panel` / `historyPanel`），页面上的计数由脚本就地更新；没存上的评价留在 `localStorage` 的 `dgy-pending-grades`，
+当天再打开网页或网络恢复时补交。首页「继续往下做」
 从最近一条不是热身/复习的记录所在考点往后找（`drill.onward_kp`）。原来一题一题的练习页（`/practice/...`）已删，
 `sessions` 表和 `reviews.session_id` 只剩历史数据，备份和 `pipeline.export_progress` 照旧带上。
 

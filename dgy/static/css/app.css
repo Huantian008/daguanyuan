@@ -670,6 +670,7 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
 .qc-btn:hover { background: var(--surface-2); color: var(--ink); }
 .qc-btn[aria-expanded="true"] { background: var(--accent-soft); color: var(--accent); }
 .qc-grades { display: flex; align-items: center; gap: 8px; margin: 0; }
+.qc-unsaved { color: var(--unknown-ink); font-size: 12px; }
 .qc-grade { min-width: 84px; min-height: 40px; padding: 6px 16px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--ink-2); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: background-color .15s, border-color .15s, color .15s; }
 .qc-grade-mastered:hover { background: var(--mastered-soft); border-color: var(--mastered); color: var(--mastered-ink); }
 .qc-grade-shaky:hover { background: var(--shaky-soft); border-color: var(--shaky); color: var(--shaky-ink); }
@@ -708,6 +709,7 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
   .qc-actions { flex-direction: column; align-items: stretch; }
   .qc-toggles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .qc-grades { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .qc-unsaved { grid-column: 1 / -1; }
   .qc-grade { min-width: 0; padding: 6px 4px; }
   .qcard .qopts { grid-template-columns: minmax(0, 1fr); }
 }

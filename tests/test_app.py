@@ -143,7 +143,7 @@ def test_next_day_offers_warmup_and_due_review_as_card_pages(env):
         assert 'id="q-1"' in cards and 'action="/q/1/grade"' in cards and 'id="q-2"' not in cards
         assert (f'<input type="hidden" name="back" value="/review/{mode}#q-1">'
                 f'<input type="hidden" name="mode" value="{mode}">') in cards
-        assert "今天已评 0 / 1 题" in cards
+        assert "今天已评 0 / 1 题" in visible(cards)
 
 
 def test_review_page_keeps_a_graded_card_and_records_the_mode(env):
@@ -154,7 +154,8 @@ def test_review_page_keeps_a_graded_card_and_records_the_mode(env):
                         follow_redirects=False)
     assert r.headers["location"] == "/review/warmup#q-1"
     cards = env.client.get("/review/warmup").text
-    assert re.search(r'id="q-1"[\s\S]*qc-grade-mastered is-picked[\s\S]*id="q-2"', cards) and "今天已评 1 / 2 题" in cards
+    assert re.search(r'id="q-1"[\s\S]*qc-grade-mastered is-picked[\s\S]*id="q-2"', cards) and "今天已评 1 / 2 题" in visible(cards)
+    assert '<span class="js-graded">1</span>' in cards and '<a class="btn js-all-graded" data-total="2" href="/">' in cards
     assert 'data-warmup-count="1"' in env.client.get("/").text
     # #1 was due as well; graded today, it has left due review
     assert "今天没有到期的题。" in env.client.get("/review/due").text
@@ -378,6 +379,35 @@ def test_chapter_grade_ignores_bad_input(env):
     assert env.client.post("/q/999/grade", data={"grade": "mastered"}).status_code == 404
     r = env.client.post("/q/4/grade", data={"grade": "shaky", "back": "//evil.example"}, follow_redirects=False)
     assert r.headers["location"] == "/bank/B#q-4"
+
+
+def test_the_page_script_grades_without_a_reload(env):
+    ask = {"Accept": "application/json"}
+    r = env.client.post("/q/4/grade", data={"grade": "mastered"}, headers=ask, follow_redirects=False)
+    assert r.status_code == 200
+    panel = r.json()["history"]
+    assert "下次复习" in panel and "已做 1 次" in panel and panel.count("chip-mastered") == 1
+    assert panel in env.client.get("/bank/B").text  # the card's 做题记录 as the page has it
+    # changing the grade: the panel follows, still one review
+    panel = env.client.post("/q/4/grade", data={"grade": "unknown", "mode": "warmup"}, headers=ask).json()["history"]
+    assert "chip-unknown" in panel and "chip-mastered" not in panel and "已做 1 次" in panel
+    assert review_modes(env) == [(4, "browse")]
+    # bad input records nothing
+    assert env.client.post("/q/4/grade", data={"grade": "perfect"}, headers=ask).json()["history"] == panel
+    untouched = env.client.post("/q/5/grade", data={"grade": "perfect"}, headers=ask).json()["history"]
+    assert "还没做过这道题" in untouched and "下次复习" not in untouched
+    assert env.client.post("/q/999/grade", data={"grade": "mastered"}, headers=ask).status_code == 404
+
+
+def test_cards_and_counts_carry_what_the_page_script_updates(env):
+    grade(env, 4, "mastered")
+    page = env.client.get("/bank/B", params={"kp": "1"}).text
+    # a question never graded is marked, so its first grade adds one to 做过
+    assert "data-new" not in re.search(r'<article [^>]*id="q-4"[^>]*>', page).group(0)
+    assert "data-new" in re.search(r'<article [^>]*id="q-5"[^>]*>', page).group(0)
+    assert page.count('<span class="js-done">1</span>') == 2  # the heading and the current 考点 in the tree
+    assert page.count('js-done-bar" data-total="2"') == 2
+    assert "做过 1 / 2 题" in visible(page)
 
 
 def test_chapter_cards_fold_away_knowledge_and_history_instead_of_a_details_link(tagged):

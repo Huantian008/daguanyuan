@@ -117,9 +117,11 @@ def record_review(conn: sqlite3.Connection, num: int, grade: str, at: datetime, 
                          (num, day.isoformat(), same_day[0]["id"]))
         else:
             card = schedule(get_card(conn, num), grade, day)
+            # the page script sends a grade again when it never heard back, so the same grade can arrive twice at once
             conn.execute(
-                "INSERT INTO reviews (num, grade, reviewed_at, study_day, mode) VALUES (?, ?, ?, ?, ?)",
-                (num, grade, at.isoformat(), day.isoformat(), mode),
+                "INSERT INTO reviews (num, grade, reviewed_at, study_day, mode) SELECT ?, ?, ?, ?, ? "
+                "WHERE NOT EXISTS (SELECT 1 FROM reviews WHERE num = ? AND study_day = ?)",
+                (num, grade, at.isoformat(), day.isoformat(), mode, num, day.isoformat()),
             )
         conn.execute(
             "INSERT INTO cards (num, level, due, last_grade, reps, lapses) VALUES (?, ?, ?, ?, ?, ?) "

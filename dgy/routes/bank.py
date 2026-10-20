@@ -4,7 +4,7 @@ from .. import db, stats
 from ..content import parse_label
 from ..drill import default_kp, drill_kps, kp_tree
 from ..srs import GRADES
-from ..web import bank, get_conn, now, redirect, render, safe_back, today, user_state
+from ..web import bank, fragment, get_conn, now, redirect, render, safe_back, today, user_state, wants_json
 from .review import REVIEW_PAGES
 
 router = APIRouter()
@@ -87,13 +87,16 @@ def exclude(request: Request, excluded: str = Form(...), nums: str = Form(""), c
 def grade(request: Request, num: int, grade: str = Form(""), back: str = Form(""), mode: str = Form(""),
           conn=Depends(get_conn)):
     """Grade a question from the chapter page or a review page.
-    Grading it again the same study day changes that day's grade."""
+    Grading it again the same study day changes that day's grade. The page script gets the card's 做题记录 back instead
+    of a redirect, so the page stays where it is."""
     content = bank(request)
     q = content.questions.get(num)
     if q is None:
         raise HTTPException(404, "没有这道题")
     if grade in GRADES:
         db.record_review(conn, num, grade, now(request), mode if mode in REVIEW_PAGES else "browse")
+    if wants_json(request):
+        return {"history": fragment("history_panel", db.histories_for(conn, [num])[num], db.get_card(conn, num))}
     return redirect(safe_back(back, f"/bank/{q.chapter}#q-{num}"))
 
 

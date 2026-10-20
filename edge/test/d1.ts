@@ -33,6 +33,10 @@ class Statement {
   }
 
   async run() {
+    return this.runNow();
+  }
+
+  runNow() {
     const r = this.stmt().run(...(this.params as never[]));
     return { success: true, results: [], meta: { changes: Number(r.changes), last_row_id: Number(r.lastInsertRowid) } };
   }
@@ -43,11 +47,12 @@ export function memoryD1() {
   db.exec(SCHEMA);
   return {
     prepare: (sql: string) => new Statement(db, sql),
+    // Like D1, a batch is one transaction that nothing else gets into: it never waits halfway.
     async batch(statements: Statement[]) {
       db.exec("BEGIN");
       try {
         const out = [];
-        for (const s of statements) out.push(await s.run());
+        for (const s of statements) out.push(s.runNow());
         db.exec("COMMIT");
         return out;
       } catch (error) {

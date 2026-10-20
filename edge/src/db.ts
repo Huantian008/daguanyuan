@@ -56,8 +56,10 @@ export async function recordReview(db: D1Database, uid: number, input: ReviewInp
       db.prepare("DELETE FROM reviews WHERE user_id = ? AND num = ? AND study_day = ? AND id <> ?").bind(uid, input.num, day, sameDay[0].id),
     ]
     : [
-      db.prepare("INSERT INTO reviews (user_id, num, grade, reviewed_at, study_day, mode) VALUES (?, ?, ?, ?, ?, ?)")
-        .bind(uid, input.num, input.grade, shanghaiIso(input.at), day, input.mode),
+      // the page script sends a grade again when it never heard back, so the same grade can arrive twice at once
+      db.prepare("INSERT INTO reviews (user_id, num, grade, reviewed_at, study_day, mode) SELECT ?, ?, ?, ?, ?, ? "
+        + "WHERE NOT EXISTS (SELECT 1 FROM reviews WHERE user_id = ? AND num = ? AND study_day = ?)")
+        .bind(uid, input.num, input.grade, shanghaiIso(input.at), day, input.mode, uid, input.num, day),
     ];
   await db.batch([
     ...log,

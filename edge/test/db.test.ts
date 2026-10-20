@@ -71,6 +71,14 @@ describe("reviews and cards", () => {
     expect((await db.historyFor(d1, ME, 5)).map((r) => r.grade)).toEqual(["shaky"]);
   });
 
+  it("keeps one review when a first grade is sent twice at once", async () => {
+    // the page script sends a grade again when it never heard back; both requests read the day before either writes
+    const input = { num: 5, grade: "mastered", at: EVENING, mode: "warmup" } as const;
+    await Promise.all([db.recordReview(d1, ME, input), db.recordReview(d1, ME, input)]);
+    expect((await db.reviewLog(d1, ME)).map((r) => [r.grade, r.mode])).toEqual([["mastered", "warmup"]]);
+    expect(await db.getCard(d1, ME, 5)).toEqual(schedule(NEW_CARD, "mastered", "2026-10-16"));
+  });
+
   it("filters the log by study day", async () => {
     await db.recordReview(d1, ME, { num: 1, grade: "mastered", at: EVENING, mode: "kp" });
     await db.recordReview(d1, ME, { num: 2, grade: "mastered", at: new Date("2026-10-18T21:00:00+08:00"), mode: "kp" });

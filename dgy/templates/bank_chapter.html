@@ -13,10 +13,11 @@
     <div class="kt-section">
       <p class="kt-sec-name">{{ section }}</p>
       {% for k in items %}
+      {% set here_kp = k.index == current.index %}
       <a class="kt-kp{% if k.index == current.index %} is-current{% endif %}" href="/bank/{{ chapter.code }}?kp={{ k.index }}"{% if k.index == current.index %} aria-current="page"{% endif %}>
         <span class="kt-name">{{ k.kp }}</span>
-        <span class="kt-count">{{ k.done }} / {{ k.total }}</span>
-        <i class="kt-bar{% if k.total and k.done == k.total %} is-full{% endif %}"><b style="width: {{ (100 * k.done / k.total)|round|int if k.total else 0 }}%"></b></i>
+        <span class="kt-count">{% if here_kp %}<span class="js-done">{{ k.done }}</span>{% else %}{{ k.done }}{% endif %} / {{ k.total }}</span>
+        <i class="kt-bar{% if k.total and k.done == k.total %} is-full{% endif %}{% if here_kp %} js-done-bar{% endif %}" data-total="{{ k.total }}"><b style="width: {{ (100 * k.done / k.total)|round|int if k.total else 0 }}%"></b></i>
       </a>
       {% endfor %}
     </div>
@@ -32,13 +33,13 @@
       <button type="button" class="drill-tree-toggle js-tree-toggle" aria-controls="kp-tree" aria-expanded="true" hidden>目录</button>
       <div class="drill-title">
         <h1>{{ current.kp }}</h1>
-        <p class="muted">{{ current.section }} · 做过 {{ current.done }} / {{ current.total }} 题</p>
+        <p class="muted">{{ current.section }} · 做过 <span class="js-done">{{ current.done }}</span> / {{ current.total }} 题</p>
       </div>
       <div class="drill-actions">
         {% if prev %}<a class="btn btn-small" href="{{ prev[1] }}">{{ prev[0] }}</a>{% endif %}
         {% if following %}<a class="btn btn-small btn-primary" href="{{ following[1] }}">{{ following[0] }}</a>{% endif %}
       </div>
-      <div class="drill-track" aria-hidden="true"><span style="width: {{ (100 * current.done / current.total)|round|int if current.total else 0 }}%"></span></div>
+      <div class="drill-track js-done-bar" data-total="{{ current.total }}" aria-hidden="true"><span style="width: {{ (100 * current.done / current.total)|round|int if current.total else 0 }}%"></span></div>
     </header>
 
     <div class="qcards">

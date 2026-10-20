@@ -70,7 +70,7 @@ export function questionCard(
   const excluded = status === "excluded";
   const gradeButton = (grade: Grade, label: string) =>
     html`<button name="grade" value="${grade}" class="qc-grade qc-grade-${grade}${graded === grade ? " is-picked" : ""}">${label}</button>`;
-  return html`<article class="qcard${excluded ? " is-excluded" : ""}" id="q-${q.num}"${text?.answer_key ? raw(" data-choice") : ""}>
+  return html`<article class="qcard${excluded ? " is-excluded" : ""}" id="q-${q.num}"${text?.answer_key ? raw(" data-choice") : ""}${status === "new" ? raw(" data-new") : ""}>
   <header class="qc-head">
     <strong class="qc-num" title="${qlabel(q.num)}">${index}</strong>
     <span class="qc-src">${q.source_full}</span>
@@ -101,8 +101,7 @@ export function questionCard(
     ${relatedKnowledge(x.sections, x.knowledge, x.titles)}
   </section>
   <section class="qc-panel" id="qh-${q.num}" data-panel="history" aria-label="做题记录">
-    <h2 class="panel-label">做题记录${x.card?.due ? html` <span class="muted">下次复习：${cnDate(x.card.due)} · 已做 ${x.card.reps} 次</span>` : ""}</h2>
-    ${reviewHistory(x.history)}
+    ${historyPanel(x.history, x.card)}
   </section>`}
 </article>`;
 }
@@ -167,6 +166,10 @@ const chapterFallback = (knowledge: KnowledgeEntry[]): Html =>
 
 export const relatedKnowledge = (sections: Section[], knowledge: KnowledgeEntry[], titles: Record<string, string>): Html =>
   sections.length ? knLinks(sections, titles) : chapterFallback(knowledge);
+
+/** A card's 做题记录; the grade route sends it on its own to the page script. */
+export const historyPanel = (history: Review[], card?: CardState): Html => html`<h2 class="panel-label">做题记录${card?.due ? html` <span class="muted">下次复习：${cnDate(card.due)} · 已做 ${card.reps} 次</span>` : ""}</h2>
+${reviewHistory(history)}`;
 
 export const reviewHistory = (history: Review[]): Html => history.length
   ? html`<ul class="plain">${[...history].reverse().map((r) => html`<li><span class="muted">${cnDate(r.studyDay)}</span> <span class="chip chip-${r.grade}">${GRADE_LABELS[r.grade]}</span></li>`)}</ul>`

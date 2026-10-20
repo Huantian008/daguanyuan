@@ -42,7 +42,7 @@ export function reviewPage(meta: Meta, d: ReviewPageData) {
   <div>
     <p class="eyebrow"><a href="/">今天</a></p>
     <h1>${page.title}</h1>
-    <p class="muted">${page.note}${d.questions.length ? ` · 今天已评 ${graded} / ${d.questions.length} 题` : ""}</p>
+    <p class="muted">${page.note}${d.questions.length ? html` · 今天已评 <span class="js-graded">${graded}</span> / ${d.questions.length} 题` : ""}</p>
   </div>
 </header>
 ${d.questions.length
@@ -54,7 +54,7 @@ ${d.questions.length
 </div>`
     : html`<p class="empty">${page.empty}</p>`}
 <nav class="drill-foot" aria-label="回首页">
-  <a class="btn${d.questions.length && graded === d.questions.length ? " btn-primary" : ""}" href="/">← 回首页</a>
+  <a class="btn js-all-graded${d.questions.length && graded === d.questions.length ? " btn-primary" : ""}" data-total="${d.questions.length}" href="/">← 回首页</a>
 </nav>`,
   });
 }

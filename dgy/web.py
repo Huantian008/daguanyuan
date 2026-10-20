@@ -86,6 +86,16 @@ def render(request: Request, name: str, **context):
     return TEMPLATES.TemplateResponse(request, name, context)
 
 
+def fragment(macro: str, *args) -> str:
+    """One macro of `_macros.html` rendered on its own, for the page script to put in place."""
+    return str(getattr(TEMPLATES.env.get_template("_macros.html").module, macro)(*args))
+
+
+def wants_json(request: Request) -> bool:
+    """The page script asks for JSON so that the page does not reload; a form post gets a redirect."""
+    return "application/json" in request.headers.get("accept", "")
+
+
 def redirect(url: str) -> RedirectResponse:
     return RedirectResponse(url, status_code=303)
 

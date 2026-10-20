@@ -12,6 +12,7 @@ import { bankPage, chapterPage, questionPage, searchPage } from "./views/bank";
 import { dashboardPage } from "./views/dashboard";
 import { historyPage, settingsPage, type HistoryDay } from "./views/history";
 import { injectSectionQuestions, knowledgeIndexPage, knowledgePage } from "./views/knowledge";
+import { historyPanel } from "./views/parts";
 import { isReviewMode, reviewPage } from "./views/review";
 import { safeBack } from "./views/util";
 
@@ -137,7 +138,10 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
   });
 
   // Grade a question from the chapter page or a review page. Grading it again the same study day changes that day's grade.
+  // The page script gets the card's 做题记录 back instead of a redirect, so the page stays where it is.
   app.post("/q/:num/grade", async (c) => {
+    const DB = c.env.DB;
+    const uid = c.get("user").id;
     const num = intOrNull(c.req.param("num"));
     const q = num === null ? undefined : content.questions.get(num);
     if (!q) return c.notFound();
@@ -145,7 +149,11 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     const grade = str(form.grade);
     const mode = str(form.mode);
     if (isGrade(grade)) {
-      await db.recordReview(c.env.DB, c.get("user").id, { num: q.num, grade, at: now(), mode: isReviewMode(mode) ? mode : "browse" });
+      await db.recordReview(DB, uid, { num: q.num, grade, at: now(), mode: isReviewMode(mode) ? mode : "browse" });
+    }
+    if (c.req.header("Accept")?.includes("application/json")) {
+      const [history, card] = await Promise.all([db.historyFor(DB, uid, q.num), db.getCard(DB, uid, q.num)]);
+      return c.json({ history: String(await historyPanel(history, card)) });
     }
     return c.redirect(safeBack(str(form.back), `/bank/${q.chapter}#q-${q.num}`), 303);
   });

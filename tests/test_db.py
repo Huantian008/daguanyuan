@@ -74,6 +74,19 @@ def test_a_doubled_review_of_the_day_is_folded_into_one_when_the_grade_changes(c
     assert [r.grade for r in db.history_for(conn, 5)] == ["shaky"]
 
 
+def test_a_first_grade_sent_twice_at_once_is_one_review(conn, monkeypatch):
+    # the page script sends a grade again when it never heard back; here the other request writes after this one has
+    # read the reviews of the day and before it writes
+    def racing(state, grade, day):
+        monkeypatch.setattr(db, "schedule", schedule)
+        db.record_review(conn, 5, grade, EVENING, "warmup")
+        return schedule(state, grade, day)
+    monkeypatch.setattr(db, "schedule", racing)
+    card = db.record_review(conn, 5, "mastered", EVENING, "warmup")
+    assert card == db.get_card(conn, 5) == schedule(CardState(), "mastered", date(2026, 10, 16))
+    assert [(r.grade, r.mode) for r in db.review_log(conn)] == [("mastered", "warmup")]
+
+
 def test_review_log_since_filters_by_study_day(conn):
     db.record_review(conn, 1, "mastered", EVENING, "kp")
     db.record_review(conn, 2, "mastered", datetime(2026, 10, 18, 21, 0, tzinfo=TZ), "kp")

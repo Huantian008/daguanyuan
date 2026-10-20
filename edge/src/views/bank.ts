@@ -70,11 +70,14 @@ export function chapterPage(meta: Meta, d: ChapterPageData) {
     <p class="kt-chapter"><a href="/bank">题库</a> / ${chapter.name}</p>
     ${d.tree.map(([section, items]) => html`<div class="kt-section">
       <p class="kt-sec-name">${section}</p>
-      ${items.map((k) => html`<a class="kt-kp${k.index === current.index ? " is-current" : ""}" href="/bank/${chapter.code}?kp=${k.index}"${k.index === current.index ? raw(' aria-current="page"') : ""}>
+      ${items.map((k) => {
+        const here = k.index === current.index;
+        return html`<a class="kt-kp${here ? " is-current" : ""}" href="/bank/${chapter.code}?kp=${k.index}"${here ? raw(' aria-current="page"') : ""}>
         <span class="kt-name">${k.kp}</span>
-        <span class="kt-count">${k.done} / ${k.total}</span>
-        <i class="kt-bar${k.total && k.done === k.total ? " is-full" : ""}"><b style="width: ${percent(k.done, k.total)}%"></b></i>
-      </a>`)}
+        <span class="kt-count">${here ? html`<span class="js-done">${k.done}</span>` : k.done} / ${k.total}</span>
+        <i class="kt-bar${k.total && k.done === k.total ? " is-full" : ""}${here ? " js-done-bar" : ""}" data-total="${k.total}"><b style="width: ${percent(k.done, k.total)}%"></b></i>
+      </a>`;
+      })}
     </div>`)}
     <div class="kt-section kt-chapters">
       <p class="kt-sec-name">其他章</p>
@@ -87,13 +90,13 @@ export function chapterPage(meta: Meta, d: ChapterPageData) {
       <button type="button" class="drill-tree-toggle js-tree-toggle" aria-controls="kp-tree" aria-expanded="true" hidden>目录</button>
       <div class="drill-title">
         <h1>${current.kp}</h1>
-        <p class="muted">${current.section} · 做过 ${current.done} / ${current.total} 题</p>
+        <p class="muted">${current.section} · 做过 <span class="js-done">${current.done}</span> / ${current.total} 题</p>
       </div>
       <div class="drill-actions">
         ${prev ? html`<a class="btn btn-small" href="${prev[1]}">${prev[0]}</a>` : ""}
         ${following ? html`<a class="btn btn-small btn-primary" href="${following[1]}">${following[0]}</a>` : ""}
       </div>
-      <div class="drill-track" aria-hidden="true"><span style="width: ${percent(current.done, current.total)}%"></span></div>
+      <div class="drill-track js-done-bar" data-total="${current.total}" aria-hidden="true"><span style="width: ${percent(current.done, current.total)}%"></span></div>
     </header>
 
     <div class="qcards">

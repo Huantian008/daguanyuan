@@ -1,5 +1,5 @@
-// 大观园：主题切换、题目字号；题卡和题目页的展开开关，题目页的快捷键；知识点抽屉；知识点文字版的公式渲染。
-// 页面不依赖这段脚本也能用：没有脚本时答案和知识点直接展开，知识点链接打开文字版页面。
+// 大观园：主题切换、题目字号；题卡和题目页的展开开关，题目页的快捷键；题卡评价在后台保存；知识点抽屉；知识点文字版的公式渲染。
+// 页面不依赖这段脚本也能用：没有脚本时答案和知识点直接展开，评价整页提交，知识点链接打开文字版页面。
 (() => {
   const root = document.documentElement;
   const version = document.currentScript ? new URL(document.currentScript.src, location.href).searchParams.get("v") : null;
@@ -183,6 +183,144 @@
     });
     show();
     treeToggle.hidden = false;
+  }
+
+  // ---------- grades on question cards: saved in the background, so the page does not reload ----------
+  // A grade shows at once and goes to the server with fetch. Until the server has it, it waits in localStorage and is
+  // sent again when a page loads or the network comes back, on the same study day only (later it would count for the
+  // wrong day). Only one request per question is out at a time, so the grade that stays is the last one clicked.
+
+  const PENDING_KEY = "dgy-pending-grades";
+  // A study day runs 04:00 to 04:00 Shanghai time (UTC+8), so it is the UTC date four hours on.
+  const studyDay = () => new Date(Date.now() + 4 * 3600 * 1000).toISOString().slice(0, 10);
+  let pendingHere = {};
+  const readPending = () => {
+    try {
+      return JSON.parse(localStorage.getItem(PENDING_KEY)) || {};
+    } catch {
+      return pendingHere; // storage blocked: grades wait as long as this page is open
+    }
+  };
+  const writePending = (pending) => {
+    pendingHere = pending;
+    try {
+      if (Object.keys(pending).length) localStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+      else localStorage.removeItem(PENDING_KEY);
+    } catch {
+      // kept in pendingHere
+    }
+  };
+  const gradeForm = (num) => document.querySelector(`form.qc-grades[action="/q/${num}/grade"]`);
+
+  // The counts on the page follow: 做过 X / Y on a chapter page, 今天已评 X / N on a review page.
+  const countDone = () => {
+    let done = 0;
+    document.querySelectorAll(".js-done").forEach((count) => {
+      done = Number(count.textContent) + 1;
+      count.textContent = done;
+    });
+    document.querySelectorAll(".js-done-bar").forEach((bar) => {
+      const total = Number(bar.dataset.total);
+      bar.firstElementChild.style.width = `${total ? Math.round((100 * done) / total) : 0}%`;
+      bar.classList.toggle("is-full", total > 0 && done >= total);
+    });
+  };
+  const countGraded = () => {
+    const graded = document.querySelectorAll(".qc-grades .is-picked").length;
+    document.querySelectorAll(".js-graded").forEach((count) => {
+      count.textContent = graded;
+    });
+    document.querySelectorAll(".js-all-graded").forEach((link) => link.classList.toggle("btn-primary", graded >= Number(link.dataset.total)));
+  };
+  const pick = (form, grade) => {
+    form.querySelectorAll(".qc-grade").forEach((button) => button.classList.toggle("is-picked", button.value === grade));
+    const card = form.closest(".qcard");
+    if (card && "new" in card.dataset) {
+      delete card.dataset.new;
+      countDone();
+    }
+    countGraded();
+  };
+  const showUnsaved = (num, unsaved) => {
+    const form = gradeForm(num);
+    const note = form?.querySelector(".qc-unsaved");
+    if (unsaved && form && !note) {
+      const span = document.createElement("span");
+      span.className = "qc-unsaved";
+      span.textContent = "还没存上，联网后会自动补交";
+      form.querySelector(".qc-grade").before(span);
+    } else if (!unsaved) {
+      note?.remove();
+    }
+  };
+
+  const sending = new Set();
+  const send = (num) => {
+    const entry = readPending()[num];
+    if (!entry || sending.has(num)) return;
+    sending.add(num);
+    fetch(`/q/${num}/grade`, {
+      method: "POST",
+      headers: { Accept: "application/json" },
+      body: new URLSearchParams({ grade: entry.grade, mode: entry.mode }),
+      credentials: "same-origin",
+      keepalive: true, // finishes even when the page is left right after the click
+    })
+      // anything but JSON is a failure: offline, or a login that has run out (the reply is then the login page)
+      .then((res) => (res.ok && res.headers.get("content-type")?.includes("json") ? res.json() : Promise.reject(res.status)))
+      .then((saved) => {
+        const pending = readPending();
+        if (pending[num]?.grade === entry.grade) {
+          delete pending[num];
+          writePending(pending);
+        }
+        const panel = document.getElementById(`qh-${num}`);
+        if (panel) panel.innerHTML = saved.history;
+        showUnsaved(num, false);
+      })
+      .catch(() => showUnsaved(num, true))
+      .finally(() => {
+        sending.delete(num);
+        const latest = readPending()[num];
+        if (latest && latest.grade !== entry.grade) send(num);
+      });
+  };
+  const sendAll = () => {
+    const pending = readPending();
+    const today = studyDay();
+    for (const num of Object.keys(pending)) {
+      if (pending[num].day !== today) delete pending[num];
+    }
+    writePending(pending);
+    Object.keys(pending).forEach(send);
+  };
+
+  document.addEventListener("submit", (event) => {
+    const form = event.target;
+    const button = event.submitter;
+    if (!form.matches("form.qc-grades") || !button?.value) return;
+    event.preventDefault();
+    const num = form.getAttribute("action").split("/")[2];
+    if (button.classList.contains("is-picked") && !readPending()[num]) return;
+    pick(form, button.value);
+    const pending = readPending();
+    pending[num] = { grade: button.value, mode: form.elements.mode?.value ?? "", day: studyDay() };
+    writePending(pending);
+    send(num);
+  });
+
+  // Back to a page graded without reloading: a page the browser kept is as it was left, but one it shows from its
+  // HTTP cache is the page as first loaded, before those grades. Load that one afresh.
+  const navigation = performance.getEntriesByType("navigation")[0];
+  if (document.querySelector("form.qc-grades") && navigation?.type === "back_forward" && navigation.transferSize === 0) {
+    location.reload();
+  } else {
+    for (const [num, entry] of Object.entries(readPending())) {
+      const form = gradeForm(num);
+      if (form && entry.day === studyDay()) pick(form, entry.grade);
+    }
+    sendAll();
+    addEventListener("online", sendAll);
   }
 
   // ---------- formulas ----------

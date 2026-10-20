@@ -52,7 +52,7 @@
 {# One question on the chapter page: header, the question, a bar of buttons, and the answer and solution folded away. #}
 {# `mode` is warmup / due on those pages, so the grade is recorded as part of them. #}
 {% macro qcard(q, text, status, index, graded, back, sections, knowledge, titles, history, card, mode='') -%}
-<article class="qcard{% if status == 'excluded' %} is-excluded{% endif %}" id="q-{{ q.num }}"{% if text and text.answer_key %} data-choice{% endif %}>
+<article class="qcard{% if status == 'excluded' %} is-excluded{% endif %}" id="q-{{ q.num }}"{% if text and text.answer_key %} data-choice{% endif %}{% if status == 'new' %} data-new{% endif %}>
   <header class="qc-head">
     <strong class="qc-num" title="{{ q.num|qlabel }}">{{ index }}</strong>
     <span class="qc-src">{{ q.source_full }}</span>
@@ -84,8 +84,7 @@
     {{ related_knowledge(sections, knowledge, titles) }}
   </section>
   <section class="qc-panel" id="qh-{{ q.num }}" data-panel="history" aria-label="做题记录">
-    <h2 class="panel-label">做题记录{% if card and card.due %} <span class="muted">下次复习：{{ card.due|cn_date }} · 已做 {{ card.reps }} 次</span>{% endif %}</h2>
-    {{ review_history(history) }}
+    {{ history_panel(history, card) }}
   </section>
   {% endif %}
 </article>
@@ -155,6 +154,12 @@
 {% else %}
 <p class="muted">这道题还没有逐题标注，先看整章：{% for k in knowledge if k %}{% if not loop.first %}、{% endif %}<a href="/knowledge/{{ k.slug }}?tab=text">{{ k.title }}</a>{% endfor %}</p>
 {% endif %}
+{%- endmacro %}
+
+{# A card's 做题记录; the grade route sends it on its own to the page script. #}
+{% macro history_panel(history, card) -%}
+<h2 class="panel-label">做题记录{% if card and card.due %} <span class="muted">下次复习：{{ card.due|cn_date }} · 已做 {{ card.reps }} 次</span>{% endif %}</h2>
+{{ review_history(history) }}
 {%- endmacro %}
 
 {% macro review_history(history) -%}

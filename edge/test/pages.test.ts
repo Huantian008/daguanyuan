@@ -121,7 +121,7 @@ describe("warm-up and due review", () => {
       expect(cards).toContain('id="q-1"');
       expect(cards).toContain('action="/q/1/grade"');
       expect(cards).toContain(`<input type="hidden" name="back" value="/review/${mode}#q-1"><input type="hidden" name="mode" value="${mode}">`);
-      expect(cards).toContain("今天已评 0 / 1 题");
+      expect(visible(cards)).toContain("今天已评 0 / 1 题");
       expect(cards).not.toContain('id="q-2"');
     }
   });
@@ -135,7 +135,9 @@ describe("warm-up and due review", () => {
     expect(res.headers.get("location")).toBe("/review/warmup#q-1");
     const cards = await text(client, "/review/warmup");
     expect(cards).toMatch(/id="q-1"[\s\S]*qc-grade-mastered is-picked[\s\S]*id="q-2"/);
-    expect(cards).toContain("今天已评 1 / 2 题");
+    expect(visible(cards)).toContain("今天已评 1 / 2 题");
+    expect(cards).toContain('<span class="js-graded">1</span>');
+    expect(cards).toContain('<a class="btn js-all-graded" data-total="2" href="/">');
     expect(await text(client, "/")).toContain('data-warmup-count="1"');
     // #1 was due as well; graded today, it has left due review
     expect(await text(client, "/review/due")).toContain("今天没有到期的题。");
@@ -353,6 +355,50 @@ describe("bank", () => {
     expect((await client.post("/q/999/grade", { grade: "mastered" })).status).toBe(404);
     const evil = await client.post("/q/4/grade", { grade: "shaky", back: "//evil.example" });
     expect(evil.headers.get("location")).toBe("/bank/B#q-4");
+  });
+
+  it("grades for the page script without a reload", async () => {
+    const { client } = await loggedIn();
+    const ask = (num: number, form: Record<string, string>) =>
+      client.request(`/q/${num}/grade`, { method: "POST", body: new URLSearchParams(form), headers: { Accept: "application/json" } });
+    const res = await ask(4, { grade: "mastered" });
+    expect(res.status).toBe(200);
+    let panel = ((await res.json()) as { history: string }).history;
+    expect(panel).toContain("下次复习");
+    expect(panel).toContain("已做 1 次");
+    expect(panel.match(/chip-mastered/g)).toHaveLength(1);
+    expect(await text(client, "/bank/B")).toContain(panel); // the card's 做题记录 as the page has it
+    // changing the grade: the panel follows, still one review
+    panel = ((await (await ask(4, { grade: "unknown", mode: "warmup" })).json()) as { history: string }).history;
+    expect(panel).toContain("chip-unknown");
+    expect(panel).not.toContain("chip-mastered");
+    expect(panel).toContain("已做 1 次");
+    expect(await reviewModes(client)).toEqual([[4, "browse"]]);
+    // bad input records nothing
+    expect(((await (await ask(4, { grade: "perfect" })).json()) as { history: string }).history).toBe(panel);
+    const untouched = ((await (await ask(5, { grade: "perfect" })).json()) as { history: string }).history;
+    expect(untouched).toContain("还没做过这道题");
+    expect(untouched).not.toContain("下次复习");
+    expect((await ask(999, { grade: "mastered" })).status).toBe(404);
+  });
+
+  it("sends the page script to the login page when the login has run out", async () => {
+    const { client } = setup();
+    const res = await client.request("/q/4/grade", { method: "POST", body: new URLSearchParams({ grade: "mastered" }), headers: { Accept: "application/json" } });
+    expect(res.status).toBe(303);
+    expect(res.headers.get("location")).toBe("/login?next=%2Fq%2F4%2Fgrade");
+  });
+
+  it("marks what the page script counts on a chapter page", async () => {
+    const { client } = await loggedIn();
+    await grade(client, 4, "mastered");
+    const page = await text(client, "/bank/B?kp=1");
+    // a question never graded is marked, so its first grade adds one to 做过
+    expect(page.match(/<article [^>]*id="q-4"[^>]*>/)?.[0]).not.toContain("data-new");
+    expect(page.match(/<article [^>]*id="q-5"[^>]*>/)?.[0]).toContain("data-new");
+    expect(page.split('<span class="js-done">1</span>')).toHaveLength(3); // the heading and the current 考点 in the tree
+    expect(page.split('js-done-bar" data-total="2"')).toHaveLength(3);
+    expect(visible(page)).toContain("做过 1 / 2 题");
   });
 
   it("folds knowledge and history away on each card instead of a 详情 link", async () => {

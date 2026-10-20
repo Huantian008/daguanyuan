@@ -54,7 +54,7 @@ describe("two users on one site", () => {
     }
     // what the friend grades as warm-up does not count on my page
     await grade(pal, 1, "mastered", { mode: "warmup" });
-    expect(await text(me, "/review/warmup")).toContain("今天已评 0 / 1 题");
+    expect(visible(await text(me, "/review/warmup"))).toContain("今天已评 0 / 1 题");
   });
 
   it("each continue from their own last question", async () => {
