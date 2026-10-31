@@ -7,11 +7,7 @@
     <p class="eyebrow"><a href="/bank">题库</a></p>
     <h1>搜索“{{ q }}”</h1>
   </div>
-  <form class="search" action="/bank/search" method="get" role="search">
-    <label class="visually-hidden" for="q">搜索题目</label>
-    <input id="q" name="q" type="search" value="{{ q }}">
-    <button class="btn">搜索</button>
-  </form>
+  {% include '_search_form.html' %}
 </header>
 {% if found %}
 <p class="muted">找到 {{ found|length }} 题</p>

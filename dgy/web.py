@@ -4,7 +4,7 @@ from datetime import date, datetime
 from pathlib import Path
 from sqlite3 import Connection
 
-from fastapi import Request
+from fastapi import Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -83,7 +83,7 @@ def warmup_days(conn: Connection) -> int:
 
 
 def render(request: Request, name: str, **context):
-    return TEMPLATES.TemplateResponse(request, name, context)
+    return TEMPLATES.TemplateResponse(request, name, {"study_day": today(request).isoformat(), **context})
 
 
 def fragment(macro: str, *args) -> str:
@@ -103,3 +103,8 @@ def redirect(url: str) -> RedirectResponse:
 def safe_back(url: str | None, default: str = "/") -> str:
     """Only allow redirects to paths on this site."""
     return url if url and url.startswith("/") and not url.startswith("//") else default
+
+
+def require_owner(owner: str = Form("")):
+    if owner != "local":
+        raise HTTPException(409, "页面所属账号已改变，请刷新页面后重试。")

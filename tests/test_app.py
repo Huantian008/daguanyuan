@@ -71,7 +71,7 @@ def visible(html):
 
 
 def grade(env, num, value, **form):
-    r = env.client.post(f"/q/{num}/grade", data={"grade": value, **form}, follow_redirects=False)
+    r = env.client.post(f"/q/{num}/grade", data={"owner": "local", "grade": value, **form}, follow_redirects=False)
     assert r.status_code == 303
 
 
@@ -88,7 +88,7 @@ def test_dashboard_shows_exam_countdown_and_empty_queues(env):
     assert "今天不用热身" in page and "今天没有到期的题" in page and "disabled" not in page
     # nothing graded yet: 继续往下做 starts at the first 考点 of the book, and has the only primary button
     assert "<b>1</b> 题没做" in page and "函数极限连续 / 函数性质 / 有界" in page
-    assert '<a class="btn btn-primary" href="/bank/A?kp=1">开始做题</a>' in page
+    assert '<a class="btn btn-primary" href="/bank/A?kp=1#q-1">开始做题</a>' in page
 
 
 def test_dashboard_date_and_countdown_turn_at_midnight_while_the_rest_goes_by_study_day(env):
@@ -106,16 +106,16 @@ def test_dashboard_date_and_countdown_turn_at_midnight_while_the_rest_goes_by_st
 def test_dashboard_picks_up_where_the_last_chapter_page_grade_left_off(env):
     grade(env, 4, "mastered")
     page = env.client.get("/").text
-    assert '<a class="btn btn-primary" href="/bank/B?kp=1">继续上次</a>' in page
+    assert '<a class="btn btn-primary" href="/bank/B?kp=1#q-5">继续上次</a>' in page
     assert "<b>1</b> 题没做" in page and "一元微分 / 导数概念 / 基本概念题" in page and "换个考点" in page
     # #2's 考点 is done now, so it moves on to the next one with work left
     grade(env, 2, "mastered")
-    assert 'href="/bank/A?kp=3">继续上次</a>' in env.client.get("/").text
+    assert 'href="/bank/A?kp=3#q-3">继续上次</a>' in env.client.get("/").text
     # grading in warm-up the next day does not move it back to #4
     env.clock.at += timedelta(days=1)
     grade(env, 4, "mastered", mode="warmup")
     page = env.client.get("/").text
-    assert 'href="/bank/A?kp=3">继续上次</a>' in page and "/practice/" not in page
+    assert 'href="/bank/A?kp=3#q-3">继续上次</a>' in page and "/practice/" not in page
 
 
 def test_dashboard_says_so_when_the_whole_bank_is_done(env):
@@ -150,7 +150,7 @@ def test_review_page_keeps_a_graded_card_and_records_the_mode(env):
     grade(env, 1, "shaky")
     grade(env, 2, "mastered")
     env.clock.at += timedelta(days=1)
-    r = env.client.post("/q/1/grade", data={"grade": "mastered", "mode": "warmup", "back": "/review/warmup#q-1"},
+    r = env.client.post("/q/1/grade", data={"owner": "local", "grade": "mastered", "mode": "warmup", "back": "/review/warmup#q-1"},
                         follow_redirects=False)
     assert r.headers["location"] == "/review/warmup#q-1"
     cards = env.client.get("/review/warmup").text
@@ -275,24 +275,27 @@ def test_top_bar_has_a_question_size_switch_shown_by_javascript(env):
 
 
 def test_excluding_a_kp_skips_it(env):
-    r = env.client.post("/bank/exclude", data={"chapter": "A", "section": "函数性质", "kp": "有界",
+    r = env.client.post("/bank/exclude", data={"owner": "local", "chapter": "A", "section": "函数性质", "kp": "有界",
                                                "excluded": "1", "back": "/bank/A"}, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/bank/A"
     assert 'id="q-2"' in env.client.get("/bank/A").text
-    assert 'href="/bank/A?kp=2">开始做题</a>' in env.client.get("/").text
+    assert 'href="/bank/A?kp=2#q-2">开始做题</a>' in env.client.get("/").text
     assert "不做" in env.client.get("/q/1").text
 
 
 def test_question_6_is_excluded_by_default_and_can_be_restored(env):
     assert "仅数一" in env.client.get("/q/6").text
+    assert "恢复，要做" in env.client.get("/q/6").text
+    assert "恢复，要做" in env.client.get("/bank/B?kp=2").text
     assert 'action="/q/6/grade"' not in env.client.get("/bank/B", params={"kp": "2"}).text
-    env.client.post("/bank/exclude", data={"nums": "6", "excluded": "0", "back": "/q/6"})
+    env.client.post("/bank/exclude", data={"owner": "local", "nums": "6", "excluded": "0", "back": "/q/6"})
     assert 'action="/q/6/grade"' in env.client.get("/bank/B", params={"kp": "2"}).text
 
 
 def test_question_page_and_search(env):
     page = env.client.get("/q/1").text
     assert "有界" in page and "2004数三" in page and "a/001.webp" in page
+    assert "不做了" not in page and 'action="/bank/exclude"' not in page
     r = env.client.get("/bank/search", params={"q": "3"}, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/q/3"
     assert "#001" in env.client.get("/bank/search", params={"q": "2004"}).text
@@ -320,6 +323,7 @@ def test_bank_pages(env):
 
 def test_chapter_page_lays_out_one_kp_with_its_questions(env):
     page = env.client.get("/bank/B").text
+    assert "不做了" not in page and 'action="/bank/exclude"' not in page
     assert 'id="q-4"' in page and 'id="q-5"' in page and 'id="q-6"' not in page
     assert 'action="/q/4/grade"' in page and 'name="grade" value="mastered"' in page
     # the answer and solution wait in folds that open without JavaScript being needed to see them
@@ -332,7 +336,7 @@ def test_chapter_page_lays_out_one_kp_with_its_questions(env):
 
 def test_chapter_page_opens_on_the_first_kp_with_work_left(env):
     assert "?kp=1" in env.client.get("/bank/A").text and 'id="q-1"' in env.client.get("/bank/A").text
-    env.client.post("/q/1/grade", data={"grade": "mastered"})
+    env.client.post("/q/1/grade", data={"owner": "local", "grade": "mastered"})
     page = env.client.get("/bank/A").text
     assert 'id="q-2"' in page and 'id="q-1"' not in page
     assert 'id="q-3"' in env.client.get("/bank/A", params={"kp": "3"}).text
@@ -350,7 +354,7 @@ def test_chapter_page_steps_between_kps_and_chapters(env):
 
 
 def test_grading_from_the_chapter_page_can_be_changed_all_day(env):
-    r = env.client.post("/q/4/grade", data={"grade": "mastered", "back": "/bank/B?kp=1#q-4"}, follow_redirects=False)
+    r = env.client.post("/q/4/grade", data={"owner": "local", "grade": "mastered", "back": "/bank/B?kp=1#q-4"}, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/bank/B?kp=1#q-4"
     page = env.client.get("/bank/B").text
     assert 'class="qc-grade qc-grade-mastered is-picked">掌握</button>' in page
@@ -373,30 +377,30 @@ def test_grading_from_the_chapter_page_can_be_changed_all_day(env):
 
 
 def test_chapter_grade_ignores_bad_input(env):
-    r = env.client.post("/q/4/grade", data={"grade": "perfect"}, follow_redirects=False)
+    r = env.client.post("/q/4/grade", data={"owner": "local", "grade": "perfect"}, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/bank/B#q-4"
     assert "is-picked" not in env.client.get("/bank/B").text
-    assert env.client.post("/q/999/grade", data={"grade": "mastered"}).status_code == 404
-    r = env.client.post("/q/4/grade", data={"grade": "shaky", "back": "//evil.example"}, follow_redirects=False)
+    assert env.client.post("/q/999/grade", data={"owner": "local", "grade": "mastered"}).status_code == 404
+    r = env.client.post("/q/4/grade", data={"owner": "local", "grade": "shaky", "back": "//evil.example"}, follow_redirects=False)
     assert r.headers["location"] == "/bank/B#q-4"
 
 
 def test_the_page_script_grades_without_a_reload(env):
     ask = {"Accept": "application/json"}
-    r = env.client.post("/q/4/grade", data={"grade": "mastered"}, headers=ask, follow_redirects=False)
+    r = env.client.post("/q/4/grade", data={"owner": "local", "grade": "mastered"}, headers=ask, follow_redirects=False)
     assert r.status_code == 200
     panel = r.json()["history"]
     assert "下次复习" in panel and "已做 1 次" in panel and panel.count("chip-mastered") == 1
     assert panel in env.client.get("/bank/B").text  # the card's 做题记录 as the page has it
     # changing the grade: the panel follows, still one review
-    panel = env.client.post("/q/4/grade", data={"grade": "unknown", "mode": "warmup"}, headers=ask).json()["history"]
+    panel = env.client.post("/q/4/grade", data={"owner": "local", "grade": "unknown", "mode": "warmup"}, headers=ask).json()["history"]
     assert "chip-unknown" in panel and "chip-mastered" not in panel and "已做 1 次" in panel
     assert review_modes(env) == [(4, "browse")]
     # bad input records nothing
-    assert env.client.post("/q/4/grade", data={"grade": "perfect"}, headers=ask).json()["history"] == panel
-    untouched = env.client.post("/q/5/grade", data={"grade": "perfect"}, headers=ask).json()["history"]
+    assert env.client.post("/q/4/grade", data={"owner": "local", "grade": "perfect"}, headers=ask).json()["history"] == panel
+    untouched = env.client.post("/q/5/grade", data={"owner": "local", "grade": "perfect"}, headers=ask).json()["history"]
     assert "还没做过这道题" in untouched and "下次复习" not in untouched
-    assert env.client.post("/q/999/grade", data={"grade": "mastered"}, headers=ask).status_code == 404
+    assert env.client.post("/q/999/grade", data={"owner": "local", "grade": "mastered"}, headers=ask).status_code == 404
 
 
 def test_cards_and_counts_carry_what_the_page_script_updates(env):
@@ -418,7 +422,7 @@ def test_chapter_cards_fold_away_knowledge_and_history_instead_of_a_details_link
     assert "还没做过这道题" in page
     untagged = tagged.client.get("/bank/A", params={"kp": "2"}).text
     assert "这道题还没有逐题标注" in untagged and 'href="/knowledge/01?tab=text"' in untagged
-    tagged.client.post("/q/1/grade", data={"grade": "shaky"})
+    tagged.client.post("/q/1/grade", data={"owner": "local", "grade": "shaky"})
     graded = tagged.client.get("/bank/A", params={"kp": "1"}).text
     assert re.search(r'id="qh-1"[\s\S]*?chip chip-shaky">不熟练/错误', graded) and "下次复习" in graded
 
@@ -454,7 +458,7 @@ def test_history_lists_reviews(env):
 
 
 def test_settings_change_exam_date(env):
-    r = env.client.post("/settings", data={"exam_date": "2026-12-20", "warmup_days": "2"}, follow_redirects=False)
+    r = env.client.post("/settings", data={"owner": "local", "exam_date": "2026-12-20", "warmup_days": "2"}, follow_redirects=False)
     assert r.status_code == 303
     assert "还有 65 天" in visible(env.client.get("/").text)
 
@@ -482,3 +486,85 @@ def test_password_protects_pages_and_images(tmp_path):
     r = env.client.post("/login", data={"password": "pw", "next": "/bank"}, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/bank"
     assert env.client.get("/").status_code == 200
+
+
+def test_grade_owner_and_accessible_status(env):
+    page = env.client.get("/bank/A").text
+    assert 'data-grade-owner="local"' in page
+    assert 'name="owner" value="local"' in page
+    assert 'role="status" aria-live="polite" aria-atomic="true"' in page
+    assert 'value="mastered" aria-pressed="false"' in page
+    for owner in ("", "someone-else"):
+        result = env.client.post("/q/1/grade", data={"owner": owner, "grade": "unknown"})
+        assert result.status_code == 409
+    assert review_modes(env) == []
+    grade(env, 1, "mastered")
+    assert 'value="mastered" aria-pressed="true"' in env.client.get("/bank/A?kp=1").text
+
+
+def test_login_page_does_not_replay_pending_grades(tmp_path):
+    protected = _make_env(tmp_path, password="test-password")
+    assert 'data-grade-owner=""' in protected.client.get("/login").text
+
+
+def test_long_break_warmup_matches_home(env):
+    grade(env, 1, "unknown")
+    env.clock.at += timedelta(days=500)
+    assert 'data-warmup-count="1"' in env.client.get("/").text
+    assert 'id="q-1"' in env.client.get("/review/warmup").text
+
+
+def test_other_mutations_require_page_owner(env):
+    for owner in ("", "wrong"):
+        for path, form in [("/bank/exclude", {"nums": "1", "excluded": "1"}),
+                           ("/settings", {"exam_date": "2027-01-01"}), ("/logout", {})]:
+            assert env.client.post(path, data={"owner": owner, **form}, follow_redirects=False).status_code == 409
+    assert 'name="owner" value="local"' in env.client.get("/settings").text
+    assert "不做了" not in env.client.get("/bank/A?kp=1").text
+
+
+def test_grade_rejects_expired_study_day(env):
+    r = env.client.post("/q/1/grade", data={"owner": "local", "day": "2026-10-15", "grade": "mastered"})
+    assert r.status_code == 422 and r.json()["code"] == "day_changed"
+    assert review_modes(env) == []
+    env.client.post("/q/1/grade", data={"owner": "local", "day": "2026-10-16", "grade": "mastered"})
+    env.clock.at += timedelta(days=1)
+    env.client.post("/q/1/grade", data={"owner": "local", "day": "2026-10-17", "grade": "mastered"})
+    assert len(review_modes(env)) == 2
+
+
+def test_card_filter_keeps_original_number_and_overall_progress(env):
+    grade(env, 4, "unknown")
+    page = env.client.get("/bank/B?kp=1&status=new").text
+    assert 'id="q-4"' not in page and 'id="q-5"' in page
+    assert 'title="#005">2</strong>' in page
+    assert "做过 1 / 2 题" in visible(page)
+    assert "没有符合筛选的题目" in env.client.get("/bank/B?kp=1&status=shaky").text
+
+
+def test_search_tokens_subject_and_status(tmp_path):
+    from .factories import two_books
+    env = _make_env(tmp_path, bank=two_books())
+    grade(env, 1, "unknown")
+    page = env.client.get("/bank/search", params={"q": "2004   有界", "subject": "gaoshu", "status": "unknown"}).text
+    assert "找到 1 题" in visible(page) and 'href="/q/1"' in page
+    page = env.client.get("/bank/search", params={"subject": "xiandai", "status": "new"}).text
+    assert "找到 3 题" in visible(page) and 'href="/q/1"' not in page
+    r = env.client.get("/bank/search", params={"q": "线 １"}, follow_redirects=False)
+    assert r.headers["location"] == "/q/1001"
+    assert "没有找到" in env.client.get("/bank/search?q=1&subject=xiandai").text
+
+
+def test_solution_image_zoom_link_and_day_metadata(env):
+    page = env.client.get("/bank/A").text
+    assert 'class="solution-zoom" href="/content/s/001-1.webp?v=' in page
+    assert 'aria-label="放大解析图片"' in page
+    assert 'title="点按放大"' not in page
+    assert 'data-study-day="2026-10-16"' in page
+    assert 'name="day" value="2026-10-16"' in page
+
+
+def test_expired_login_json_is_actionable(tmp_path):
+    env = _make_env(tmp_path, password="pw")
+    r = env.client.post("/q/1/grade", data={"owner": "local", "grade": "unknown"}, headers={"Accept": "application/json"})
+    assert r.status_code == 401 and r.json()["code"] == "login_required"

@@ -76,6 +76,7 @@
     const open = button.getAttribute("aria-expanded") !== "true";
     button.setAttribute("aria-expanded", String(open));
     panel.classList.toggle("is-open", open);
+    if (open) renderMath(panel);
     // Scroll just enough to bring the start of a panel that opened below the fold into view, keeping the question visible.
     const shortfall = open ? panel.getBoundingClientRect().top - (innerHeight - REVEAL_PEEK) : 0;
     if (shortfall > 0) scrollBy({ top: shortfall, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
@@ -114,6 +115,7 @@
     const view = sheet.querySelector(".qview");
     const next = view.dataset.view === "text" ? "image" : "text";
     setView(sheet, next);
+    if (next === "text") renderMath(view);
     // A question with a figure always opens on its image, so switching it says nothing about the reader's preference.
     if (!("figure" in view.dataset)) {
       try {
@@ -318,29 +320,47 @@
   // sent again when a page loads or the network comes back, on the same study day only (later it would count for the
   // wrong day). Only one request per question is out at a time, so the grade that stays is the last one clicked.
 
-  const PENDING_KEY = "dgy-pending-grades";
-  // A study day runs 04:00 to 04:00 Shanghai time (UTC+8), so it is the UTC date four hours on.
+  const gradeOwner = document.body.dataset.gradeOwner;
+  const PENDING_KEY = `dgy-pending-grades:${gradeOwner}`;
+  // A study day runs 04:00 to 04:00 Shanghai time (UTC+8).
   const studyDay = () => new Date(Date.now() + 4 * 3600 * 1000).toISOString().slice(0, 10);
+  let pageDay = document.body.dataset.studyDay || studyDay();
   let pendingHere = {};
+  let storageAvailable = true;
   const readPending = () => {
+    if (!gradeOwner) return {};
+    if (!storageAvailable) return pendingHere;
     try {
-      return JSON.parse(localStorage.getItem(PENDING_KEY)) || {};
+      const stored = JSON.parse(localStorage.getItem(PENDING_KEY)) || {};
+      return Object.fromEntries(Object.entries(stored).filter(([num, entry]) =>
+        /^\d+$/.test(num) && entry?.owner === gradeOwner && typeof entry.id === "string"
+        && ["mastered", "shaky", "unknown"].includes(entry.grade) && /^\d{4}-\d{2}-\d{2}$/.test(entry.day)));
     } catch {
-      return pendingHere; // storage blocked: grades wait as long as this page is open
+      storageAvailable = false;
+      return pendingHere;
     }
   };
   const writePending = (pending) => {
+    if (!gradeOwner) return;
     pendingHere = pending;
     try {
       if (Object.keys(pending).length) localStorage.setItem(PENDING_KEY, JSON.stringify(pending));
       else localStorage.removeItem(PENDING_KEY);
     } catch {
-      // kept in pendingHere
+      storageAvailable = false;
     }
   };
   const gradeForm = (num) => document.querySelector(`form.qc-grades[action="/q/${num}/grade"]`);
+  try {
+    if (gradeOwner && Object.keys(JSON.parse(localStorage.getItem("dgy-pending-grades")) || {}).length) {
+      const note = document.createElement("p");
+      note.className = "note";
+      note.setAttribute("role", "status");
+      note.textContent = "有旧版本留下的未同步评价，无法确认所属账号，未自动提交。请核对做题记录后重新评价。";
+      document.getElementById("main")?.prepend(note);
+    }
+  } catch { /* Unreadable legacy storage is never submitted. */ }
 
-  // The counts on the page follow: 做过 X / Y on a chapter page, 今天已评 X / N on a review page.
   const countDone = () => {
     let done = 0;
     document.querySelectorAll(".js-done").forEach((count) => {
@@ -355,13 +375,14 @@
   };
   const countGraded = () => {
     const graded = document.querySelectorAll(".qc-grades .is-picked").length;
-    document.querySelectorAll(".js-graded").forEach((count) => {
-      count.textContent = graded;
-    });
+    document.querySelectorAll(".js-graded").forEach((count) => { count.textContent = graded; });
     document.querySelectorAll(".js-all-graded").forEach((link) => link.classList.toggle("btn-primary", graded >= Number(link.dataset.total)));
   };
   const pick = (form, grade) => {
-    form.querySelectorAll(".qc-grade").forEach((button) => button.classList.toggle("is-picked", button.value === grade));
+    form.querySelectorAll(".qc-grade").forEach((button) => {
+      button.classList.toggle("is-picked", button.value === grade);
+      button.setAttribute("aria-pressed", String(button.value === grade));
+    });
     const card = form.closest(".qcard");
     if (card && "new" in card.dataset) {
       delete card.dataset.new;
@@ -369,94 +390,272 @@
     }
     countGraded();
   };
-  const showUnsaved = (num, unsaved) => {
-    const form = gradeForm(num);
-    const note = form?.querySelector(".qc-unsaved");
-    if (unsaved && form && !note) {
-      const span = document.createElement("span");
-      span.className = "qc-unsaved";
-      span.textContent = "还没存上，联网后会自动补交";
-      form.querySelector(".qc-grade").before(span);
-    } else if (!unsaved) {
-      note?.remove();
-    }
+  const refreshDay = () => {
+    const next = studyDay();
+    if (pageDay === next) return;
+    pageDay = next;
+    document.querySelectorAll("form.qc-grades").forEach((form) => {
+      form.querySelectorAll(".qc-grade").forEach((button) => {
+        button.classList.toggle("is-picked", false);
+        button.setAttribute("aria-pressed", "false");
+      });
+      if (form.elements.day) form.elements.day.value = next;
+    });
+    countGraded();
   };
-
   const sending = new Set();
-  const send = (num) => {
-    const entry = readPending()[num];
-    if (!entry || sending.has(num)) return;
-    sending.add(num);
-    fetch(`/q/${num}/grade`, {
-      method: "POST",
-      headers: { Accept: "application/json" },
-      body: new URLSearchParams({ grade: entry.grade, mode: entry.mode }),
-      credentials: "same-origin",
-      keepalive: true, // finishes even when the page is left right after the click
-    })
-      // anything but JSON is a failure: offline, or a login that has run out (the reply is then the login page)
-      .then((res) => (res.ok && res.headers.get("content-type")?.includes("json") ? res.json() : Promise.reject(res.status)))
-      .then((saved) => {
-        const pending = readPending();
-        if (pending[num]?.grade === entry.grade) {
+  const retries = new Map();
+  const failures = new Map();
+  const retryDelays = [1500, 4000, 10000];
+  const cancelRetry = (num) => {
+    const retry = retries.get(num);
+    if (retry?.timer) clearTimeout(retry.timer);
+    retries.delete(num);
+  };
+  const failureText = (code) => ({
+    login_required: "登录已过期，评价尚未保存，请重新登录。",
+    owner_mismatch: "当前登录账号已改变，评价未提交。请回到原账号后重试。",
+    day_changed: "这条评价已跨学习日，尚未保存。请核对记录后重新评价。",
+    rejected: "评价未保存，请刷新页面后重试。",
+    retry_exhausted: "自动重试未成功，评价仍保留。请点击“立即重试”。",
+  })[code] || "评价尚未保存，正在等待重试；也可以点击“立即重试”。";
+  const showSaveStatus = (num, state, message) => {
+    const form = gradeForm(num);
+    const note = form?.querySelector(".qc-save-status");
+    if (!note) return;
+    form.setAttribute("aria-busy", String(state === "saving"));
+    note.classList.toggle("visually-hidden", state !== "failed");
+    note.classList.toggle("qc-unsaved", state === "failed");
+    note.textContent = message ?? ({ saving: "正在保存评价", saved: "评价已保存", failed: failureText() })[state];
+    const retry = form.querySelector(".js-grade-retry");
+    if (retry) retry.hidden = state !== "failed" || readPending()[num]?.day !== studyDay()
+      || ["login_required", "owner_mismatch", "day_changed"].includes(failures.get(num));
+  };
+  const pendingBox = document.getElementById("pending-grades");
+  const renderPending = () => {
+    if (!pendingBox) return;
+    const entries = Object.entries(readPending());
+    pendingBox.hidden = !entries.length;
+    const list = pendingBox.querySelector("ul");
+    list.replaceChildren();
+    for (const [num, entry] of entries) {
+      const expired = entry.day !== studyDay() || failures.get(num) === "day_changed";
+      const row = document.createElement("li");
+      const link = document.createElement("a");
+      link.href = `/q/${num}`;
+      link.textContent = entry.label || "查看题目";
+      const message = document.createElement("span");
+      const grade = { mastered: "掌握", shaky: "不熟练", unknown: "不会" }[entry.grade];
+      message.textContent = `${entry.day} · ${grade} · ${expired ? "已过期，未保存，请核对后重新评价" : sending.has(num) ? "正在保存" : failureText(failures.get(num))}`;
+      row.append(link, message);
+      if (expired) {
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "btn btn-small";
+        remove.textContent = "已核对，移除待处理项";
+        remove.addEventListener("click", () => {
+          const pending = readPending();
+          if (pending[num]?.id !== entry.id) return;
           delete pending[num];
           writePending(pending);
-        }
+          cancelRetry(num);
+          failures.delete(num);
+          showSaveStatus(num, "saved", "待处理项已移除；未补记学习记录。");
+          renderPending();
+        });
+        row.append(remove);
+      }
+      list.append(row);
+    }
+    const login = pendingBox.querySelector(".js-sync-login");
+    login.hidden = ![...failures.values()].some((code) => code === "login_required" || code === "owner_mismatch");
+    login.href = `/login?next=${encodeURIComponent(location.pathname + location.search + location.hash)}`;
+    pendingBox.querySelector(".js-sync-retry").hidden = !entries.some(([num, entry]) => entry.day === studyDay()
+      && !["login_required", "owner_mismatch", "day_changed"].includes(failures.get(num)));
+  };
+  const send = async (num) => {
+    const entry = readPending()[num];
+    if (!entry || sending.has(num)) return;
+    if (entry.day !== studyDay()) {
+      cancelRetry(num);
+      showSaveStatus(num, "failed", failureText("day_changed"));
+      renderPending();
+      return;
+    }
+    sending.add(num);
+    showSaveStatus(num, "saving");
+    renderPending();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const res = await fetch(`/q/${num}/grade`, {
+        method: "POST", headers: { Accept: "application/json" },
+        body: new URLSearchParams({ grade: entry.grade, mode: entry.mode, owner: gradeOwner, day: entry.day }),
+        credentials: "same-origin", keepalive: true, signal: controller.signal,
+      });
+      const json = res.headers.get("content-type")?.includes("json");
+      if (res.status === 401 || (res.ok && !json)) throw "login_required";
+      if (!res.ok) {
+        const detail = json ? await res.json().catch(() => ({})) : {};
+        throw detail.code || (res.status === 409 ? "owner_mismatch" : res.status >= 500 || res.status === 429 ? "network" : "rejected");
+      }
+      const saved = await res.json();
+      const pending = readPending();
+      if (pending[num]?.id === entry.id) {
+        delete pending[num];
+        writePending(pending);
+      }
+      cancelRetry(num);
+      failures.delete(num);
+      if (!pending[num]) {
         const panel = document.getElementById(`qh-${num}`);
         if (panel) panel.innerHTML = saved.history;
-        showUnsaved(num, false);
-      })
-      .catch(() => showUnsaved(num, true))
-      .finally(() => {
-        sending.delete(num);
-        const latest = readPending()[num];
-        if (latest && latest.grade !== entry.grade) send(num);
-      });
+        showSaveStatus(num, "saved");
+      }
+    } catch (error) {
+      const code = entry.day !== studyDay() ? "day_changed" : typeof error === "string" ? error : "network";
+      failures.set(num, code);
+      showSaveStatus(num, "failed", failureText(code));
+      const latest = readPending()[num];
+      if (code === "network" && latest?.id === entry.id && latest.day === studyDay()) {
+        const retry = retries.get(num) ?? { id: entry.id, count: 0 };
+        if (retry.count < retryDelays.length) {
+          retry.timer = setTimeout(() => { retry.timer = null; send(num); }, retryDelays[retry.count++]);
+          retries.set(num, retry);
+        } else {
+          failures.set(num, "retry_exhausted");
+          showSaveStatus(num, "failed", failureText("retry_exhausted"));
+        }
+      }
+    } finally {
+      clearTimeout(timeout);
+      sending.delete(num);
+      renderPending();
+      const latest = readPending()[num];
+      if (latest && latest.id !== entry.id) send(num);
+    }
   };
   const sendAll = () => {
-    const pending = readPending();
-    const today = studyDay();
-    for (const num of Object.keys(pending)) {
-      if (pending[num].day !== today) delete pending[num];
-    }
-    writePending(pending);
-    Object.keys(pending).forEach(send);
+    refreshDay();
+    for (const num of Object.keys(readPending())) { cancelRetry(num); send(num); }
+    renderPending();
   };
-
+  pendingBox?.querySelector(".js-sync-retry").addEventListener("click", sendAll);
+  document.querySelectorAll(".js-grade-retry").forEach((button) => button.addEventListener("click", () => {
+    const num = button.closest("form").getAttribute("action").split("/")[2];
+    cancelRetry(num);
+    send(num);
+  }));
   document.addEventListener("submit", (event) => {
     const form = event.target;
     const button = event.submitter;
-    if (!form.matches("form.qc-grades") || !button?.value) return;
+    if (!form.matches("form.qc-grades") || !button?.value || !gradeOwner) return;
     event.preventDefault();
+    refreshDay();
     const num = form.getAttribute("action").split("/")[2];
     if (button.classList.contains("is-picked") && !readPending()[num]) return;
     pick(form, button.value);
     const pending = readPending();
-    pending[num] = { grade: button.value, mode: form.elements.mode?.value ?? "", day: studyDay() };
+    const id = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    pending[num] = { grade: button.value, mode: form.elements.mode?.value ?? "", day: studyDay(), owner: gradeOwner, id, label: form.dataset.questionLabel };
+    cancelRetry(num);
+    failures.delete(num);
     writePending(pending);
     send(num);
   });
 
-  // Back to a page graded without reloading: a page the browser kept is as it was left, but one it shows from its
-  // HTTP cache is the page as first loaded, before those grades. Load that one afresh.
   const navigation = performance.getEntriesByType("navigation")[0];
   if (document.querySelector("form.qc-grades") && navigation?.type === "back_forward" && navigation.transferSize === 0) {
     location.reload();
   } else {
+    refreshDay();
     for (const [num, entry] of Object.entries(readPending())) {
       const form = gradeForm(num);
       if (form && entry.day === studyDay()) pick(form, entry.grade);
     }
     sendAll();
     addEventListener("online", sendAll);
+    addEventListener("focus", sendAll);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) sendAll(); });
+  }
+
+  // ---------- enlarged solution images: native scrolling on touch, drag with a mouse ----------
+  if (typeof HTMLDialogElement === "function") {
+    let viewer, image, stage, origin, scale = 1, baseWidth = 0, drag = null;
+    const resize = () => {
+      const oldWidth = image.getBoundingClientRect().width || baseWidth;
+      const centerX = (stage.scrollLeft + stage.clientWidth / 2) / oldWidth;
+      const centerY = (stage.scrollTop + stage.clientHeight / 2) / oldWidth;
+      image.style.width = `${baseWidth * scale}px`;
+      stage.scrollLeft = centerX * baseWidth * scale - stage.clientWidth / 2;
+      stage.scrollTop = centerY * baseWidth * scale - stage.clientHeight / 2;
+      viewer.querySelector(".zoom-value").textContent = `${Math.round(scale * 100)}%`;
+      viewer.querySelector('[data-zoom="out"]').disabled = scale <= 1;
+      viewer.querySelector('[data-zoom="in"]').disabled = scale >= 4;
+    };
+    const fit = () => {
+      baseWidth = Math.min(image.naturalWidth || 1600, Math.max(1, stage.clientWidth - 24));
+      scale = 1;
+      resize();
+      stage.scrollTop = stage.scrollLeft = 0;
+    };
+    const buildViewer = () => {
+      viewer = document.createElement("dialog");
+      viewer.className = "image-viewer";
+      viewer.setAttribute("aria-label", "放大解析图片");
+      viewer.innerHTML = `<div class="image-viewer-inner"><header class="image-viewer-head">
+        <button type="button" class="btn btn-small" data-zoom="out" aria-label="缩小解析图片">缩小</button>
+        <span class="zoom-value" role="status" aria-live="polite"></span>
+        <button type="button" class="btn btn-small" data-zoom="in" aria-label="放大解析图片">放大</button>
+        <button type="button" class="btn btn-small" data-zoom="fit">适合屏幕</button>
+        <button type="button" class="btn btn-small zoom-close" autofocus>关闭</button>
+      </header><div class="zoom-stage" tabindex="0" aria-label="解析图片，可滚动查看"><img alt="放大的解析" draggable="false"></div></div>`;
+      document.body.append(viewer);
+      image = viewer.querySelector("img");
+      stage = viewer.querySelector(".zoom-stage");
+      image.addEventListener("load", fit);
+      viewer.querySelector(".zoom-close").addEventListener("click", () => viewer.close());
+      viewer.addEventListener("close", () => { origin?.focus(); });
+      viewer.addEventListener("click", (event) => {
+        if (event.target === viewer) viewer.close();
+        const action = event.target.closest("[data-zoom]")?.dataset.zoom;
+        if (action === "fit") fit();
+        else if (action) { scale = Math.max(1, Math.min(4, scale + (action === "in" ? 0.5 : -0.5))); resize(); }
+      });
+      stage.addEventListener("pointerdown", (event) => {
+        if (event.pointerType !== "mouse" || event.button !== 0) return;
+        drag = { x: event.clientX, y: event.clientY, left: stage.scrollLeft, top: stage.scrollTop };
+        stage.setPointerCapture(event.pointerId);
+        event.preventDefault();
+      });
+      stage.addEventListener("pointermove", (event) => {
+        if (!drag) return;
+        stage.scrollLeft = drag.left - event.clientX + drag.x;
+        stage.scrollTop = drag.top - event.clientY + drag.y;
+      });
+      for (const name of ["pointerup", "pointercancel", "lostpointercapture"]) stage.addEventListener(name, () => { drag = null; });
+      addEventListener("resize", () => { if (viewer.open) fit(); });
+    };
+    document.addEventListener("click", (event) => {
+      const link = event.target.closest("a.solution-zoom");
+      if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      if (!viewer) buildViewer();
+      origin = link;
+      image.src = link.href;
+      if (!viewer.open) viewer.showModal();
+      fit();
+    });
   }
 
   // ---------- formulas ----------
 
-  const renderMath = (scope) => {
+  function renderMath(scope, { skipCards = false, includeHidden = false } = {}) {
     if (!window.katex) return;
     scope.querySelectorAll(".math.inline, .math.block").forEach((el) => {
       if (el.dataset.rendered) return;
+      if (skipCards && el.closest(".qcard")) return;
+      if (!includeHidden && el.closest('.qc-panel:not(.is-open), .reveal-panel:not(.is-open), .qview[data-view="image"] .qtext, details:not([open])')) return;
       window.katex.render(el.textContent, el, {
         displayMode: el.classList.contains("block"),
         throwOnError: false,
@@ -464,7 +663,7 @@
       });
       el.dataset.rendered = "1";
     });
-  };
+  }
 
   let katexLoading = null;
   const loadKatex = () => {
@@ -592,5 +791,27 @@
     });
   }
 
-  renderMath(document);
+  // Render only visible/nearby question cards. Answers and image-mode text render when explicitly opened.
+  const cards = [...document.querySelectorAll(".qcard")];
+  if (cards.length && typeof IntersectionObserver === "function") {
+    renderMath(document, { skipCards: true });
+    const nearby = cards.filter((card) => {
+      const rect = card.getBoundingClientRect();
+      return rect.bottom >= -400 && rect.top <= innerHeight + 400;
+    });
+    nearby.forEach((card) => renderMath(card));
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) if (entry.isIntersecting) {
+        renderMath(entry.target);
+        observer.unobserve(entry.target);
+      }
+    }, { rootMargin: "400px" });
+    cards.forEach((card) => observer.observe(card));
+  } else {
+    renderMath(document);
+  }
+  document.addEventListener("toggle", (event) => {
+    if (event.target.matches("details[open]")) renderMath(event.target);
+  }, true);
+  addEventListener("beforeprint", () => renderMath(document, { includeHidden: true }));
 })();

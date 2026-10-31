@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import * as db from "../src/db";
-import { NEW_CARD, schedule } from "../src/srs";
+import { cardFrom, NEW_CARD, schedule } from "../src/srs";
 import { memoryD1 } from "./d1";
 
 const EVENING = new Date("2026-10-16T22:00:00+08:00");
@@ -77,6 +77,27 @@ describe("reviews and cards", () => {
     await Promise.all([db.recordReview(d1, ME, input), db.recordReview(d1, ME, input)]);
     expect((await db.reviewLog(d1, ME)).map((r) => [r.grade, r.mode])).toEqual([["mastered", "warmup"]]);
     expect(await db.getCard(d1, ME, 5)).toEqual(schedule(NEW_CARD, "mastered", "2026-10-16"));
+  });
+
+  it("keeps different concurrent grades consistent, including on later review days", async () => {
+    for (const at of [EVENING, new Date("2026-10-23T22:00:00+08:00")]) {
+      await Promise.all((["mastered", "unknown", "shaky", "mastered"] as const).map((grade) =>
+        db.recordReview(d1, ME, { num: 5, grade, at, mode: "warmup" })));
+      const history = await db.historyFor(d1, ME, 5);
+      expect(new Set(history.map((r) => r.studyDay)).size).toBe(history.length);
+      expect(await db.getCard(d1, ME, 5)).toEqual(cardFrom(history.map((r) => [r.grade, r.studyDay])));
+    }
+  });
+
+  it("keeps the card consistent when requests cross the study-day boundary", async () => {
+    await Promise.all([
+      db.recordReview(d1, ME, { num: 5, grade: "mastered", at: new Date("2026-10-17T04:01:00+08:00"), mode: "browse" }),
+      db.recordReview(d1, ME, { num: 5, grade: "unknown", at: EVENING, mode: "warmup" }),
+    ]);
+    const history = await db.historyFor(d1, ME, 5);
+    expect(history).toHaveLength(2);
+    expect(await db.getCard(d1, ME, 5)).toEqual(cardFrom(history.map((r) => [r.grade, r.studyDay])));
+    expect((await db.getCard(d1, ME, 5)).lastGrade).toBe("mastered");
   });
 
   it("filters the log by study day", async () => {

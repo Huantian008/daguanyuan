@@ -15,6 +15,7 @@ class Statement {
   constructor(private db: DatabaseSync, private sql: string, private params: unknown[] = []) {}
 
   bind(...params: unknown[]) {
+    if (params.length > 100) throw new Error("D1 maximum 100 bound parameters exceeded");
     return new Statement(this.db, this.sql, params);
   }
 

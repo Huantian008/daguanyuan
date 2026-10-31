@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 
-from .srs import CardState, card_from, schedule
+from .srs import CardState, card_from
 from .studyday import TZ, study_day
 
 SCHEMA = """
@@ -103,25 +103,23 @@ def record_review(conn: sqlite3.Connection, num: int, grade: str, at: datetime, 
     and the review keeps its time and mode. The same grade again changes nothing, so a double click is one review."""
     at = at.astimezone(TZ)
     day = study_day(at)
-    history = conn.execute("SELECT id, grade, study_day FROM reviews WHERE num = ? ORDER BY reviewed_at, id", (num,)).fetchall()
-    same_day = [r for r in history if r["study_day"] == day.isoformat()]
-    if same_day and same_day[-1]["grade"] == grade:
-        return get_card(conn, num)
     with conn:
+        # Lock before reading: another connection must not change the log between this read and the card write.
+        conn.execute("BEGIN IMMEDIATE")
+        history = conn.execute("SELECT id, grade, study_day FROM reviews WHERE num = ? ORDER BY reviewed_at, id", (num,)).fetchall()
+        same_day = [r for r in history if r["study_day"] == day.isoformat()]
+        updated = [(r["grade"], date.fromisoformat(r["study_day"])) for r in history if r["study_day"] != day.isoformat()]
+        updated.append((grade, day))
+        card = card_from(sorted(updated, key=lambda r: r[1]))
         if same_day:
-            earlier = [(r["grade"], date.fromisoformat(r["study_day"])) for r in history if r["study_day"] < day.isoformat()]
-            card = schedule(card_from(earlier), grade, day)
             conn.execute("UPDATE reviews SET grade = ? WHERE id = ?", (grade, same_day[0]["id"]))
             # a double click can leave two reviews of the day; the changed one is all that stays
             conn.execute("DELETE FROM reviews WHERE num = ? AND study_day = ? AND id <> ?",
                          (num, day.isoformat(), same_day[0]["id"]))
         else:
-            card = schedule(get_card(conn, num), grade, day)
-            # the page script sends a grade again when it never heard back, so the same grade can arrive twice at once
             conn.execute(
-                "INSERT INTO reviews (num, grade, reviewed_at, study_day, mode) SELECT ?, ?, ?, ?, ? "
-                "WHERE NOT EXISTS (SELECT 1 FROM reviews WHERE num = ? AND study_day = ?)",
-                (num, grade, at.isoformat(), day.isoformat(), mode, num, day.isoformat()),
+                "INSERT INTO reviews (num, grade, reviewed_at, study_day, mode) VALUES (?, ?, ?, ?, ?)",
+                (num, grade, at.isoformat(), day.isoformat(), mode),
             )
         conn.execute(
             "INSERT INTO cards (num, level, due, last_grade, reps, lapses) VALUES (?, ?, ?, ?, ?, ?) "
@@ -142,6 +140,15 @@ def review_log(conn: sqlite3.Connection, since: date | None = None) -> list[Revi
                date.fromisoformat(row["study_day"]), row["mode"])
         for row in rows
     ]
+
+
+def warmup_log(conn: sqlite3.Connection, day: date, days: int) -> list[Review]:
+    """Today's reviews and the last N days with activity, without a calendar cutoff."""
+    rows = conn.execute("SELECT * FROM reviews WHERE study_day = ? OR study_day IN "
+                        "(SELECT DISTINCT study_day FROM reviews WHERE study_day < ? ORDER BY study_day DESC LIMIT ?) "
+                        "ORDER BY reviewed_at, id", (day.isoformat(), day.isoformat(), days))
+    return [Review(row["num"], row["grade"], datetime.fromisoformat(row["reviewed_at"]),
+                   date.fromisoformat(row["study_day"]), row["mode"]) for row in rows]
 
 
 def history_for(conn: sqlite3.Connection, num: int) -> list[Review]:

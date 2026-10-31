@@ -1,6 +1,4 @@
 """Warm-up and due review, laid out as cards like the chapter page."""
-from datetime import timedelta
-
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from .. import db, stats
@@ -22,7 +20,7 @@ def review(request: Request, mode: str, conn=Depends(get_conn)):
     content = bank(request)
     day = today(request)
     state = user_state(conn, content)
-    reviews = db.review_log(conn, since=day - timedelta(days=60))
+    reviews = db.warmup_log(conn, day, warmup_days(conn))
     if mode == "warmup":
         queue = stats.warmup_queue(reviews, state.active, day, warmup_days(conn))
     else:

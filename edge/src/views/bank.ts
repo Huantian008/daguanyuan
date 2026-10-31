@@ -8,11 +8,15 @@ import type { UserState } from "../state";
 import type { ChapterProgress, Distribution, Review } from "../stats";
 import { cnDate } from "../studyday";
 import { layout } from "./layout";
-import { STATUS_LABELS, answerBody, distBar, excludeToggle, katexCss, katexJs, qmeta, questionBody, questionCard, relatedKnowledge, revealToggle, reviewHistory, type Status } from "./parts";
+import { STATUS_LABELS, answerBody, distBar, restoreQuestion, katexCss, katexJs, qmeta, questionBody, questionCard, relatedKnowledge, revealToggle, reviewHistory, type Status } from "./parts";
 
-const searchForm = (q = "", placeholder = "题号、年份、考点或题干文字，如 123、线12、2019数二、拐点") => html`<form class="search" action="/bank/search" method="get" role="search">
+const searchForm = (q = "", subject = "all", status = "all") => html`<form class="search" action="/bank/search" method="get" role="search">
     <label class="visually-hidden" for="q">搜索题目</label>
-    <input id="q" name="q" type="search" value="${q}" placeholder="${placeholder}">
+    <input id="q" name="q" type="search" value="${q}" placeholder="题号、年份或考点，多个关键词用空格分隔">
+    <label class="visually-hidden" for="subject">科目</label>
+    <select id="subject" name="subject">${[["all", "全部科目"], ["gaoshu", "高数"], ["xiandai", "线代"]].map(([value, label]) => html`<option value="${value}"${subject === value ? raw(" selected") : ""}>${label}</option>`)}</select>
+    <label class="visually-hidden" for="status">掌握状态</label>
+    <select id="status" name="status">${[["all", "全部状态"], ["new", "未做"], ["unknown", "不会"], ["shaky", "不熟练"], ["mastered", "掌握"], ["excluded", "已排除"]].map(([value, label]) => html`<option value="${value}"${status === value ? raw(" selected") : ""}>${label}</option>`)}</select>
     <button class="btn">搜索</button>
   </form>`;
 
@@ -43,6 +47,7 @@ export interface ChapterPageData {
   chapters: ChapterInfo[];
   tree: [string, DrillKp[]][];
   current: DrillKp;
+  statusFilter: string;
   prev: [string, string] | null;
   following: [string, string] | null;
   state: UserState;
@@ -58,7 +63,10 @@ const percent = (done: number, total: number) => (total ? Math.round((100 * done
 
 export function chapterPage(meta: Meta, d: ChapterPageData) {
   const { chapter, current, prev, following } = d;
-  const here = `/bank/${chapter.code}?kp=${current.index}`;
+  const filter = d.statusFilter;
+  const suffix = filter === "all" ? "" : `&status=${filter}`;
+  const here = `/bank/${chapter.code}?kp=${current.index}${suffix}`;
+  const shown = current.questions.map((q, i) => ({ q, index: i + 1 })).filter(({ q }) => filter === "all" || d.state.status(q.num) === filter);
   return layout(meta, {
     title: `${chapter.name} · ${current.kp}`,
     nav: "bank",
@@ -75,7 +83,7 @@ export function chapterPage(meta: Meta, d: ChapterPageData) {
       <p class="kt-sec-name">${section}</p>
       ${items.map((k) => {
         const here = k.index === current.index;
-        return html`<a class="kt-kp${here ? " is-current" : ""}" href="/bank/${chapter.code}?kp=${k.index}"${here ? raw(' aria-current="page"') : ""}>
+        return html`<a class="kt-kp${here ? " is-current" : ""}" href="/bank/${chapter.code}?kp=${k.index}${suffix}"${here ? raw(' aria-current="page"') : ""}>
         <span class="kt-name">${k.kp}</span>
         <span class="kt-count">${here ? html`<span class="js-done">${k.done}</span>` : k.done} / ${k.total}</span>
         <i class="kt-bar${k.total && k.done === k.total ? " is-full" : ""}${here ? " js-done-bar" : ""}" data-total="${k.total}"><b style="width: ${percent(k.done, k.total)}%"></b></i>
@@ -103,8 +111,14 @@ export function chapterPage(meta: Meta, d: ChapterPageData) {
       <div class="drill-track js-done-bar" data-total="${current.total}" aria-hidden="true"><span style="width: ${percent(current.done, current.total)}%"></span></div>
     </header>
 
+    <form class="card-filters" method="get" action="/bank/${chapter.code}" aria-label="筛选题卡">
+      <input type="hidden" name="kp" value="${current.index}">
+      ${[["all", "全部"], ["new", "未做"], ["unknown", "不会"], ["shaky", "不熟练"]].map(([value, label]) => html`<button class="btn btn-small${filter === value ? " btn-primary" : ""}" name="status" value="${value}" aria-pressed="${String(filter === value)}">${label}</button>`)}
+      <span class="muted">显示 ${shown.length} 题</span>
+    </form>
+    ${shown.length ? "" : html`<p class="empty">这个考点没有符合筛选的题目。选择“全部”可查看所有题卡。</p>`}
     <div class="qcards">
-      ${current.questions.map((q, i) => questionCard(meta, q, d.texts.get(q.num), d.state.status(q.num), i + 1, d.gradedToday.get(q.num), `${here}#q-${q.num}`, {
+      ${shown.map(({ q, index }) => questionCard(meta, q, d.texts.get(q.num), d.state.status(q.num), index, d.gradedToday.get(q.num), `${here}#q-${q.num}`, {
         sections: d.sections.get(q.num) ?? [], knowledge: d.knowledge, titles: d.titles, history: d.histories.get(q.num) ?? [], card: d.state.cards.get(q.num),
       }))}
     </div>
@@ -121,7 +135,7 @@ export function chapterPage(meta: Meta, d: ChapterPageData) {
 /** Like Jinja's truncate(60, true, "…", 0) in search.html. */
 const snippet = (text: string, length = 60) => (text.length <= length ? text : `${text.slice(0, length - 1)}…`);
 
-export function searchPage(meta: Meta, q: string, found: Question[], state: UserState, texts: Map<number, QuestionText>) {
+export function searchPage(meta: Meta, q: string, found: Question[], state: UserState, texts: Map<number, QuestionText>, subject = "all", status = "all") {
   return layout(meta, {
     title: `搜索 ${q}`,
     nav: "bank",
@@ -130,7 +144,7 @@ export function searchPage(meta: Meta, q: string, found: Question[], state: User
     <p class="eyebrow"><a href="/bank">题库</a></p>
     <h1>搜索“${q}”</h1>
   </div>
-  ${searchForm(q, "")}
+  ${searchForm(q, subject, status)}
 </header>
 ${found.length
     ? html`<p class="muted">找到 ${found.length} 题</p>
@@ -176,9 +190,9 @@ export function questionPage(meta: Meta, d: QuestionData) {
     <p class="eyebrow"><a href="/bank/${d.chapter.code}?kp=${d.kpIndex}#q-${q.num}">${d.chapter.name}</a> / ${q.path.join(" / ")}</p>
     <h1>${qlabel(q.num)} ${q.kp}</h1>
   </div>
-  <div class="head-actions">
-    ${excludeToggle(d.status === "excluded", `/q/${q.num}`, { nums: String(q.num) })}
-  </div>
+  ${d.status === "excluded" ? html`<div class="head-actions">
+    ${restoreQuestion(`/q/${q.num}`, q.num, meta.grade_owner)}
+  </div>` : ""}
 </header>
 
 <p class="status-line">

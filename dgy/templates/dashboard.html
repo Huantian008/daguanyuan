@@ -33,7 +33,7 @@
     <p class="step-count"><b>{{ kp.total - kp.done }}</b> 题没做</p>
     <p class="step-note">{{ name }} / {{ kp.section }} / {{ kp.kp }}</p>
     <div class="step-actions">
-      <a class="{{ onwards_cls }}" href="/bank/{{ code }}?kp={{ kp.index }}">{{ '继续上次' if resumed else '开始做题' }}</a>
+      <a class="{{ onwards_cls }}" href="/bank/{{ code }}?kp={{ kp.index }}#q-{{ onward_num }}">{{ '继续上次' if resumed else '开始做题' }}</a>
       <a class="btn" href="/bank">换个考点</a>
     </div>
     {% else %}

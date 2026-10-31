@@ -69,7 +69,7 @@ export function questionCard(
 ): Html {
   const excluded = status === "excluded";
   const gradeButton = (grade: Grade, label: string) =>
-    html`<button name="grade" value="${grade}" class="qc-grade qc-grade-${grade}${graded === grade ? " is-picked" : ""}">${label}</button>`;
+    html`<button name="grade" value="${grade}" aria-pressed="${String(graded === grade)}" class="qc-grade qc-grade-${grade}${graded === grade ? " is-picked" : ""}">${label}</button>`;
   return html`<article class="qcard${excluded ? " is-excluded" : ""}" id="q-${q.num}"${text?.answer_key ? raw(" data-choice") : ""}${status === "new" ? raw(" data-new") : ""}>
   <header class="qc-head">
     <strong class="qc-num" title="${qlabel(q.num)}">${index}</strong>
@@ -77,7 +77,7 @@ export function questionCard(
     <span class="qc-path">${q.path.join(" / ")}</span>
     ${q.stars !== null || q.flags.length ? html`<span class="qc-meta">${q.stars !== null ? html`<span class="qdiff" title="原书得分率 ${q.difficulty}">${stars(q.stars)}</span> 建议 ${q.minutes} 分钟` : ""}${q.flags.map((flag) => html` <span class="flag">${flag}</span>`)}</span>` : ""}
     ${text && !excluded ? html`<button type="button" class="qview-toggle js-qview" aria-pressed="false" title="在文字和原图之间切换" hidden>原图</button>` : ""}
-    <span class="qc-tools">${excludeToggle(excluded, back, { nums: String(q.num) })}</span>
+    ${excluded ? html`<span class="qc-tools">${restoreQuestion(back, q.num, meta.grade_owner)}</span>` : ""}
   </header>
   ${excluded ? "" : html`${questionBody(meta, q, text, { forceLazy: true, dataCorrect: true })}
   <div class="qc-actions">
@@ -87,7 +87,11 @@ export function questionCard(
       <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qk-${q.num}" hidden>相关知识点</button>
       <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qh-${q.num}" hidden>做题记录</button>
     </div>
-    <form method="post" action="/q/${q.num}/grade" class="qc-grades">
+    <form method="post" action="/q/${q.num}/grade" class="qc-grades" data-question-label="${qlabel(q.num)}">
+      <input type="hidden" name="owner" value="${meta.grade_owner ?? ""}">
+      <input type="hidden" name="day" value="${meta.study_day ?? ""}">
+      <span class="qc-save-status visually-hidden" role="status" aria-live="polite" aria-atomic="true"></span>
+      <button type="button" class="btn btn-small js-grade-retry" hidden>立即重试</button>
       <input type="hidden" name="back" value="${back}">${hidden("mode", x.mode)}
       ${gradeButton("shaky", "不熟练")}
       ${gradeButton("unknown", "不会")}
@@ -110,7 +114,7 @@ export const katexCss = (meta: Meta): Html => html`<link rel="stylesheet" href="
 export const katexJs = (meta: Meta): Html => html`<script src="${staticUrl(meta, "vendor/katex/katex.min.js")}" defer></script>`;
 
 export function images(meta: Meta, list: Img[], cls: string, alt: string, scale = 2, lazy = true): Html {
-  return html`${list.map((img) => html`<img class="${cls}" src="${contentUrl(meta, img.src)}" width="${Math.round(img.w / scale)}" height="${Math.round(img.h / scale)}" alt="${alt}" ${lazy ? raw('loading="lazy" decoding="async"') : raw('fetchpriority="high"')}>`)}`;
+  return html`${list.map((img) => html`${cls === "simg" ? html`<a class="solution-zoom" href="${contentUrl(meta, img.src)}" target="_blank" rel="noopener" aria-label="放大解析图片">` : ""}<img class="${cls}" src="${contentUrl(meta, img.src)}" width="${Math.round(img.w / scale)}" height="${Math.round(img.h / scale)}" alt="${alt}" ${lazy ? raw('loading="lazy" decoding="async"') : raw('fetchpriority="high"')}>${cls === "simg" ? raw("</a>") : ""}`)}`;
 }
 
 const DIST_KEYS = ["mastered", "shaky", "unknown", "new"] as const;
@@ -126,18 +130,12 @@ export const legend = (d: Distribution): Html => html`<ul class="legend" data-di
 
 const hidden = (name: string, value?: string) => (value ? html`<input type="hidden" name="${name}" value="${value}">` : "");
 
-export interface ExcludeOptions {
-  nums?: string;
-  chapter?: string;
-  section?: string;
-  kp?: string;
-  onLabel?: string;
-}
-
-export const excludeToggle = (excluded: boolean, back: string, o: ExcludeOptions = {}): Html => html`<form method="post" action="/bank/exclude" class="inline">
-  <input type="hidden" name="excluded" value="${excluded ? "0" : "1"}">
-  <input type="hidden" name="back" value="${back}">${hidden("nums", o.nums)}${hidden("chapter", o.chapter)}${hidden("section", o.section)}${hidden("kp", o.kp)}
-  <button class="btn-quiet">${excluded ? "恢复，要做" : (o.onLabel ?? "不做了")}</button>
+export const restoreQuestion = (back: string, num: number, owner = ""): Html => html`<form method="post" action="/bank/exclude" class="inline">
+  <input type="hidden" name="owner" value="${owner}">
+  <input type="hidden" name="excluded" value="0">
+  <input type="hidden" name="back" value="${back}">
+  <input type="hidden" name="nums" value="${num}">
+  <button class="btn-quiet">恢复，要做</button>
 </form>`;
 
 const CHEVRON = raw('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>');

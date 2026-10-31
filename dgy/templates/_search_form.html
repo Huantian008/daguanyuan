@@ -1,0 +1,9 @@
+<form class="search" action="/bank/search" method="get" role="search">
+  <label class="visually-hidden" for="q">搜索题目</label>
+  <input id="q" name="q" type="search" value="{{ q|default('') }}" placeholder="题号、年份或考点，多个关键词用空格分隔">
+  <label class="visually-hidden" for="subject">科目</label>
+  <select id="subject" name="subject">{% for value, label in [('all', '全部科目'), ('gaoshu', '高数'), ('xiandai', '线代')] %}<option value="{{ value }}"{% if subject|default('all') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+  <label class="visually-hidden" for="status">掌握状态</label>
+  <select id="status" name="status">{% for value, label in [('all', '全部状态'), ('new', '未做'), ('unknown', '不会'), ('shaky', '不熟练'), ('mastered', '掌握'), ('excluded', '已排除')] %}<option value="{{ value }}"{% if status|default('all') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+  <button class="btn">搜索</button>
+</form>

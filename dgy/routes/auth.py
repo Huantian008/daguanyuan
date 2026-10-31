@@ -1,8 +1,8 @@
 import hmac
 
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Depends, Form, Request
 
-from ..web import redirect, render, safe_back
+from ..web import redirect, render, require_owner, safe_back
 
 router = APIRouter()
 
@@ -23,7 +23,7 @@ def login(request: Request, password: str = Form(""), next: str = Form("/")):
     return render(request, "login.html", next=safe_back(next), error="密码不对，请重新输入。")
 
 
-@router.post("/logout")
+@router.post("/logout", dependencies=[Depends(require_owner)])
 def logout(request: Request):
     request.session.clear()
     return redirect("/login")

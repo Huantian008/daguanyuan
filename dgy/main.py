@@ -6,7 +6,7 @@ from typing import Callable
 from urllib.parse import quote
 
 from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -44,6 +44,8 @@ def create_app(settings: Settings | None = None, clock: Callable[[], datetime] |
     async def guard(request: Request, call_next):
         path = request.url.path
         if settings.password and not request.session.get("auth") and not path.startswith(PUBLIC_PREFIXES):
+            if "application/json" in request.headers.get("accept", ""):
+                return JSONResponse({"code": "login_required", "error": "登录已过期，请重新登录。"}, status_code=401)
             target = path + (f"?{request.url.query}" if request.url.query else "")
             return RedirectResponse(f"/login?next={quote(target)}", status_code=303)
         day = studyday.study_day(app.state.clock())

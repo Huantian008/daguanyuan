@@ -51,7 +51,7 @@
 
 {# One question on the chapter page: header, the question, a bar of buttons, and the answer and solution folded away. #}
 {# `mode` is warmup / due on those pages, so the grade is recorded as part of them. #}
-{% macro qcard(q, text, status, index, graded, back, sections, knowledge, titles, history, card, mode='') -%}
+{% macro qcard(q, text, status, index, graded, back, sections, knowledge, titles, history, card, mode='', day='') -%}
 <article class="qcard{% if status == 'excluded' %} is-excluded{% endif %}" id="q-{{ q.num }}"{% if text and text.answer_key %} data-choice{% endif %}{% if status == 'new' %} data-new{% endif %}>
   <header class="qc-head">
     <strong class="qc-num" title="{{ q.num|qlabel }}">{{ index }}</strong>
@@ -59,7 +59,7 @@
     <span class="qc-path">{{ q.path|join(' / ') }}</span>
     {% if q.stars is not none or q.flags %}<span class="qc-meta">{% if q.stars is not none %}<span class="qdiff" title="原书得分率 {{ q.difficulty }}">{{ q.stars|stars }}</span> 建议 {{ q.minutes }} 分钟{% endif %}{% for flag in q.flags %} <span class="flag">{{ flag }}</span>{% endfor %}</span>{% endif %}
     {% if text and status != 'excluded' %}<button type="button" class="qview-toggle js-qview" aria-pressed="false" title="在文字和原图之间切换" hidden>原图</button>{% endif %}
-    <span class="qc-tools">{{ exclude_toggle(status == 'excluded', back, nums=q.num) }}</span>
+    {% if status == 'excluded' %}<span class="qc-tools">{{ restore_question(back, q.num) }}</span>{% endif %}
   </header>
   {% if status != 'excluded' %}
   {{ question_body(q, text, force_lazy=true, data_correct=true) }}
@@ -70,11 +70,15 @@
       <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qk-{{ q.num }}" hidden>相关知识点</button>
       <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qh-{{ q.num }}" hidden>做题记录</button>
     </div>
-    <form method="post" action="/q/{{ q.num }}/grade" class="qc-grades">
+    <form method="post" action="/q/{{ q.num }}/grade" class="qc-grades" data-question-label="{{ q.num|qlabel }}">
+      <input type="hidden" name="owner" value="local">
+      <input type="hidden" name="day" value="{{ day }}">
+      <span class="qc-save-status visually-hidden" role="status" aria-live="polite" aria-atomic="true"></span>
+      <button type="button" class="btn btn-small js-grade-retry" hidden>立即重试</button>
       <input type="hidden" name="back" value="{{ back }}">{% if mode %}<input type="hidden" name="mode" value="{{ mode }}">{% endif %}
-      <button name="grade" value="shaky" class="qc-grade qc-grade-shaky{% if graded == 'shaky' %} is-picked{% endif %}">不熟练</button>
-      <button name="grade" value="unknown" class="qc-grade qc-grade-unknown{% if graded == 'unknown' %} is-picked{% endif %}">不会</button>
-      <button name="grade" value="mastered" class="qc-grade qc-grade-mastered{% if graded == 'mastered' %} is-picked{% endif %}">掌握</button>
+      <button name="grade" value="shaky" aria-pressed="{{ 'true' if graded == 'shaky' else 'false' }}" class="qc-grade qc-grade-shaky{% if graded == 'shaky' %} is-picked{% endif %}">不熟练</button>
+      <button name="grade" value="unknown" aria-pressed="{{ 'true' if graded == 'unknown' else 'false' }}" class="qc-grade qc-grade-unknown{% if graded == 'unknown' %} is-picked{% endif %}">不会</button>
+      <button name="grade" value="mastered" aria-pressed="{{ 'true' if graded == 'mastered' else 'false' }}" class="qc-grade qc-grade-mastered{% if graded == 'mastered' %} is-picked{% endif %}">掌握</button>
     </form>
   </div>
   <section class="qc-panel" id="qa-{{ q.num }}" data-panel="answer" aria-label="答案">{{ answer_part(q, text) }}</section>
@@ -94,7 +98,7 @@
 {% macro katex_script() -%}<script src="/static/vendor/katex/katex.min.js" defer></script>{%- endmacro %}
 
 {% macro images(list, cls, alt, scale=2, lazy=true) -%}
-{% for img in list %}<img class="{{ cls }}" src="/content/{{ img.src }}?v={{ content_v }}" width="{{ (img.w / scale)|round|int }}" height="{{ (img.h / scale)|round|int }}" alt="{{ alt }}" {% if lazy %}loading="lazy" decoding="async"{% else %}fetchpriority="high"{% endif %}>{% endfor %}
+{% for img in list %}{% if cls == 'simg' %}<a class="solution-zoom" href="/content/{{ img.src }}?v={{ content_v }}" target="_blank" rel="noopener" aria-label="放大解析图片">{% endif %}<img class="{{ cls }}" src="/content/{{ img.src }}?v={{ content_v }}" width="{{ (img.w / scale)|round|int }}" height="{{ (img.h / scale)|round|int }}" alt="{{ alt }}" {% if lazy %}loading="lazy" decoding="async"{% else %}fetchpriority="high"{% endif %}>{% if cls == 'simg' %}</a>{% endif %}{% endfor %}
 {%- endmacro %}
 
 {% macro dist_bar(dist) -%}
@@ -112,15 +116,13 @@
 </ul>
 {%- endmacro %}
 
-{% macro exclude_toggle(excluded, back, nums='', chapter='', section='', kp='', on_label='不做了') -%}
+{% macro restore_question(back, num) -%}
 <form method="post" action="/bank/exclude" class="inline">
-  <input type="hidden" name="excluded" value="{{ '0' if excluded else '1' }}">
+  <input type="hidden" name="owner" value="local">
+  <input type="hidden" name="excluded" value="0">
   <input type="hidden" name="back" value="{{ back }}">
-  {%- if nums %}<input type="hidden" name="nums" value="{{ nums }}">{% endif %}
-  {%- if chapter %}<input type="hidden" name="chapter" value="{{ chapter }}">{% endif %}
-  {%- if section %}<input type="hidden" name="section" value="{{ section }}">{% endif %}
-  {%- if kp %}<input type="hidden" name="kp" value="{{ kp }}">{% endif %}
-  <button class="btn-quiet">{{ '恢复，要做' if excluded else on_label }}</button>
+  <input type="hidden" name="nums" value="{{ num }}">
+  <button class="btn-quiet">恢复，要做</button>
 </form>
 {%- endmacro %}
 

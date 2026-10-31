@@ -48,7 +48,7 @@ export function layout(meta: Meta, o: PageOptions): Html {
   <link rel="stylesheet" href="${staticUrl(meta, "css/app.css")}">
   ${o.head ?? ""}
 </head>
-<body>
+<body data-grade-owner="${meta.grade_owner ?? ""}" data-study-day="${meta.study_day ?? ""}">
   <a class="skip-link" href="#main">跳到正文</a>
   <header class="topbar">
     <div class="topbar-inner">
@@ -59,6 +59,11 @@ export function layout(meta: Meta, o: PageOptions): Html {
     </div>
   </header>
   <main id="main" class="page ${o.pageClass ?? ""}">
+    <section id="pending-grades" class="sync-notice" hidden aria-labelledby="pending-title">
+      <h2 id="pending-title">未保存的评价</h2>
+      <ul></ul>
+      <div class="sync-actions"><button type="button" class="btn btn-small js-sync-retry">立即重试</button><a class="btn btn-small js-sync-login" hidden>重新登录</a></div>
+    </section>
     ${o.body}
   </main>
   ${o.scripts ?? ""}

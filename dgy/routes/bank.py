@@ -1,10 +1,13 @@
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi.responses import JSONResponse
 
 from .. import db, stats
 from ..content import parse_label
 from ..drill import default_kp, drill_kps, kp_tree
+from ..search import STATUSES, SUBJECTS, matches, normalize
 from ..srs import GRADES
-from ..web import bank, fragment, get_conn, now, redirect, render, safe_back, today, user_state, wants_json
+from ..studyday import study_day
+from ..web import bank, fragment, get_conn, now, redirect, render, require_owner, safe_back, today, user_state, wants_json
 from .review import REVIEW_PAGES
 
 router = APIRouter()
@@ -24,23 +27,29 @@ def chapters(request: Request, conn=Depends(get_conn)):
 
 
 @router.get("/bank/search")
-def search(request: Request, q: str = "", conn=Depends(get_conn)):
+def search(request: Request, q: str = "", subject: str = "all", status: str = "all", conn=Depends(get_conn)):
     content = bank(request)
-    term = q.strip().lstrip("#")
-    if (num := parse_label(term)) in content.questions:
+    state = user_state(conn, content)
+    subject = subject if subject in SUBJECTS else "all"
+    status = status if status in STATUSES else "all"
+    term = normalize(q).strip().lstrip("#")
+    num = parse_label("".join(term.split()))
+
+    def accepted(question):
+        return matches(question, content.texts.get(question.num), "" if question.num == num else term,
+                       subject, status, state.status(question.num))
+
+    if num in content.questions and accepted(content.questions[num]):
         return redirect(f"/q/{num}")
-    found = [
-        question for num, question in sorted(content.questions.items())
-        if term and (term in question.source_full or term in question.source
-                     or term in question.kp or term in question.section
-                     or (num in content.texts and term in content.texts[num].search))
-    ]
-    return render(request, "search.html", nav="bank", q=q, found=found, state=user_state(conn, content),
-                  texts=content.texts)
+    found = [question for _, question in sorted(content.questions.items())
+             if (term or subject != "all" or status != "all") and accepted(question)
+             and (num not in content.questions or question.num == num)]
+    return render(request, "search.html", nav="bank", q=q, found=found, state=state,
+                  texts=content.texts, subject=subject, status=status)
 
 
 @router.get("/bank/{code}")
-def chapter(request: Request, code: str, kp: str = "", conn=Depends(get_conn)):
+def chapter(request: Request, code: str, kp: str = "", status: str = "all", conn=Depends(get_conn)):
     content = bank(request)
     if code not in {c.code for c in content.chapters}:
         raise HTTPException(404, "没有这一章")
@@ -62,16 +71,22 @@ def chapter(request: Request, code: str, kp: str = "", conn=Depends(get_conn)):
         following = ("下一章", f"/bank/{codes[at + 1]}?kp=1")
     else:
         following = None
-    nums = [q.num for q in current.questions]
+    status = status if status in ("all", "new", "unknown", "shaky") else "all"
+    visible_questions = [(i, q) for i, q in enumerate(current.questions, 1) if status == "all" or state.status(q.num) == status]
+    if status != "all":
+        prev = (prev[0], prev[1] + "&status=" + status) if prev else None
+        following = (following[0], following[1] + "&status=" + status) if following else None
+    nums = [q.num for _, q in visible_questions]
     return render(request, "bank_chapter.html", nav="bank", chapter=content.chapter(code), chapters=content.chapters,
                   tree=kp_tree(kps), current=current, prev=prev, following=following, state=state,
+                  status_filter=status, visible_questions=visible_questions,
                   texts=content.texts, graded_today=db.graded_on(conn, today(request)),
                   sections={num: content.sections_for(num) for num in nums}, titles=content.knowledge_titles(),
                   knowledge=[content.knowledge_entry(s) for s in content.chapter_links.get(code, [])],
                   histories=db.histories_for(conn, nums))
 
 
-@router.post("/bank/exclude")
+@router.post("/bank/exclude", dependencies=[Depends(require_owner)])
 def exclude(request: Request, excluded: str = Form(...), nums: str = Form(""), chapter: str = Form(""),
             section: str = Form(""), kp: str = Form(""), back: str = Form("/bank"), conn=Depends(get_conn)):
     content = bank(request)
@@ -85,7 +100,7 @@ def exclude(request: Request, excluded: str = Form(...), nums: str = Form(""), c
 
 @router.post("/q/{num}/grade")
 def grade(request: Request, num: int, grade: str = Form(""), back: str = Form(""), mode: str = Form(""),
-          conn=Depends(get_conn)):
+          owner: str = Form(""), day: str = Form(""), conn=Depends(get_conn)):
     """Grade a question from the chapter page or a review page.
     Grading it again the same study day changes that day's grade. The page script gets the card's 做题记录 back instead
     of a redirect, so the page stays where it is."""
@@ -93,8 +108,13 @@ def grade(request: Request, num: int, grade: str = Form(""), back: str = Form(""
     q = content.questions.get(num)
     if q is None:
         raise HTTPException(404, "没有这道题")
+    if owner != "local":
+        raise HTTPException(409, "评价所属账号不一致，请刷新页面后重试。")
+    at = now(request)
+    if day and day != study_day(at).isoformat():
+        return JSONResponse({"code": "day_changed", "error": "这条评价已跨学习日，请核对后重新评价。"}, status_code=422)
     if grade in GRADES:
-        db.record_review(conn, num, grade, now(request), mode if mode in REVIEW_PAGES else "browse")
+        db.record_review(conn, num, grade, at, mode if mode in REVIEW_PAGES else "browse")
     if wants_json(request):
         return {"history": fragment("history_panel", db.histories_for(conn, [num])[num], db.get_card(conn, num))}
     return redirect(safe_back(back, f"/bank/{q.chapter}#q-{num}"))

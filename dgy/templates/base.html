@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="/static/css/app.css?v={{ asset_v }}">
   {% block head %}{% endblock %}
 </head>
-<body>
+<body data-grade-owner="{{ 'local' if request.url.path != '/login' else '' }}" data-study-day="{{ study_day }}">
   <a class="skip-link" href="#main">跳到正文</a>
   <header class="topbar">
     <div class="topbar-inner">
@@ -27,6 +27,11 @@
     </div>
   </header>
   <main id="main" class="page {% block page_class %}{% endblock %}">
+    <section id="pending-grades" class="sync-notice" hidden aria-labelledby="pending-title">
+      <h2 id="pending-title">未保存的评价</h2>
+      <ul></ul>
+      <div class="sync-actions"><button type="button" class="btn btn-small js-sync-retry">立即重试</button><a class="btn btn-small js-sync-login" hidden>重新登录</a></div>
+    </section>
     {% block content %}{% endblock %}
   </main>
   {% block scripts %}{% endblock %}

@@ -1,7 +1,8 @@
 /** Page routes, ported from dgy/routes/*.py. */
-import type { Hono } from "hono";
-import { parseLabel, type Content, type KnowledgeEntry } from "./content";
+import type { Context, Hono } from "hono";
+import { parseLabel, type Content, type KnowledgeEntry, type Question } from "./content";
 import * as db from "./db";
+import { STATUSES, SUBJECTS, matches, normalize } from "./search";
 import { defaultKp, drillKps, kpIndexOf, kpTree, onwardKp } from "./drill";
 import type { AppEnv, KnowledgeData, Meta } from "./env";
 import { isGrade } from "./srs";
@@ -29,6 +30,7 @@ export interface PageDeps {
 
 export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now }: PageDeps) {
   const today = () => studyDay(now());
+  const pageMeta = (c: Context<AppEnv>): Meta => ({ ...meta, grade_owner: String(c.get("user").id), study_day: today() });
 
   app.get("/", async (c) => {
     const DB = c.env.DB;
@@ -37,15 +39,16 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     const [state, reviews, exam, warmup] = await Promise.all([
       loadState(DB, uid, content), db.reviewLog(DB, uid, addDays(day, -400)), examDate(DB, uid), warmupDays(DB, uid),
     ]);
+    const warmupReviews = await db.warmupLog(DB, uid, day, warmup);
     const last = stats.lastDrilled(reviews, (num) => content.questions.has(num));
     const onward = onwardKp(content, state.status, last === undefined ? undefined : content.questions.get(last));
     const date = calendarDay(now());
-    return c.html(dashboardPage(meta, {
+    return c.html(dashboardPage(pageMeta(c), {
       date,
       daysLeft: daysBetween(date, exam),
-      warmup: stats.warmupQueue(reviews, state.active, day, warmup),
+      warmup: stats.warmupQueue(warmupReviews, state.active, day, warmup),
       due: stats.dueQueue(state.cards, state.active, day),
-      onward: onward && { ...onward, name: content.chapter(onward.code).name, resumed: last !== undefined },
+      onward: onward && { ...onward, name: content.chapter(onward.code).name, resumed: last !== undefined, num: onward.kp.questions.find((q) => state.status(q.num) === "new")!.num },
       progress: stats.chapterProgress(content, state.cards, state.excluded),
       dist: stats.masteryDistribution(state.active, state.cards),
       activeTotal: state.active.size,
@@ -64,12 +67,13 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     const DB = c.env.DB;
     const uid = c.get("user").id;
     const day = today();
-    const [state, reviews, warmup, gradedToday] = await Promise.all([
-      loadState(DB, uid, content), db.reviewLog(DB, uid, addDays(day, -60)), warmupDays(DB, uid), db.gradedOn(DB, uid, day),
+    const [state, warmup, gradedToday] = await Promise.all([
+      loadState(DB, uid, content), warmupDays(DB, uid), db.gradedOn(DB, uid, day),
     ]);
+    const reviews = await db.warmupLog(DB, uid, day, warmup);
     const queue = mode === "warmup" ? stats.warmupQueue(reviews, state.active, day, warmup) : stats.dueQueue(state.cards, state.active, day);
     const nums = stats.reviewList(reviews, mode, day, queue);
-    return c.html(reviewPage(meta, {
+    return c.html(reviewPage(pageMeta(c), {
       mode, questions: nums.map((n) => content.questions.get(n)!), state, texts: content.texts, gradedToday,
       sections: new Map(nums.map((n) => [n, content.sectionsFor(n)])), knowledge: (q) => content.knowledgeFor(q.chapter),
       titles: content.knowledgeTitles(), histories: await db.historiesFor(DB, uid, nums),
@@ -84,19 +88,21 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
       groups[groups.length - 1][1].push(
         [p, stats.masteryDistribution(content.inChapter(p.code).map((q) => q.num).filter((n) => state.active.has(n)), state.cards)]);
     }
-    return c.html(bankPage(meta, groups));
+    return c.html(bankPage(pageMeta(c), groups));
   });
 
   app.get("/bank/search", async (c) => {
     const q = c.req.query("q") ?? "";
-    const term = q.trim().replace(/^#/, "");
-    const num = parseLabel(term);
-    if (num !== null && content.questions.has(num)) return c.redirect(`/q/${num}`, 303);
-    const found = term
-      ? content.all().filter((x) => x.source_full.includes(term) || x.source.includes(term) || x.kp.includes(term) || x.section.includes(term)
-        || (content.text(x.num)?.search.includes(term) ?? false))
-      : [];
-    return c.html(searchPage(meta, q, found, await loadState(c.env.DB, c.get("user").id, content), content.texts));
+    const term = normalize(q).trim().replace(/^#/, "");
+    const subject = SUBJECTS.includes(c.req.query("subject") ?? "") ? c.req.query("subject")! : "all";
+    const status = STATUSES.includes(c.req.query("status") ?? "") ? c.req.query("status")! : "all";
+    const state = await loadState(c.env.DB, c.get("user").id, content);
+    const num = parseLabel(term.replace(/\s+/g, ""));
+    const accepted = (question: Question) => matches(question, content.text(question.num), question.num === num ? "" : term, subject, status, state.status(question.num));
+    if (num !== null && content.questions.has(num) && accepted(content.questions.get(num)!)) return c.redirect(`/q/${num}`, 303);
+    const found = term || subject !== "all" || status !== "all"
+      ? content.all().filter((q) => accepted(q) && (num === null || !content.questions.has(num) || q.num === num)) : [];
+    return c.html(searchPage(pageMeta(c), q, found, state, content.texts, subject, status));
   });
 
   app.get("/bank/:code", async (c) => {
@@ -107,15 +113,20 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     const kps = drillKps(content, code, state.status);
     const asked = intOrNull(c.req.query("kp"));
     const current = kps[(asked !== null && asked >= 1 && asked <= kps.length ? asked : defaultKp(kps)) - 1];
-    const nums = current.questions.map((q) => q.num);
+    const statusFilter = ["all", "new", "unknown", "shaky"].includes(c.req.query("status") ?? "") ? c.req.query("status")! : "all";
+    const nums = current.questions.filter((q) => statusFilter === "all" || state.status(q.num) === statusFilter).map((q) => q.num);
     const codes = content.chapters.map((ch) => ch.code);
     const at = codes.indexOf(code);
     const prev: [string, string] | null = current.index > 1 ? ["上一节", `/bank/${code}?kp=${current.index - 1}`]
       : at > 0 ? ["上一章", `/bank/${codes[at - 1]}?kp=${drillKps(content, codes[at - 1], state.status).length}`] : null;
     const following: [string, string] | null = current.index < kps.length ? ["下一节", `/bank/${code}?kp=${current.index + 1}`]
       : at + 1 < codes.length ? ["下一章", `/bank/${codes[at + 1]}?kp=1`] : null;
-    return c.html(chapterPage(meta, {
-      chapter: content.chapter(code), chapters: content.chapters, tree: kpTree(kps), current, prev, following, state,
+    if (statusFilter !== "all") {
+      if (prev) prev[1] += `&status=${statusFilter}`;
+      if (following) following[1] += `&status=${statusFilter}`;
+    }
+    return c.html(chapterPage(pageMeta(c), {
+      chapter: content.chapter(code), chapters: content.chapters, tree: kpTree(kps), current, prev, following, state, statusFilter,
       texts: content.texts, gradedToday,
       sections: new Map(nums.map((n) => [n, content.sectionsFor(n)])), knowledge: content.knowledgeFor(code), titles: content.knowledgeTitles(),
       histories: await db.historiesFor(c.env.DB, uid, nums),
@@ -146,10 +157,17 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     const q = num === null ? undefined : content.questions.get(num);
     if (!q) return c.notFound();
     const form = await c.req.parseBody();
+    if (str(form.owner) !== String(uid)) {
+      return c.json({ error: "评价所属账号与当前登录不一致，请回到原账号后重试。" }, 409);
+    }
+    const at = now();
+    if (str(form.day) && str(form.day) !== studyDay(at)) {
+      return c.json({ code: "day_changed", error: "这条评价已跨学习日，请核对后重新评价。" }, 422);
+    }
     const grade = str(form.grade);
     const mode = str(form.mode);
     if (isGrade(grade)) {
-      await db.recordReview(DB, uid, { num: q.num, grade, at: now(), mode: isReviewMode(mode) ? mode : "browse" });
+      await db.recordReview(DB, uid, { num: q.num, grade, at, mode: isReviewMode(mode) ? mode : "browse" });
     }
     if (c.req.header("Accept")?.includes("application/json")) {
       const [history, card] = await Promise.all([db.historyFor(DB, uid, q.num), db.getCard(DB, uid, q.num)]);
@@ -166,7 +184,7 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     if (!q) return c.notFound();
     const [state, history] = await Promise.all([loadState(DB, uid, content), db.historyFor(DB, uid, q.num)]);
     const [prev, next] = content.neighbors(q.num);
-    return c.html(questionPage(meta, {
+    return c.html(questionPage(pageMeta(c), {
       q, chapter: content.chapter(q.chapter), card: state.cards.get(q.num), status: state.status(q.num), history,
       knowledge: content.knowledgeFor(q.chapter), sections: content.sectionsFor(q.num), titles: content.knowledgeTitles(),
       text: content.text(q.num),
@@ -181,7 +199,7 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
       if (!groups.has(entry.group)) groups.set(entry.group, []);
       groups.get(entry.group)!.push(entry);
     }
-    return c.html(knowledgeIndexPage(meta, [...groups], (slug) => slug in knowledge.chapters, knowledge.overview));
+    return c.html(knowledgeIndexPage(pageMeta(c), [...groups], (slug) => slug in knowledge.chapters, knowledge.overview));
   });
 
   app.get("/knowledge/:slug", async (c) => {
@@ -194,7 +212,7 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     const tab = c.req.query("tab") === "text" && text ? "text" : "original";
     const state = await loadState(c.env.DB, c.get("user").id, content);
     const chapters = content.chapters.filter((ch) => (content.chapterLinks[ch.code] ?? []).includes(slug));
-    return c.html(knowledgePage(meta, {
+    return c.html(knowledgePage(pageMeta(c), {
       entry, tab, chapters, state,
       text: text && { html: injectSectionQuestions(text.html, slug, content, state), toc: text.toc },
       pageQuestions: entry.pages.map((_, i) => content.questionsOnPage(slug, i + 1)),
@@ -213,14 +231,14 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
       last.items.push(r);
     }
     for (const d of days) d.count = new Set(d.items.map((r) => r.num)).size;
-    return c.html(historyPage(meta, days, content.questions));
+    return c.html(historyPage(pageMeta(c), days, content.questions));
   });
 
   app.get("/settings", async (c) => {
     const DB = c.env.DB;
     const { id: uid, name } = c.get("user");
     const [exam, warmup] = await Promise.all([examDate(DB, uid), warmupDays(DB, uid)]);
-    return c.html(settingsPage(meta, {
+    return c.html(settingsPage(pageMeta(c), {
       examDate: exam, warmupDays: warmup, saved: c.req.query("saved") === "1", builtAt: content.builtAt, userName: name,
     }));
   });

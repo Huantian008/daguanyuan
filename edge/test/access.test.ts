@@ -100,7 +100,7 @@ describe("login and access control", () => {
   it("logs out", async () => {
     const { client } = setup();
     await client.login();
-    await client.post("/logout", {});
+    await client.post("/logout", { owner: "1" });
     expect((await client.get("/")).status).toBe(303);
   });
 

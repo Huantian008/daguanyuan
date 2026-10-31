@@ -48,6 +48,7 @@ export function settingsPage(meta: Meta, d: SettingsData) {
     body: html`<header class="page-head"><h1>设置</h1></header>
 ${d.saved ? html`<p class="note note-ok" role="status">已保存。</p>` : ""}
 <form class="card form" method="post" action="/settings">
+  <input type="hidden" name="owner" value="${meta.grade_owner ?? ""}">
   <label for="exam_date">考研初试日期</label>
   <input id="exam_date" name="exam_date" type="date" value="${d.examDate}" required>
   <label for="warmup_days">热身取最近几个学习日的题</label>
@@ -64,7 +65,7 @@ ${d.saved ? html`<p class="note note-ok" role="status">已保存。</p>` : ""}
     <li>题库生成时间：${d.builtAt}</li>
   </ul>
   <p class="muted">当前登录：${d.userName}</p>
-  <form method="post" action="/logout"><button class="btn">退出登录</button></form>
+  <form method="post" action="/logout"><input type="hidden" name="owner" value="${meta.grade_owner ?? ""}"><button class="btn">退出登录</button></form>
 </section>`,
   });
 }

@@ -99,7 +99,7 @@ def test_gaoshu_card_keeps_its_meta(env):
 
 
 def test_grading_a_xiandai_question(env):
-    r = env.client.post("/q/1001/grade", data={"grade": "mastered"}, follow_redirects=False)
+    r = env.client.post("/q/1001/grade", data={"owner": "local", "grade": "mastered"}, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/bank/L1#q-1001"
     bank = visible(env.client.get("/bank").text)
     assert bank.index("行列式 做过 1 / 2 题") > bank.index("线性代数")

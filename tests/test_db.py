@@ -1,9 +1,11 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
+from threading import Barrier, Event
 
 import pytest
 
 from dgy import db
-from dgy.srs import CardState, schedule
+from dgy.srs import CardState, card_from, schedule
 from dgy.studyday import TZ
 
 EVENING = datetime(2026, 10, 16, 22, 0, tzinfo=TZ)
@@ -74,17 +76,78 @@ def test_a_doubled_review_of_the_day_is_folded_into_one_when_the_grade_changes(c
     assert [r.grade for r in db.history_for(conn, 5)] == ["shaky"]
 
 
-def test_a_first_grade_sent_twice_at_once_is_one_review(conn, monkeypatch):
-    # the page script sends a grade again when it never heard back; here the other request writes after this one has
-    # read the reviews of the day and before it writes
-    def racing(state, grade, day):
-        monkeypatch.setattr(db, "schedule", schedule)
-        db.record_review(conn, 5, grade, EVENING, "warmup")
-        return schedule(state, grade, day)
-    monkeypatch.setattr(db, "schedule", racing)
-    card = db.record_review(conn, 5, "mastered", EVENING, "warmup")
-    assert card == db.get_card(conn, 5) == schedule(CardState(), "mastered", date(2026, 10, 16))
-    assert [(r.grade, r.mode) for r in db.review_log(conn)] == [("mastered", "warmup")]
+@pytest.mark.parametrize("grades", [("mastered", "mastered"), ("mastered", "unknown")])
+def test_concurrent_reviews_keep_log_and_card_consistent(tmp_path, grades):
+    path = tmp_path / "race.db"
+    c = db.connect(path)
+    db.init_db(c)
+    c.close()
+    ready = Barrier(2)
+
+    def submit(grade):
+        c = db.connect(path)
+        try:
+            ready.wait(timeout=3)
+            return db.record_review(c, 5, grade, EVENING, "warmup")
+        finally:
+            c.close()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        list(pool.map(submit, grades))
+    c = db.connect(path)
+    try:
+        history = db.history_for(c, 5)
+        assert len(history) == 1
+        assert history[0].mode == "warmup"
+        assert db.get_card(c, 5) == card_from((r.grade, r.study_day) for r in history)
+    finally:
+        c.close()
+
+
+def test_read_and_card_calculation_hold_the_write_lock(tmp_path, monkeypatch):
+    path = tmp_path / "race.db"
+    c = db.connect(path)
+    db.init_db(c)
+    c.close()
+    entered, release = Event(), Event()
+    original = db.card_from
+
+    def paused(history):
+        entered.set()
+        assert release.wait(timeout=3)
+        return original(history)
+
+    monkeypatch.setattr(db, "card_from", paused)
+
+    def submit():
+        c = db.connect(path)
+        try:
+            db.record_review(c, 5, "mastered", EVENING, "browse")
+        finally:
+            c.close()
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        task = pool.submit(submit)
+        assert entered.wait(timeout=3)
+        c = db.connect(path)
+        try:
+            c.execute("PRAGMA busy_timeout = 0")
+            import sqlite3
+            with pytest.raises(sqlite3.OperationalError, match="locked"):
+                c.execute("BEGIN IMMEDIATE")
+        finally:
+            release.set()
+            c.close()
+        task.result()
+
+
+def test_late_request_for_previous_day_keeps_the_newer_review(conn):
+    later = datetime(2026, 10, 17, 4, 1, tzinfo=TZ)
+    db.record_review(conn, 5, "mastered", later, "browse")
+    db.record_review(conn, 5, "unknown", EVENING, "browse")
+    history = db.history_for(conn, 5)
+    assert db.get_card(conn, 5) == card_from((r.grade, r.study_day) for r in history)
+    assert db.get_card(conn, 5).last_grade == "mastered"
 
 
 def test_review_log_since_filters_by_study_day(conn):

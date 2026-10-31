@@ -3,7 +3,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, Form, Request
 
 from .. import db
-from ..web import exam_date, get_conn, redirect, render, warmup_days
+from ..web import exam_date, get_conn, redirect, render, require_owner, warmup_days
 
 router = APIRouter()
 
@@ -18,7 +18,7 @@ def settings_form(request: Request, saved: int = 0, conn=Depends(get_conn)):
                   built_at=request.app.state.content.built_at)
 
 
-@router.post("/settings")
+@router.post("/settings", dependencies=[Depends(require_owner)])
 def save(request: Request, exam_date: str = Form(...), warmup_days: str = Form("3"), conn=Depends(get_conn)):
     try:
         db.set_setting(conn, "exam_date", date.fromisoformat(exam_date).isoformat())

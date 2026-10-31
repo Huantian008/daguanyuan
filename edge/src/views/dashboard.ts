@@ -13,6 +13,7 @@ export interface Onward {
   name: string;
   kp: DrillKp;
   resumed: boolean;
+  num: number;
 }
 
 export interface DashboardData {
@@ -69,7 +70,7 @@ export function dashboardPage(meta: Meta, d: DashboardData) {
       ? html`<p class="step-count"><b>${o.kp.total - o.kp.done}</b> 题没做</p>
     <p class="step-note">${o.name} / ${o.kp.section} / ${o.kp.kp}</p>
     <div class="step-actions">
-      <a class="${onwardsCls}" href="/bank/${o.code}?kp=${o.kp.index}">${o.resumed ? "继续上次" : "开始做题"}</a>
+      <a class="${onwardsCls}" href="/bank/${o.code}?kp=${o.kp.index}#q-${o.num}">${o.resumed ? "继续上次" : "开始做题"}</a>
       <a class="btn" href="/bank">换个考点</a>
     </div>`
       : html`<p class="step-count"><b>0</b> 题没做过</p>

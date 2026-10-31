@@ -99,7 +99,7 @@ describe("线代 pages", () => {
 
   it("grade a 线代 question", async () => {
     const { client } = await loggedIn();
-    const res = await client.post("/q/1001/grade", { grade: "mastered" });
+    const res = await client.post("/q/1001/grade", { owner: "1", grade: "mastered" });
     expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("/bank/L1#q-1001");
     const bank = visible(await (await client.get("/bank")).text());

@@ -20,6 +20,9 @@ export type AppEnv = { Bindings: Env; Variables: { user: User } };
 export interface Meta {
   content_v: string;
   asset_v: string;
+  /** Account bound to the rendered page; absent on login/public pages. */
+  grade_owner?: string;
+  study_day?: string;
 }
 
 /** Knowledge Markdown pre-rendered to HTML by the Python exporter. */

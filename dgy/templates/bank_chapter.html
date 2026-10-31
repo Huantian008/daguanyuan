@@ -5,7 +5,7 @@
 {% block head %}{{ katex_head() }}{% endblock %}
 {% block scripts %}{{ katex_script() }}{% endblock %}
 {% block content %}
-{% set here = '/bank/' ~ chapter.code ~ '?kp=' ~ current.index %}
+{% set here = '/bank/' ~ chapter.code ~ '?kp=' ~ current.index ~ ('&status=' ~ status_filter if status_filter != 'all' else '') %}
 <div class="drill">
   <nav class="kp-tree" id="kp-tree" aria-label="考点目录">
     <div class="kt-top">
@@ -17,7 +17,7 @@
       <p class="kt-sec-name">{{ section }}</p>
       {% for k in items %}
       {% set here_kp = k.index == current.index %}
-      <a class="kt-kp{% if k.index == current.index %} is-current{% endif %}" href="/bank/{{ chapter.code }}?kp={{ k.index }}"{% if k.index == current.index %} aria-current="page"{% endif %}>
+      <a class="kt-kp{% if k.index == current.index %} is-current{% endif %}" href="/bank/{{ chapter.code }}?kp={{ k.index }}{% if status_filter != 'all' %}&status={{ status_filter }}{% endif %}"{% if k.index == current.index %} aria-current="page"{% endif %}>
         <span class="kt-name">{{ k.kp }}</span>
         <span class="kt-count">{% if here_kp %}<span class="js-done">{{ k.done }}</span>{% else %}{{ k.done }}{% endif %} / {{ k.total }}</span>
         <i class="kt-bar{% if k.total and k.done == k.total %} is-full{% endif %}{% if here_kp %} js-done-bar{% endif %}" data-total="{{ k.total }}"><b style="width: {{ (100 * k.done / k.total)|round|int if k.total else 0 }}%"></b></i>
@@ -46,10 +46,18 @@
       <div class="drill-track js-done-bar" data-total="{{ current.total }}" aria-hidden="true"><span style="width: {{ (100 * current.done / current.total)|round|int if current.total else 0 }}%"></span></div>
     </header>
 
+    <form class="card-filters" method="get" action="/bank/{{ chapter.code }}" aria-label="筛选题卡">
+      <input type="hidden" name="kp" value="{{ current.index }}">
+      {% for value, label in [('all', '全部'), ('new', '未做'), ('unknown', '不会'), ('shaky', '不熟练')] %}
+      <button class="btn btn-small{% if status_filter == value %} btn-primary{% endif %}" name="status" value="{{ value }}" aria-pressed="{{ 'true' if status_filter == value else 'false' }}">{{ label }}</button>
+      {% endfor %}
+      <span class="muted">显示 {{ visible_questions|length }} 题</span>
+    </form>
+    {% if not visible_questions %}<p class="empty">这个考点没有符合筛选的题目。选择“全部”可查看所有题卡。</p>{% endif %}
     <div class="qcards">
-      {% for q in current.questions %}
-      {{ qcard(q, texts.get(q.num), state.status(q.num), loop.index, graded_today.get(q.num), here ~ '#q-' ~ q.num,
-               sections[q.num], knowledge, titles, histories[q.num], state.cards.get(q.num)) }}
+      {% for index, q in visible_questions %}
+      {{ qcard(q, texts.get(q.num), state.status(q.num), index, graded_today.get(q.num), here ~ '#q-' ~ q.num,
+               sections[q.num], knowledge, titles, histories[q.num], state.cards.get(q.num), day=study_day) }}
       {% endfor %}
     </div>
 

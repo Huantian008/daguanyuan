@@ -54,8 +54,18 @@ export function createApp(deps: AppDeps) {
     const account = accounts.find((a) => a.id === userId);
     if (account) {
       c.set("user", toUser(account));
+      if (c.req.method === "POST" && (["/bank/exclude", "/settings", "/logout"].includes(url.pathname) || /^\/q\/\d+\/grade$/.test(url.pathname))) {
+        const form = await c.req.parseBody();
+        if (String(form.owner ?? "") !== String(account.id)) {
+          const error = "页面所属账号与当前登录不一致，请刷新页面后重试。";
+          return c.req.header("Accept")?.includes("application/json")
+            ? c.json({ code: "owner_mismatch", error }, 409)
+            : c.html(layout(meta, { title: "账号已改变", body: html`<section class="card"><h1>账号已改变</h1><p>${error}</p><a href="/">回首页</a></section>` }), 409);
+        }
+      }
       return next();
     }
+    if (c.req.header("Accept")?.includes("application/json")) return c.json({ code: "login_required", error: "登录已过期，请重新登录。" }, 401);
     return c.redirect(`/login?next=${encodeURIComponent(url.pathname + url.search)}`, 303);
   });
 
