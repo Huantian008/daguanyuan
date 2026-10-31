@@ -87,7 +87,7 @@ export function chapterPage(meta: Meta, d: ChapterPageData) {
 
   <div class="drill-main">
     <header class="drill-head">
-      <button type="button" class="drill-tree-toggle js-tree-toggle" aria-controls="kp-tree" aria-expanded="true" hidden>收起目录</button>
+      <button type="button" class="drill-tree-toggle js-tree-toggle" aria-controls="kp-tree" aria-expanded="true" aria-label="收起目录" title="收起目录" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></svg></button>
       <div class="drill-title">
         <h1>${current.kp}</h1>
         <p class="muted">${current.section} · 做过 <span class="js-done">${current.done}</span> / ${current.total} 题</p>

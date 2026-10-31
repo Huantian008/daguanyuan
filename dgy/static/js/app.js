@@ -169,7 +169,9 @@
     const show = () => {
       drill.classList.toggle("tree-closed", closed);
       treeToggle.setAttribute("aria-expanded", String(!closed));
-      treeToggle.textContent = closed ? "展开目录" : "收起目录";
+      const label = closed ? "展开目录" : "收起目录";
+      treeToggle.setAttribute("aria-label", label);
+      treeToggle.title = label;
     };
     treeToggle.addEventListener("click", () => {
       closed = !closed;
