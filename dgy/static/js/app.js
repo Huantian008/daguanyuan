@@ -158,26 +158,41 @@
   // ---------- 考点 tree and top area on chapter pages ----------
   // The button in the chapter header opens and closes the tree. With a mouse on a wide screen the tree and the top area
   // (top bar and chapter header) each have a pin instead. Pinned, they stay where they are. Unpinned, they slide out of
-  // the way and come back while the mouse is at that edge of the window (left for the tree, top for the top area) or the
-  // keyboard focus is in them.
+  // the way and come back while the keyboard focus is in them, or from the mouse: the top area when it reaches the top
+  // edge of the window, the tree when it rests a moment in the window's top-left corner (a screen to the left of this
+  // one would make the whole left edge a place the mouse only passes through).
 
   const drill = document.querySelector(".drill");
   const mouseWide = drill && matchMedia("(hover: hover) and (pointer: fine) and (min-width: 961px)");
 
-  // While a panel is hidden (`hidden()`), shows it when the mouse reaches one window edge and hides it again a moment
-  // after the mouse moves away from it.
-  const peekPanel = (parts, hidden, atEdge, near, onChange) => {
+  // While a panel is hidden (`hidden()`), shows it when the mouse is in a zone at the window edge (`inZone`) — at once, or
+  // only after resting there `rest` ms, so a mouse passing through on its way to another screen does not open it — and
+  // hides it again a moment after the mouse moves away from it (`near`).
+  const peekPanel = (parts, hidden, inZone, rest, near, onChange) => {
     let out = false;
     let timer = 0;
+    let waiting = 0;
     const set = (on) => {
       clearTimeout(timer);
       timer = 0;
       if (out !== on) onChange((out = on));
     };
+    const stopWaiting = () => {
+      clearTimeout(waiting);
+      waiting = 0;
+    };
     document.addEventListener("pointermove", (event) => {
       if (event.pointerType !== "mouse" || !hidden()) return;
-      if (atEdge(event)) set(true);
-      else if (!out || near(event)) {
+      if (inZone(event)) {
+        if (out || !rest) set(true);
+        else if (!waiting) waiting = setTimeout(() => {
+          waiting = 0;
+          set(true);
+        }, rest);
+        return;
+      }
+      stopWaiting();
+      if (!out || near(event)) {
         clearTimeout(timer);
         timer = 0;
       } else if (!timer) {
@@ -188,6 +203,10 @@
         }, 300);
       }
     }, { passive: true });
+    // the mouse left the window (say, for another screen) before it had rested long enough
+    document.addEventListener("mouseout", (event) => {
+      if (!event.relatedTarget) stopWaiting();
+    });
     for (const part of parts) {
       part.addEventListener("focusin", () => set(true));
       part.addEventListener("focusout", (event) => {
@@ -215,7 +234,9 @@
     const peekTree = peekPanel(
       [tree],
       () => closed && mouseWide.matches,
-      (event) => event.clientX <= 16,
+      // the strip of page left of the questions, from the top of the window down past the chapter header's left end
+      (event) => event.clientY <= 160 && event.clientX <= Math.max(32, tree.offsetLeft + 12),
+      180,
       (event) => event.clientX <= tree.offsetLeft + tree.offsetWidth + 24,
       (out) => drill.classList.toggle("tree-peek", out),
     );
@@ -226,7 +247,7 @@
       treeToggle.setAttribute("aria-label", label);
       treeToggle.title = label;
       treePin.setAttribute("aria-pressed", String(!closed));
-      treePin.title = closed ? "目录自动隐藏，鼠标移到窗口左边缘时出现；点一下固定" : "目录已固定，点一下改为自动隐藏";
+      treePin.title = closed ? "目录自动隐藏，鼠标在窗口左上角停一下时出现；点一下固定" : "目录已固定，点一下改为自动隐藏";
     };
     const flip = (keepOut) => {
       closed = !closed;
@@ -269,6 +290,7 @@
       [topbar, head],
       () => root.classList.contains("top-away"),
       (event) => event.clientY <= 24,
+      0,
       (event) => event.clientY <= topbar.offsetHeight + head.offsetHeight + 24,
       (out) => root.classList.toggle("top-peek", out),
     );
