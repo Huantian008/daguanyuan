@@ -8,7 +8,10 @@
 {% set here = '/bank/' ~ chapter.code ~ '?kp=' ~ current.index %}
 <div class="drill">
   <nav class="kp-tree" id="kp-tree" aria-label="考点目录">
-    <p class="kt-chapter"><a href="/bank">题库</a> / {{ chapter.name }}</p>
+    <div class="kt-top">
+      <p class="kt-chapter"><a href="/bank">题库</a> / {{ chapter.name }}</p>
+      <button type="button" class="pin-btn js-tree-pin" aria-label="固定目录" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="pin-head" d="M9 3.5h6M10 3.5v5.5l-3 4h10l-3-4V3.5z"/><path d="M12 13v7.5"/></svg></button>
+    </div>
     {% for section, items in tree %}
     <div class="kt-section">
       <p class="kt-sec-name">{{ section }}</p>
@@ -39,6 +42,7 @@
         {% if prev %}<a class="btn btn-small" href="{{ prev[1] }}">{{ prev[0] }}</a>{% endif %}
         {% if following %}<a class="btn btn-small btn-primary" href="{{ following[1] }}">{{ following[0] }}</a>{% endif %}
       </div>
+      <button type="button" class="pin-btn js-top-pin" aria-label="固定顶部" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="pin-head" d="M9 3.5h6M10 3.5v5.5l-3 4h10l-3-4V3.5z"/><path d="M12 13v7.5"/></svg></button>
       <div class="drill-track js-done-bar" data-total="{{ current.total }}" aria-hidden="true"><span style="width: {{ (100 * current.done / current.total)|round|int if current.total else 0 }}%"></span></div>
     </header>
 

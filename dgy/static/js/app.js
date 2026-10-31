@@ -153,10 +153,54 @@
     });
   });
 
+  // ---------- 考点 tree and top area on chapter pages ----------
+  // The button in the chapter header opens and closes the tree. With a mouse on a wide screen the tree and the top area
+  // (top bar and chapter header) each have a pin instead. Pinned, they stay where they are. Unpinned, they slide out of
+  // the way and come back while the mouse is at that edge of the window (left for the tree, top for the top area) or the
+  // keyboard focus is in them.
+
   const drill = document.querySelector(".drill");
+  const mouseWide = drill && matchMedia("(hover: hover) and (pointer: fine) and (min-width: 961px)");
+
+  // While a panel is hidden (`hidden()`), shows it when the mouse reaches one window edge and hides it again a moment
+  // after the mouse moves away from it.
+  const peekPanel = (parts, hidden, atEdge, near, onChange) => {
+    let out = false;
+    let timer = 0;
+    const set = (on) => {
+      clearTimeout(timer);
+      timer = 0;
+      if (out !== on) onChange((out = on));
+    };
+    document.addEventListener("pointermove", (event) => {
+      if (event.pointerType !== "mouse" || !hidden()) return;
+      if (atEdge(event)) set(true);
+      else if (!out || near(event)) {
+        clearTimeout(timer);
+        timer = 0;
+      } else if (!timer) {
+        timer = setTimeout(() => {
+          // a hidden panel keeps no focus, so a key press cannot work it unseen
+          if (parts.some((part) => part.contains(document.activeElement))) document.activeElement.blur();
+          set(false);
+        }, 300);
+      }
+    }, { passive: true });
+    for (const part of parts) {
+      part.addEventListener("focusin", () => set(true));
+      part.addEventListener("focusout", (event) => {
+        if (!parts.some((p) => p.contains(event.relatedTarget))) set(false);
+      });
+    }
+    return set;
+  };
+
   const treeToggle = document.querySelector(".js-tree-toggle");
-  if (drill && treeToggle) {
-    const TREE_KEY = "dgy-tree-closed";
+  const tree = document.querySelector("#kp-tree");
+  const treePin = document.querySelector(".js-tree-pin");
+  if (drill && treeToggle && tree && treePin) {
+    // a new key: hiding the tree is now a choice made with the pin, so every tree starts out pinned
+    const TREE_KEY = "dgy-tree-hidden";
     const narrow = matchMedia("(max-width: 960px)").matches;
     let closed = narrow;
     if (!narrow) {
@@ -166,15 +210,25 @@
         // storage blocked: the tree stays open
       }
     }
+    const peekTree = peekPanel(
+      [tree],
+      () => closed && mouseWide.matches,
+      (event) => event.clientX <= 16,
+      (event) => event.clientX <= tree.offsetLeft + tree.offsetWidth + 24,
+      (out) => drill.classList.toggle("tree-peek", out),
+    );
     const show = () => {
       drill.classList.toggle("tree-closed", closed);
       treeToggle.setAttribute("aria-expanded", String(!closed));
       const label = closed ? "展开目录" : "收起目录";
       treeToggle.setAttribute("aria-label", label);
       treeToggle.title = label;
+      treePin.setAttribute("aria-pressed", String(!closed));
+      treePin.title = closed ? "目录自动隐藏，鼠标移到窗口左边缘时出现；点一下固定" : "目录已固定，点一下改为自动隐藏";
     };
-    treeToggle.addEventListener("click", () => {
+    const flip = (keepOut) => {
       closed = !closed;
+      peekTree(keepOut && closed);
       show();
       if (!narrow) {
         try {
@@ -183,10 +237,81 @@
           // the choice lasts for this page only
         }
       }
-    });
+    };
+    treeToggle.addEventListener("click", () => flip(false));
+    // the mouse is on the pin, so an unpinned tree stays out until the mouse leaves it
+    treePin.addEventListener("click", () => flip(true));
     show();
     treeToggle.hidden = false;
   }
+
+  const topbar = document.querySelector(".topbar");
+  const head = document.querySelector(".drill-head");
+  const topPin = document.querySelector(".js-top-pin");
+  if (drill && topbar && head && topPin) {
+    const TOP_KEY = "dgy-top-pinned";
+    let pinned = true;
+    try {
+      pinned = localStorage.getItem(TOP_KEY) !== "0";
+    } catch {
+      // storage blocked: the top area stays pinned
+    }
+    // the top area goes away only once the chapter header has stuck to the top bar
+    let away = false;
+    const sync = () => {
+      const auto = !pinned && mouseWide.matches;
+      root.classList.toggle("top-auto", auto);
+      root.classList.toggle("top-away", auto && away);
+    };
+    const peekTop = peekPanel(
+      [topbar, head],
+      () => root.classList.contains("top-away"),
+      (event) => event.clientY <= 24,
+      (event) => event.clientY <= topbar.offsetHeight + head.offsetHeight + 24,
+      (out) => root.classList.toggle("top-peek", out),
+    );
+    const measure = () => root.style.setProperty("--top-shift", `${topbar.offsetHeight + head.offsetHeight + 24}px`);
+    const check = () => {
+      const stuck = head.parentElement.getBoundingClientRect().top < topbar.offsetHeight;
+      if (stuck === away) return;
+      away = stuck;
+      if (away) peekTop(false);
+      sync();
+    };
+    let checking = false;
+    addEventListener("scroll", () => {
+      if (checking) return;
+      checking = true;
+      requestAnimationFrame(() => {
+        checking = false;
+        check();
+      });
+    }, { passive: true });
+    const sizes = new ResizeObserver(measure);
+    sizes.observe(topbar);
+    sizes.observe(head);
+    const show = () => {
+      topPin.setAttribute("aria-pressed", String(pinned));
+      topPin.title = pinned ? "顶部已固定，点一下改为自动隐藏" : "顶部自动隐藏，鼠标移到窗口上边缘时出现；点一下固定";
+      sync();
+    };
+    topPin.addEventListener("click", () => {
+      pinned = !pinned;
+      try {
+        localStorage.setItem(TOP_KEY, pinned ? "1" : "0");
+      } catch {
+        // the choice lasts for this page only
+      }
+      peekTop(true); // the mouse is on the pin: the top area stays until the mouse leaves it
+      show();
+    });
+    mouseWide.addEventListener("change", sync);
+    measure();
+    check();
+    show();
+  }
+  // slide only on later changes, not into the state the page opened in
+  if (drill) requestAnimationFrame(() => requestAnimationFrame(() => root.classList.add("pane-anim")));
 
   // ---------- grades on question cards: saved in the background, so the page does not reload ----------
   // A grade shows at once and goes to the server with fetch. Until the server has it, it waits in localStorage and is

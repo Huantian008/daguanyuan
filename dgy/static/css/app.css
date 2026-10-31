@@ -648,6 +648,36 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
 .js .drill-tree-toggle { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); cursor: pointer; transition: background-color .15s, color .15s; }
 .drill-tree-toggle:hover { background: var(--surface-2); color: var(--ink); }
 .drill-tree-toggle svg { width: 18px; height: 18px; }
+.pin-btn { display: none; align-items: center; justify-content: center; flex: none; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); cursor: pointer; transition: background-color .15s, color .15s; }
+.pin-btn:hover { background: var(--surface-2); color: var(--ink); }
+.pin-btn svg { width: 17px; height: 17px; transition: transform .35s cubic-bezier(.16, 1, .3, 1); }
+.pin-btn[aria-pressed="true"] .pin-head { fill: currentColor; }
+.pin-btn[aria-pressed="false"] svg { transform: rotate(45deg); }
+.kt-top { display: flex; align-items: center; gap: 6px; margin: 0 0 10px 8px; }
+.kt-top .kt-chapter { flex: 1; min-width: 0; margin: 0; }
+.kt-top .pin-btn { width: 28px; height: 28px; }
+
+/* With a mouse on a wide screen the 考点 tree and the top area each have a pin. Unpinned, the tree waits off the left
+   edge and the top area slides up once the chapter header has stuck; the matching window edge brings them back.
+   Coming out eases out fast and settles; going away eases in. */
+@media (hover: hover) and (pointer: fine) and (min-width: 961px) {
+  .js { --tree-top: 76px; }
+  .js.top-away:not(.top-peek) { --tree-top: 16px; }
+  .js .drill-tree-toggle { display: none; }
+  .js .pin-btn { display: inline-flex; }
+  .js .kp-tree { top: var(--tree-top); max-height: calc(100dvh - var(--tree-top) - 16px); }
+  .js .drill.tree-closed .kp-tree {
+    --tree-left: max(12px, calc((100vw - 1320px) / 2 + 20px));
+    display: block; position: fixed; z-index: 15; left: var(--tree-left); width: 264px;
+    box-shadow: var(--shadow-lg); transform: translateX(calc(-100% - var(--tree-left) - 80px));
+  }
+  .js .drill.tree-closed.tree-peek .kp-tree { transform: none; }
+  .js.top-away:not(.top-peek) :is(.topbar, .drill-head) { transform: translateY(calc(-1 * var(--top-shift, 240px))); }
+  .js.top-auto .qcard { scroll-margin-top: 24px; }
+  .js.pane-anim :is(.topbar, .drill-head, .kp-tree) { transition: transform .45s cubic-bezier(.16, 1, .3, 1), top .45s cubic-bezier(.16, 1, .3, 1); }
+  .js.pane-anim.top-away:not(.top-peek) :is(.topbar, .drill-head),
+  .js.pane-anim .drill.tree-closed:not(.tree-peek) .kp-tree { transition-duration: .26s; transition-timing-function: cubic-bezier(.55, 0, .75, .2); }
+}
 .drill-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 20px; }
 
 .qcards { display: grid; gap: 18px; }
