@@ -325,6 +325,33 @@ describe("bank", () => {
     expect(nextChapter).toContain("上一章");
   });
 
+  it("keeps the chapter page's controls in the top bar", async () => {
+    const { client } = await loggedIn();
+    const page = await text(client, "/bank/A?kp=1");
+    const bar = page.slice(page.indexOf('<header class="topbar">'), page.indexOf("</header>"));
+    for (const part of ["js-tree-toggle", "js-top-pin", "js-done-bar", "下一节"]) expect(bar).toContain(part);
+    expect(page).not.toContain("js-tree-pin");
+    const head = page.slice(page.indexOf('<header class="drill-head">'));
+    expect(head.indexOf('class="card-filters"')).toBeLessThan(head.indexOf("</header>")); // the filters share the title row
+  });
+
+  it("has the tree button only on chapter pages, and shows no brand on any page", async () => {
+    const { client } = await loggedIn();
+    for (const path of ["/", "/bank", "/knowledge", "/history", "/settings", "/bank/A"]) {
+      const page = await text(client, path);
+      expect(page).not.toContain('class="brand');
+      expect(visible(page.slice(page.indexOf("<body")))).not.toContain("大观园");
+      expect(page.includes("js-tree-toggle")).toBe(path === "/bank/A");
+    }
+  });
+
+  it("titles the login page 登录", async () => {
+    const { client } = setup();
+    const page = await text(client, "/login");
+    expect(page).toContain("<h1>登录</h1>");
+    expect(visible(page.slice(page.indexOf("<body")))).not.toContain("大观园");
+  });
+
   it("grades from the chapter page, and the grade can be changed all day", async () => {
     const { client, clock } = await loggedIn();
     const res = await client.post("/q/4/grade", { owner: "1", grade: "mastered", back: "/bank/B?kp=1#q-4" });

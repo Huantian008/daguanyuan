@@ -73,12 +73,17 @@ export function chapterPage(meta: Meta, d: ChapterPageData) {
     pageClass: "page-drill",
     head: katexCss(meta),
     scripts: katexJs(meta),
+    barStart: html`<button type="button" class="drill-tree-toggle js-tree-toggle" aria-controls="kp-tree" aria-expanded="true" aria-label="收起目录" title="收起目录"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path class="tree-icon-pane" d="M3.5 7A2.5 2.5 0 0 1 6 4.5h3.5v15H6A2.5 2.5 0 0 1 3.5 17z" stroke="none"/><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></svg></button>`,
+    barContext: html`<div class="bar-context">
+        <span class="bar-title" aria-hidden="true">${current.kp}</span>
+        ${prev ? html`<a class="btn btn-small" href="${prev[1]}">← ${prev[0]}</a>` : ""}
+        ${following ? html`<a class="btn btn-small btn-primary" href="${following[1]}">${following[0]} →</a>` : ""}
+        <button type="button" class="pin-btn js-top-pin" aria-label="固定顶部" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="pin-head" d="M9 3.5h6M10 3.5v5.5l-3 4h10l-3-4V3.5z"/><path d="M12 13v7.5"/></svg></button>
+      </div>
+      <div class="drill-track js-done-bar" data-total="${current.total}" aria-hidden="true"><span style="width: ${percent(current.done, current.total)}%"></span></div>`,
     body: html`<div class="drill">
   <nav class="kp-tree" id="kp-tree" aria-label="考点目录">
-    <div class="kt-top">
-      <p class="kt-chapter"><a href="/bank">题库</a> / ${chapter.name}</p>
-      <button type="button" class="pin-btn js-tree-pin" aria-label="固定目录" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="pin-head" d="M9 3.5h6M10 3.5v5.5l-3 4h10l-3-4V3.5z"/><path d="M12 13v7.5"/></svg></button>
-    </div>
+    <p class="kt-chapter"><a href="/bank">题库</a> / ${chapter.name}</p>
     ${d.tree.map(([section, items]) => html`<div class="kt-section">
       <p class="kt-sec-name">${section}</p>
       ${items.map((k) => {
@@ -98,24 +103,20 @@ export function chapterPage(meta: Meta, d: ChapterPageData) {
 
   <div class="drill-main">
     <header class="drill-head">
-      <button type="button" class="drill-tree-toggle js-tree-toggle" aria-controls="kp-tree" aria-expanded="true" aria-label="收起目录" title="收起目录" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></svg></button>
       <div class="drill-title">
         <h1>${current.kp}</h1>
         <p class="muted">${current.section} · 做过 <span class="js-done">${current.done}</span> / ${current.total} 题</p>
       </div>
+      <form class="card-filters" method="get" action="/bank/${chapter.code}" aria-label="筛选题卡">
+        <input type="hidden" name="kp" value="${current.index}">
+        ${[["all", "全部"], ["new", "未做"], ["unknown", "不会"], ["shaky", "不熟练"]].map(([value, label]) => html`<button class="btn btn-small${filter === value ? " btn-primary" : ""}" name="status" value="${value}" aria-pressed="${String(filter === value)}">${label}</button>`)}
+        <span class="muted">显示 ${shown.length} 题</span>
+      </form>
       <div class="drill-actions">
-        ${prev ? html`<a class="btn btn-small" href="${prev[1]}">${prev[0]}</a>` : ""}
-        ${following ? html`<a class="btn btn-small btn-primary" href="${following[1]}">${following[0]}</a>` : ""}
+        ${prev ? html`<a class="btn btn-small" href="${prev[1]}">← ${prev[0]}</a>` : ""}
+        ${following ? html`<a class="btn btn-small btn-primary" href="${following[1]}">${following[0]} →</a>` : ""}
       </div>
-      <button type="button" class="pin-btn js-top-pin" aria-label="固定顶部" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="pin-head" d="M9 3.5h6M10 3.5v5.5l-3 4h10l-3-4V3.5z"/><path d="M12 13v7.5"/></svg></button>
-      <div class="drill-track js-done-bar" data-total="${current.total}" aria-hidden="true"><span style="width: ${percent(current.done, current.total)}%"></span></div>
     </header>
-
-    <form class="card-filters" method="get" action="/bank/${chapter.code}" aria-label="筛选题卡">
-      <input type="hidden" name="kp" value="${current.index}">
-      ${[["all", "全部"], ["new", "未做"], ["unknown", "不会"], ["shaky", "不熟练"]].map(([value, label]) => html`<button class="btn btn-small${filter === value ? " btn-primary" : ""}" name="status" value="${value}" aria-pressed="${String(filter === value)}">${label}</button>`)}
-      <span class="muted">显示 ${shown.length} 题</span>
-    </form>
     ${shown.length ? "" : html`<p class="empty">这个考点没有符合筛选的题目。选择“全部”可查看所有题卡。</p>`}
     <div class="qcards">
       ${shown.map(({ q, index }) => questionCard(meta, q, d.texts.get(q.num), d.state.status(q.num), index, d.gradedToday.get(q.num), `${here}#q-${q.num}`, {

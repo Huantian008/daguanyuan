@@ -155,23 +155,24 @@
     });
   });
 
-  // ---------- 考点 tree and top area on chapter pages ----------
-  // The button in the chapter header opens and closes the tree. With a mouse on a wide screen the tree and the top area
-  // (top bar and chapter header) each have a pin instead. Pinned, they stay where they are. Unpinned, they slide out of
-  // the way and come back while the keyboard focus is in them, or from the mouse: the top area when it reaches the top
-  // edge of the window, the tree when it rests a moment in the window's top-left corner (a screen to the left of this
-  // one would make the whole left edge a place the mouse only passes through).
+  // ---------- 考点 tree and top bar on chapter pages ----------
+  // The button at the left of the top bar shows and hides the tree. With a mouse on a wide screen a hidden tree still
+  // comes out, and the top bar has a pin: unpinned, it slides out of the way. Both come back while the keyboard focus is
+  // in them, or from the mouse: the top bar when it reaches the top edge of the window, the tree when it rests a moment
+  // in the window's top-left corner (a screen to the left of this one would make the whole left edge a place the mouse
+  // only passes through).
 
   const drill = document.querySelector(".drill");
   const mouseWide = drill && matchMedia("(hover: hover) and (pointer: fine) and (min-width: 961px)");
 
   // While a panel is hidden (`hidden()`), shows it when the mouse is in a zone at the window edge (`inZone`) — at once, or
   // only after resting there `rest` ms, so a mouse passing through on its way to another screen does not open it — and
-  // hides it again a moment after the mouse moves away from it (`near`).
+  // hides it again a moment after the mouse moves away from it (`near`). `hold()` ignores the zone until the mouse leaves it.
   const peekPanel = (parts, hidden, inZone, rest, near, onChange) => {
     let out = false;
     let timer = 0;
     let waiting = 0;
+    let held = false;
     const set = (on) => {
       clearTimeout(timer);
       timer = 0;
@@ -184,6 +185,7 @@
     document.addEventListener("pointermove", (event) => {
       if (event.pointerType !== "mouse" || !hidden()) return;
       if (inZone(event)) {
+        if (held) return;
         if (out || !rest) set(true);
         else if (!waiting) waiting = setTimeout(() => {
           waiting = 0;
@@ -191,6 +193,7 @@
         }, rest);
         return;
       }
+      held = false;
       stopWaiting();
       if (!out || near(event)) {
         clearTimeout(timer);
@@ -213,18 +216,22 @@
         if (!parts.some((p) => p.contains(event.relatedTarget))) set(false);
       });
     }
-    return set;
+    return {
+      set,
+      hold: () => {
+        held = true;
+        stopWaiting();
+      },
+    };
   };
 
   const treeToggle = document.querySelector(".js-tree-toggle");
   const tree = document.querySelector("#kp-tree");
-  const treePin = document.querySelector(".js-tree-pin");
-  if (drill && treeToggle && tree && treePin) {
-    // a new key: hiding the tree is now a choice made with the pin, so every tree starts out pinned
+  if (drill && treeToggle && tree) {
     const TREE_KEY = "dgy-tree-hidden";
-    const narrow = matchMedia("(max-width: 960px)").matches;
-    let closed = narrow;
-    if (!narrow) {
+    const narrow = matchMedia("(max-width: 960px)");
+    let closed = narrow.matches;
+    if (!closed) {
       try {
         closed = localStorage.getItem(TREE_KEY) === "1";
       } catch {
@@ -234,26 +241,27 @@
     const peekTree = peekPanel(
       [tree],
       () => closed && mouseWide.matches,
-      // the strip of page left of the questions, from the top of the window down past the chapter header's left end
-      (event) => event.clientY <= 160 && event.clientX <= Math.max(32, tree.offsetLeft + 12),
+      // the top-left corner of the window, with the tree's button in it
+      (event) => event.clientY <= 160 && event.clientX <= 48,
       180,
-      (event) => event.clientX <= tree.offsetLeft + tree.offsetWidth + 24,
+      (event) => event.clientX <= tree.offsetWidth + 24,
       (out) => drill.classList.toggle("tree-peek", out),
     );
     const show = () => {
+      drill.classList.add("tree-ready");
       drill.classList.toggle("tree-closed", closed);
       treeToggle.setAttribute("aria-expanded", String(!closed));
       const label = closed ? "展开目录" : "收起目录";
       treeToggle.setAttribute("aria-label", label);
-      treeToggle.title = label;
-      treePin.setAttribute("aria-pressed", String(!closed));
-      treePin.title = closed ? "目录自动隐藏，鼠标在窗口左上角停一下时出现；点一下固定" : "目录已固定，点一下改为自动隐藏";
+      treeToggle.title = closed && mouseWide.matches ? `${label}（鼠标在窗口左上角停一下时临时出现）` : label;
     };
-    const flip = (keepOut) => {
+    const flip = () => {
       closed = !closed;
-      peekTree(keepOut && closed);
+      peekTree.set(false);
+      // the mouse is on the button, in the corner that brings a hidden tree out: the tree goes now and stays away
+      if (closed) peekTree.hold();
       show();
-      if (!narrow) {
+      if (!narrow.matches) {
         try {
           localStorage.setItem(TREE_KEY, closed ? "1" : "0");
         } catch {
@@ -261,11 +269,13 @@
         }
       }
     };
-    treeToggle.addEventListener("click", () => flip(false));
-    // the mouse is on the pin, so an unpinned tree stays out until the mouse leaves it
-    treePin.addEventListener("click", () => flip(true));
+    treeToggle.addEventListener("click", flip);
+    // on a narrow screen the tree is a drawer over the page: a tap outside it closes it
+    document.addEventListener("pointerdown", (event) => {
+      if (!closed && narrow.matches && !tree.contains(event.target) && !treeToggle.contains(event.target)) flip();
+    });
+    mouseWide.addEventListener("change", show);
     show();
-    treeToggle.hidden = false;
   }
 
   const topbar = document.querySelector(".topbar");
@@ -277,29 +287,33 @@
     try {
       pinned = localStorage.getItem(TOP_KEY) !== "0";
     } catch {
-      // storage blocked: the top area stays pinned
+      // storage blocked: the top bar stays pinned
     }
-    // the top area goes away only once the chapter header has stuck to the top bar
+    // once the chapter's title row has scrolled away the top bar shows the 考点's name, and an unpinned bar goes too
     let away = false;
     const sync = () => {
       const auto = !pinned && mouseWide.matches;
+      root.classList.toggle("head-gone", away);
       root.classList.toggle("top-auto", auto);
       root.classList.toggle("top-away", auto && away);
     };
     const peekTop = peekPanel(
-      [topbar, head],
+      [topbar],
       () => root.classList.contains("top-away"),
       (event) => event.clientY <= 24,
       0,
-      (event) => event.clientY <= topbar.offsetHeight + head.offsetHeight + 24,
+      (event) => event.clientY <= topbar.offsetHeight + 24,
       (out) => root.classList.toggle("top-peek", out),
     );
-    const measure = () => root.style.setProperty("--top-shift", `${topbar.offsetHeight + head.offsetHeight + 24}px`);
     const check = () => {
-      const stuck = head.parentElement.getBoundingClientRect().top < topbar.offsetHeight;
-      if (stuck === away) return;
-      away = stuck;
-      if (away) peekTop(false);
+      const gone = head.getBoundingClientRect().bottom <= topbar.offsetHeight;
+      if (gone === away) return;
+      away = gone;
+      if (away) {
+        // a hidden panel keeps no focus, as in peekPanel: a click on a button in the bar leaves the focus there
+        if (!pinned && mouseWide.matches && topbar.contains(document.activeElement)) document.activeElement.blur();
+        peekTop.set(false);
+      }
       sync();
     };
     let checking = false;
@@ -311,9 +325,6 @@
         check();
       });
     }, { passive: true });
-    const sizes = new ResizeObserver(measure);
-    sizes.observe(topbar);
-    sizes.observe(head);
     const show = () => {
       topPin.setAttribute("aria-pressed", String(pinned));
       topPin.title = pinned ? "顶部已固定，点一下改为自动隐藏" : "顶部自动隐藏，鼠标移到窗口上边缘时出现；点一下固定";
@@ -326,11 +337,10 @@
       } catch {
         // the choice lasts for this page only
       }
-      peekTop(true); // the mouse is on the pin: the top area stays until the mouse leaves it
+      peekTop.set(true); // the mouse is on the pin: the top bar stays until the mouse leaves it
       show();
     });
     mouseWide.addEventListener("change", sync);
-    measure();
     check();
     show();
   }

@@ -30,6 +30,9 @@ export interface PageOptions {
   pageClass?: string;
   head?: Html | string;
   scripts?: Html | string;
+  /** In the top bar: before the navigation, and between it and the buttons on the right. */
+  barStart?: Html;
+  barContext?: Html;
 }
 
 /** Port of dgy/templates/base.html: same markup and classes, so dgy/static/css/app.css applies unchanged. */
@@ -52,8 +55,9 @@ export function layout(meta: Meta, o: PageOptions): Html {
   <a class="skip-link" href="#main">跳到正文</a>
   <header class="topbar">
     <div class="topbar-inner">
-      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-text">大观园</span></a>
+      ${o.barStart ?? ""}
       <nav class="nav" aria-label="主导航">${links}</nav>
+      ${o.barContext ?? ""}
       ${QSIZE_TOGGLE}
       ${THEME_TOGGLE}
     </div>

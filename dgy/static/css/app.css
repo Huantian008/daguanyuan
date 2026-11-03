@@ -41,6 +41,8 @@
     "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
   --mono: "SF Mono", "JetBrains Mono", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
   --q-size: 20px; /* question text; the Aa button in the top bar picks 标准 / 大 / 特大 */
+  --bar-h: 44px; /* the top bar, its border included */
+  --tree-top: var(--bar-h); /* where the 考点 tree starts: under the top bar, or at the window's top once the bar has gone */
 }
 :root[data-qsize="normal"] { --q-size: 16px; }
 :root[data-qsize="large"] { --q-size: 18px; }
@@ -188,36 +190,26 @@ kbd {
   border-bottom: 1px solid var(--line);
   view-transition-name: topbar;
 }
-.topbar-inner { max-width: 1120px; margin: 0 auto; padding: 0 20px; height: 60px; display: flex; align-items: center; gap: 24px; }
-.brand { display: flex; flex: none; align-items: center; gap: 10px; color: var(--ink); font-size: 18px; font-weight: 750; letter-spacing: .06em; white-space: nowrap; }
-.brand:hover { color: var(--ink); text-decoration: none; }
-.brand-mark {
-  width: 26px; height: 26px; border-radius: 8px;
-  background:
-    linear-gradient(#fff, #fff) 6px 7px / 14px 2.5px no-repeat,
-    linear-gradient(#fff, #fff) 6px 12px / 14px 2.5px no-repeat,
-    linear-gradient(#fff, #fff) 6px 17px / 9px 2.5px no-repeat,
-    linear-gradient(135deg, #5b7cff, #3a4fd6);
-  box-shadow: 0 2px 6px rgba(67, 97, 238, .35);
-}
-.nav { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; }
+.topbar-inner { height: calc(var(--bar-h) - 1px); padding: 0 12px; display: flex; align-items: center; gap: 6px; }
+/* a page without the 考点 tree's button keeps its place, so the links stay put from page to page */
+.nav { display: flex; flex: none; gap: 2px; margin: 0 auto 0 36px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.drill-tree-toggle + .nav { margin-left: 0; }
 .nav::-webkit-scrollbar { display: none; }
-.nav a { color: var(--ink-2); padding: 6px 12px; border-radius: 999px; white-space: nowrap; font-size: 14px; transition: background-color .15s, color .15s; }
+.nav a { color: var(--ink-2); padding: 3px 10px; border-radius: 7px; white-space: nowrap; font-size: 13px; transition: background-color .15s, color .15s; }
 .nav a:hover { color: var(--ink); background: var(--surface-2); text-decoration: none; }
 .nav a[aria-current="page"] { color: var(--ink); font-weight: 650; background: var(--surface-3); }
 
-.theme-toggle, .qsize-toggle {
+.theme-toggle, .qsize-toggle, .drill-tree-toggle, .pin-btn {
   flex: none; display: inline-flex; align-items: center; justify-content: center;
-  width: 36px; height: 36px; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-sm);
-  background: var(--surface); color: var(--ink-2); cursor: pointer; transition: background-color .15s, color .15s;
+  width: 30px; height: 30px; padding: 0; border: 0; border-radius: 7px;
+  background: transparent; color: var(--muted); cursor: pointer; transition: background-color .15s, color .15s;
 }
-.theme-toggle:hover, .qsize-toggle:hover { background: var(--surface-2); color: var(--ink); }
+.theme-toggle:hover, .qsize-toggle:hover, .drill-tree-toggle:hover, .pin-btn:hover { background: var(--surface-2); color: var(--ink); }
 .qsize-toggle { font: inherit; font-weight: 650; letter-spacing: -.02em; line-height: 1; }
-.qsize-toggle[data-size="normal"] { font-size: 13px; }
-.qsize-toggle[data-size="large"] { font-size: 15px; }
-.qsize-toggle[data-size="xl"] { font-size: 17px; }
-.qsize-toggle:not([hidden]) + .theme-toggle { margin-left: -16px; }
-.theme-toggle svg { width: 18px; height: 18px; display: none; }
+.qsize-toggle[data-size="normal"] { font-size: 12px; }
+.qsize-toggle[data-size="large"] { font-size: 14px; }
+.qsize-toggle[data-size="xl"] { font-size: 16px; }
+.theme-toggle svg { width: 17px; height: 17px; display: none; }
 .theme-toggle[data-mode="auto"] .icon-auto,
 .theme-toggle[data-mode="light"] .icon-light,
 .theme-toggle[data-mode="dark"] .icon-dark { display: block; }
@@ -518,7 +510,7 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
 .tabs a[aria-current="page"] { color: var(--ink); font-weight: 650; background: var(--surface); box-shadow: var(--shadow-sm); }
 
 .kn-pages { display: grid; gap: 24px; justify-items: center; }
-.kn-figure { margin: 0; width: 100%; max-width: 920px; scroll-margin-top: 80px; }
+.kn-figure { margin: 0; width: 100%; max-width: 920px; scroll-margin-top: calc(var(--bar-h) + 20px); }
 .kn-page { display: block; width: 100%; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; background: var(--paper); box-shadow: var(--shadow-sm); }
 .kn-caption { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .kn-caption .section-qs { margin: 0; }
@@ -532,12 +524,12 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
 .toc-inline ul { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-bottom: 18px; }
 .toc-inline a { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px; }
 .kn-text { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 36px; align-items: start; }
-.kn-text .toc { position: sticky; top: 80px; max-height: calc(100vh - 100px); overflow-y: auto; padding-right: 4px; }
+.kn-text .toc { position: sticky; top: calc(var(--bar-h) + 20px); max-height: calc(100vh - var(--bar-h) - 40px); overflow-y: auto; padding-right: 4px; }
 
 .prose { max-width: 760px; font-size: 15.5px; line-height: 1.85; color: var(--ink); }
 .prose h1 { font-size: 26px; margin: 0 0 14px; }
-.prose h2 { font-size: 20px; margin: 40px 0 12px; padding-top: 14px; border-top: 1px solid var(--line); scroll-margin-top: 80px; }
-.prose h3 { font-size: 16px; margin: 28px 0 8px; scroll-margin-top: 80px; }
+.prose h2 { font-size: 20px; margin: 40px 0 12px; padding-top: 14px; border-top: 1px solid var(--line); scroll-margin-top: calc(var(--bar-h) + 20px); }
+.prose h3 { font-size: 16px; margin: 28px 0 8px; scroll-margin-top: calc(var(--bar-h) + 20px); }
 .prose p, .prose ul, .prose ol { margin: 10px 0; }
 .prose blockquote { margin: 14px 0; padding: 8px 16px; border-left: 3px solid var(--shaky); background: var(--shaky-soft); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; color: var(--ink-2); }
 .prose table { border-collapse: collapse; margin: 14px 0; font-size: 14px; display: block; overflow-x: auto; }
@@ -576,18 +568,16 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
 }
 
 @media (max-width: 720px) {
+  :root { --bar-h: 48px; }
   body { font-size: 15px; }
   h1 { font-size: 24px; }
   .hero h1 { font-size: 26px; }
   .page { padding: 20px 16px 64px; }
-  .topbar-inner { gap: 10px; padding: 0 12px 0 16px; height: 56px; }
-  .brand { font-size: 17px; }
-  .brand-text { display: none; }
-  .qsize-toggle:not([hidden]) + .theme-toggle { margin-left: -4px; }
+  .topbar-inner { gap: 4px; padding: 0 8px; }
+  .theme-toggle, .qsize-toggle, .drill-tree-toggle { width: 32px; height: 32px; }
   /* pages with the Aa button have one more button in the bar: keep all five links on screen */
-  .topbar-inner:has(.qsize-toggle:not([hidden])) .nav a { padding: 6px 5px; font-size: 13px; }
-  .topbar-inner:has(.qsize-toggle:not([hidden])) :is(.qsize-toggle, .theme-toggle) { width: 32px; height: 32px; }
-  .nav { gap: 0; }
+  .topbar-inner:has(.qsize-toggle:not([hidden])) .nav a { padding: 6px 5px; }
+  .nav { flex: 0 1 auto; gap: 0; margin-left: 0; }
   .nav a { padding: 6px 7px; }
   .card { padding: 18px 16px; }
   .tonight { grid-template-columns: 1fr; }
@@ -607,24 +597,26 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
 
 /* ---------- chapter page: one 考点 at a time, its questions laid out ---------- */
 
-.page-drill { max-width: 1320px; padding-top: 20px; }
+/* the tree runs along the window's left edge, and the questions sit in the middle of what is left */
+.page-drill { max-width: none; padding: 0; }
+.page-drill > .sync-notice { margin: 16px 20px 0; }
 /* warm-up and due review: the question cards without the 考点 tree */
 .page-review { max-width: 960px; }
-.drill { display: grid; grid-template-columns: 264px minmax(0, 1fr); gap: 24px; align-items: start; }
-.drill-main { min-width: 0; max-width: 980px; }
+.drill { display: grid; grid-template-columns: 264px minmax(0, 1fr); align-items: start; }
+.drill-main { width: 100%; min-width: 0; max-width: 1020px; margin: 0 auto; padding: 18px 20px 72px; }
 .js .drill.tree-closed { grid-template-columns: minmax(0, 1fr); }
 .js .drill.tree-closed .kp-tree { display: none; }
-.js .drill.tree-closed .drill-main { max-width: none; }
+.js .drill.tree-closed .drill-main { max-width: 1320px; }
 
 .kp-tree {
-  position: sticky; top: 76px; max-height: calc(100dvh - 92px); overflow-y: auto; padding: 14px 10px 18px;
-  border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-sm);
+  position: sticky; top: var(--tree-top); height: calc(100dvh - var(--tree-top)); overflow-y: auto; overscroll-behavior: contain; padding: 14px 10px 18px;
+  border-right: 1px solid var(--line); background: var(--bg);
 }
 .kt-chapter { margin: 0 8px 10px; font-weight: 700; color: var(--ink); }
 .kt-chapter a { color: var(--muted); font-weight: 500; }
 .kt-sec-name { margin: 14px 8px 4px; color: var(--muted); font-size: 12px; font-weight: 650; letter-spacing: .04em; }
 .kt-kp { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 2px 8px; padding: 7px 8px 6px; border-radius: 9px; color: var(--ink); }
-.kt-kp:hover { text-decoration: none; background: var(--surface-2); color: var(--ink); }
+.kt-kp:hover { text-decoration: none; background: var(--surface-3); color: var(--ink); }
 .kt-kp.is-current { background: var(--accent-soft); color: var(--accent); font-weight: 650; }
 .kt-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kt-count { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; font-weight: 400; }
@@ -633,55 +625,52 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
 .kt-bar.is-full b { background: var(--mastered); }
 .kt-chapters .kt-kp { grid-template-columns: 1fr; }
 
-.drill-head {
-  position: sticky; top: 60px; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
-  margin: 0 0 16px; padding: 12px 16px 14px; border: 1px solid var(--line); border-radius: var(--radius);
-  background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: var(--shadow-sm);
-}
-.drill-title { flex: 1 1 220px; min-width: 0; }
+.drill-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0 0 16px; }
+.drill-title { flex: 1 1 220px; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
 .drill-title h1 { margin: 0; font-size: 20px; }
-.drill-title p { margin: 2px 0 0; font-size: 13px; }
-.drill-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
-.drill-track { flex-basis: 100%; height: 3px; margin: 2px -16px -14px; border-radius: 0 0 var(--radius) var(--radius); background: var(--surface-3); overflow: hidden; }
+.drill-title p { margin: 0; font-size: 13px; }
+/* the top bar has these; they come down here only when the bar has no room for them */
+.drill-actions { display: none; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 8px; }
+
+/* in the top bar: where you are, the way to the next 考点, and this 考点's progress along the bar's lower edge */
+.bar-context { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.bar-title { min-width: 0; margin-right: 6px; overflow: hidden; color: var(--ink-2); font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; opacity: 0; transition: opacity .15s; }
+.head-gone .bar-title { opacity: 1; }
+.bar-context .btn { flex: none; min-height: 28px; padding: 2px 10px; font-size: 12.5px; white-space: nowrap; box-shadow: none; }
+.drill-track { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; overflow: hidden; pointer-events: none; }
 .drill-track span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-ink)); transition: width .3s; }
-.drill-tree-toggle { display: none; }
-.js .drill-tree-toggle { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); cursor: pointer; transition: background-color .15s, color .15s; }
-.drill-tree-toggle:hover { background: var(--surface-2); color: var(--ink); }
+
+.drill-tree-toggle, .pin-btn { display: none; }
+.js .drill-tree-toggle { display: inline-flex; }
 .drill-tree-toggle svg { width: 18px; height: 18px; }
-.pin-btn { display: none; align-items: center; justify-content: center; flex: none; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); cursor: pointer; transition: background-color .15s, color .15s; }
-.pin-btn:hover { background: var(--surface-2); color: var(--ink); }
+.tree-icon-pane { fill: currentColor; opacity: 0; transition: opacity .15s; }
+.drill-tree-toggle[aria-expanded="true"] .tree-icon-pane { opacity: .3; }
 .pin-btn svg { width: 17px; height: 17px; transition: transform .35s cubic-bezier(.16, 1, .3, 1); }
 .pin-btn[aria-pressed="true"] .pin-head { fill: currentColor; }
 .pin-btn[aria-pressed="false"] svg { transform: rotate(45deg); }
-.kt-top { display: flex; align-items: center; gap: 6px; margin: 0 0 10px 8px; }
-.kt-top .kt-chapter { flex: 1; min-width: 0; margin: 0; }
-.kt-top .pin-btn { width: 28px; height: 28px; }
 
-/* With a mouse on a wide screen the 考点 tree and the top area each have a pin. Unpinned, the tree waits off the left
-   edge and comes out when the mouse rests a moment in the top-left corner of the window; the top area slides up once the
-   chapter header has stuck and comes back from the top edge. Coming out eases out fast and settles; going away eases in. */
+/* With a mouse on a wide screen a hidden 考点 tree waits off the left edge and comes out when the mouse rests a moment in
+   the top-left corner of the window; the top bar has a pin, and unpinned it slides up once the chapter's title row has
+   scrolled away and comes back from the top edge. Coming out eases out fast and settles; going away eases in. */
 @media (hover: hover) and (pointer: fine) and (min-width: 961px) {
-  .js { --tree-top: 76px; }
-  .js.top-away:not(.top-peek) { --tree-top: 16px; }
-  .js .drill-tree-toggle { display: none; }
+  .js.top-away:not(.top-peek) { --tree-top: 0px; }
   .js .pin-btn { display: inline-flex; }
-  .js .drill { --tree-left: calc(max(0px, (100vw - 1320px) / 2) + 20px); }
-  .js .kp-tree { top: var(--tree-top); max-height: calc(100dvh - var(--tree-top) - 16px); }
   .js .drill.tree-closed .kp-tree {
-    display: block; position: fixed; z-index: 15; left: var(--tree-left); width: 264px;
-    box-shadow: var(--shadow-lg); transform: translateX(calc(-100% - var(--tree-left) - 80px));
+    display: block; position: fixed; z-index: 15; bottom: 0; left: 0; width: 264px; height: auto;
+    background: var(--surface); box-shadow: var(--shadow-lg); transform: translateX(calc(-100% - 80px));
   }
   .js .drill.tree-closed.tree-peek .kp-tree { transform: none; }
-  .js.top-away:not(.top-peek) :is(.topbar, .drill-head) { transform: translateY(calc(-1 * var(--top-shift, 240px))); }
+  .js.top-away:not(.top-peek) .topbar { transform: translateY(-100%); }
   .js.top-auto .qcard { scroll-margin-top: 24px; }
-  .js.pane-anim :is(.topbar, .drill-head, .kp-tree) { transition: transform .45s cubic-bezier(.16, 1, .3, 1), top .45s cubic-bezier(.16, 1, .3, 1); }
-  .js.pane-anim.top-away:not(.top-peek) :is(.topbar, .drill-head),
+  .js.pane-anim .topbar { transition: transform .45s cubic-bezier(.16, 1, .3, 1); }
+  .js.pane-anim .kp-tree { transition: transform .45s cubic-bezier(.16, 1, .3, 1), top .45s cubic-bezier(.16, 1, .3, 1), height .45s cubic-bezier(.16, 1, .3, 1); }
+  .js.pane-anim.top-away:not(.top-peek) .topbar,
   .js.pane-anim .drill.tree-closed:not(.tree-peek) .kp-tree { transition-duration: .26s; transition-timing-function: cubic-bezier(.55, 0, .75, .2); }
 }
 .drill-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 20px; }
 
 .qcards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
-.qcard { border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 24px 20px; background: var(--surface); box-shadow: var(--shadow-sm); scroll-margin-top: 150px; }
+.qcard { border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 24px 20px; background: var(--surface); box-shadow: var(--shadow-sm); scroll-margin-top: calc(var(--bar-h) + 16px); }
 .qcard.is-excluded { background: transparent; box-shadow: none; border-style: dashed; padding-bottom: 14px; }
 .qcard.is-excluded .qc-head { padding-bottom: 0; margin-bottom: 0; border-bottom: 0; }
 .qcard.is-excluded .qc-num, .qcard.is-excluded .qc-src, .qcard.is-excluded .qc-path, .qcard.is-excluded .qc-meta { opacity: .5; }
@@ -728,12 +717,22 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
 
 @media (max-width: 960px) {
   .drill { grid-template-columns: minmax(0, 1fr); }
-  .kp-tree { position: static; max-height: 60dvh; }
-  .js .drill:not(.tree-closed) .kp-tree { margin-bottom: 4px; }
-  .drill-head { position: static; }
+  .kp-tree { position: static; height: auto; max-height: 60dvh; border-right: 0; border-bottom: 1px solid var(--line); }
+  /* with the script the tree is a drawer over the page: its button is in the top bar, wherever the page has scrolled to */
+  .js .kp-tree {
+    position: fixed; z-index: 15; top: var(--bar-h); bottom: 0; left: 0; width: min(320px, 86vw); max-height: none;
+    border-right: 1px solid var(--line); border-bottom: 0; background: var(--surface); box-shadow: var(--shadow-lg);
+    animation: tree-in .22s cubic-bezier(.2, .8, .2, 1);
+  }
+  .js .drill:not(.tree-ready) .kp-tree { display: none; }
+  .bar-title { display: none; }
 }
+@keyframes tree-in { from { transform: translateX(-24px); opacity: 0; } }
 @media (max-width: 720px) {
-  .page-drill, .page-review { padding-left: 12px; padding-right: 12px; }
+  .page-review { padding-left: 12px; padding-right: 12px; }
+  .drill-main { padding: 14px 12px 64px; }
+  .bar-context { display: none; }
+  .drill-actions { display: flex; width: 100%; }
   .qcard { padding: 14px 14px 16px; }
   .qc-actions { flex-direction: column; align-items: stretch; }
   .qc-toggles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -757,6 +756,7 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
   .reveal-panel { display: block !important; }
   .kp-tree, .drill-head, .drill-foot, .qc-actions, .qc-tools, .qview-toggle { display: none !important; }
   .drill { display: block; }
+  .drill-main { max-width: none; padding: 0; }
   .qc-panel { display: none !important; }
   .qcard { break-inside: avoid; box-shadow: none; }
   body { background: #fff; }
@@ -766,7 +766,7 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
 .search { flex-wrap: wrap; max-width: 100%; }
 .search input { flex: 1 1 240px; min-width: 0; }
 .search select { width: auto; min-width: 100px; flex: 1 1 110px; }
-.card-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px 0; }
+.card-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
 .sync-notice { border: 1px solid var(--shaky); background: var(--surface); border-radius: var(--radius); padding: 14px 18px; margin-bottom: 18px; }
 .sync-notice h2 { font-size: 16px; margin: 0 0 8px; }
 .sync-notice ul { padding-left: 20px; margin: 8px 0; }

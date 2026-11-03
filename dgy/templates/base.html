@@ -14,7 +14,7 @@
   <a class="skip-link" href="#main">跳到正文</a>
   <header class="topbar">
     <div class="topbar-inner">
-      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-text">大观园</span></a>
+      {% block topbar_start %}{% endblock %}
       <nav class="nav" aria-label="主导航">
         <a href="/" {% if nav == 'home' %}aria-current="page"{% endif %}>首页</a>
         <a href="/bank" {% if nav == 'bank' %}aria-current="page"{% endif %}>题库</a>
@@ -22,6 +22,7 @@
         <a href="/history" {% if nav == 'history' %}aria-current="page"{% endif %}>学习记录</a>
         <a href="/settings" {% if nav == 'settings' %}aria-current="page"{% endif %}>设置</a>
       </nav>
+      {% block topbar_context %}{% endblock %}
       {% include "_qsize_toggle.html" %}
       {% include "_theme_toggle.html" %}
     </div>

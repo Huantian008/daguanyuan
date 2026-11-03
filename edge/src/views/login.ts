@@ -6,7 +6,7 @@ import { layout } from "./layout";
 export const loginPage = (meta: Meta, next: string, error?: string, username = "") => layout(meta, {
   title: "登录",
   body: html`<form class="card form login" method="post" action="/login">
-  <h1>大观园</h1>
+  <h1>登录</h1>
   <input type="hidden" name="next" value="${next}">
   <label for="username">用户名</label>
   <input id="username" name="username" type="text" value="${username}" autocomplete="username" autocapitalize="none" spellcheck="false" ${username ? "" : "autofocus"} required>

@@ -353,6 +353,24 @@ def test_chapter_page_steps_between_kps_and_chapters(env):
     assert "上一章" in env.client.get("/bank/B", params={"kp": "1"}).text
 
 
+def test_chapter_page_keeps_its_controls_in_the_top_bar(env):
+    page = env.client.get("/bank/A", params={"kp": "1"}).text
+    bar = page[page.index('<header class="topbar">'):page.index("</header>")]
+    for part in ("js-tree-toggle", "js-top-pin", "js-done-bar", "下一节"):
+        assert part in bar
+    assert "js-tree-pin" not in page
+    head = page[page.index('<header class="drill-head">'):]
+    assert head.index('class="card-filters"') < head.index("</header>")  # the filters share the title row
+
+
+def test_only_chapter_pages_have_the_tree_button_and_no_page_shows_a_brand(env):
+    for path in ("/", "/bank", "/knowledge", "/history", "/settings", "/bank/A"):
+        page = env.client.get(path).text
+        assert 'class="brand' not in page
+        assert "大观园" not in visible(page[page.index("<body"):])
+        assert ("js-tree-toggle" in page) == (path == "/bank/A")
+
+
 def test_grading_from_the_chapter_page_can_be_changed_all_day(env):
     r = env.client.post("/q/4/grade", data={"owner": "local", "grade": "mastered", "back": "/bank/B?kp=1#q-4"}, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/bank/B?kp=1#q-4"
@@ -505,6 +523,11 @@ def test_grade_owner_and_accessible_status(env):
 def test_login_page_does_not_replay_pending_grades(tmp_path):
     protected = _make_env(tmp_path, password="test-password")
     assert 'data-grade-owner=""' in protected.client.get("/login").text
+
+
+def test_login_page_is_titled_login(tmp_path):
+    page = _make_env(tmp_path, password="test-password").client.get("/login").text
+    assert "<h1>登录</h1>" in page and "大观园" not in visible(page[page.index("<body"):])
 
 
 def test_long_break_warmup_matches_home(env):
