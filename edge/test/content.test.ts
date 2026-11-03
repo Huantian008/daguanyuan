@@ -51,3 +51,13 @@ describe("theme and question size markup", () => {
     }
   });
 });
+
+describe("the 考点 tree's position script", () => {
+  it("is the same as the Python template's", async () => {
+    const { client } = setup();
+    await client.login();
+    const page = await (await client.get("/bank/A?kp=1")).text();
+    const snippet = readFileSync(new URL("../../dgy/templates/_tree_scroll.html", import.meta.url), "utf8").trim();
+    expect(page).toContain(snippet);
+  });
+});

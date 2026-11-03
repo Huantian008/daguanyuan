@@ -10,6 +10,10 @@ import { cnDate } from "../studyday";
 import { layout } from "./layout";
 import { STATUS_LABELS, answerBody, distBar, restoreQuestion, katexCss, katexJs, qmeta, questionBody, questionCard, relatedKnowledge, revealToggle, reviewHistory, type Status } from "./parts";
 
+// Same text as dgy/templates/_tree_scroll.html (test/content.test.ts checks): runs right after the tree, before the first
+// paint, so a new page's tree does not show its top first and then jump; app.js saves the position.
+const TREE_SCROLL = raw(`<script>try{var t=document.getElementById("kp-tree");t.scrollTop=+sessionStorage.getItem("dgy-tree-scroll:"+location.pathname)||0}catch(e){}</script>`);
+
 const searchForm = (q = "", subject = "all", status = "all") => html`<form class="search" action="/bank/search" method="get" role="search">
     <label class="visually-hidden" for="q">搜索题目</label>
     <input id="q" name="q" type="search" value="${q}" placeholder="题号、年份或考点，多个关键词用空格分隔">
@@ -100,6 +104,7 @@ export function chapterPage(meta: Meta, d: ChapterPageData) {
       ${d.chapters.filter((c) => c.code !== chapter.code).map((c) => html`<a class="kt-kp" href="/bank/${c.code}"><span class="kt-name">${c.name}</span></a>`)}
     </div>
   </nav>
+  ${TREE_SCROLL}
 
   <div class="drill-main">
     <header class="drill-head">

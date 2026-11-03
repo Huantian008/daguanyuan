@@ -255,12 +255,40 @@
       treeToggle.setAttribute("aria-label", label);
       treeToggle.title = closed && mouseWide.matches ? `${label}（鼠标在窗口左上角停一下时临时出现）` : label;
     };
+    // every 考点 is a new page, and a new page's tree starts at its top: it goes back to where it was, per chapter and tab.
+    // _tree_scroll.html does this before the first paint; here is for a tree that was not showing then, and the current 考点.
+    const TREE_SCROLL_KEY = `dgy-tree-scroll:${location.pathname}`;
+    const placeTree = () => {
+      try {
+        const saved = sessionStorage.getItem(TREE_SCROLL_KEY);
+        if (saved !== null) tree.scrollTop = Number(saved);
+      } catch {
+        // storage blocked: the current 考点 is still brought into view
+      }
+      const current = tree.querySelector(".is-current");
+      if (!current) return;
+      const box = tree.getBoundingClientRect();
+      const item = current.getBoundingClientRect();
+      // not scrollIntoView, which would scroll the page as well
+      if (item.top < box.top || item.bottom > box.bottom) tree.scrollTop += item.top - box.top - (tree.clientHeight - item.height) / 2;
+    };
+    addEventListener("pagehide", () => {
+      // a closed drawer has no height and no position: what was saved last stays
+      if (!tree.clientHeight) return;
+      try {
+        sessionStorage.setItem(TREE_SCROLL_KEY, String(Math.round(tree.scrollTop)));
+      } catch {
+        // the next page's tree goes to the current 考点 instead
+      }
+    });
     const flip = () => {
       closed = !closed;
       peekTree.set(false);
       // the mouse is on the button, in the corner that brings a hidden tree out: the tree goes now and stays away
       if (closed) peekTree.hold();
       show();
+      // display: none forgets the tree's position
+      if (!closed && !tree.scrollTop) placeTree();
       if (!narrow.matches) {
         try {
           localStorage.setItem(TREE_KEY, closed ? "1" : "0");
@@ -276,6 +304,7 @@
     });
     mouseWide.addEventListener("change", show);
     show();
+    placeTree();
   }
 
   const topbar = document.querySelector(".topbar");

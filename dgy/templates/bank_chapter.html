@@ -37,6 +37,7 @@
       {% for c in chapters if c.code != chapter.code %}<a class="kt-kp" href="/bank/{{ c.code }}"><span class="kt-name">{{ c.name }}</span></a>{% endfor %}
     </div>
   </nav>
+  {% include "_tree_scroll.html" %}
 
   <div class="drill-main">
     <header class="drill-head">

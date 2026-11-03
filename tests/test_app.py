@@ -353,6 +353,12 @@ def test_chapter_page_steps_between_kps_and_chapters(env):
     assert "上一章" in env.client.get("/bank/B", params={"kp": "1"}).text
 
 
+def test_chapter_page_puts_the_tree_position_back_right_after_the_tree(env):
+    page = env.client.get("/bank/A", params={"kp": "1"}).text
+    after_tree = page[page.index("</nav>", page.index('id="kp-tree"')):]
+    assert re.match(r"</nav>\s*<script>[^<]*dgy-tree-scroll", after_tree)
+
+
 def test_chapter_page_keeps_its_controls_in_the_top_bar(env):
     page = env.client.get("/bank/A", params={"kp": "1"}).text
     bar = page[page.index('<header class="topbar">'):page.index("</header>")]

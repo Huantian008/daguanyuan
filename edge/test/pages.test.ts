@@ -325,6 +325,12 @@ describe("bank", () => {
     expect(nextChapter).toContain("上一章");
   });
 
+  it("puts the tree's position back right after the tree, before the first paint", async () => {
+    const { client } = await loggedIn();
+    const page = await text(client, "/bank/A?kp=1");
+    expect(page.slice(page.indexOf("</nav>", page.indexOf('id="kp-tree"')))).toMatch(/^<\/nav>\s*<script>[^<]*dgy-tree-scroll/);
+  });
+
   it("keeps the chapter page's controls in the top bar", async () => {
     const { client } = await loggedIn();
     const page = await text(client, "/bank/A?kp=1");

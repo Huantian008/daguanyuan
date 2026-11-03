@@ -35,8 +35,29 @@ function imageDialog() {
     action: (name: string) => dialog.events.click({ target: { closest: () => controls[name] } }),
   };
 }
+// The chapter page's 考点 tree: like a real element, it has no height or position while display: none and stops at 0.
+function kpTree({ currentAt = 200, narrow = false } = {}) {
+  let top = 0;
+  const tree = {
+    ...element(), clientHeight: narrow ? 0 : 700, offsetWidth: 264, contains: () => false,
+    get scrollTop() { return this.clientHeight ? top : 0; },
+    set scrollTop(value: number) { if (this.clientHeight) top = Math.max(0, value); },
+    getBoundingClientRect: () => tree.clientHeight ? { top: 44, bottom: 44 + tree.clientHeight } : { top: 0, bottom: 0 },
+    querySelector: () => ({
+      getBoundingClientRect: () => {
+        if (!tree.clientHeight) return { top: 0, bottom: 0, height: 0 };
+        const y = 44 + currentAt - tree.scrollTop;
+        return { top: y, bottom: y + 40, height: 40 };
+      },
+    }),
+  };
+  const toggle = { ...element(), title: "", contains: () => false };
+  const drill = { classList: { add() {}, toggle() {} } };
+  return { narrow, tree, toggle, find: (s: string) => s === ".drill" ? drill : s === ".js-tree-toggle" ? toggle : s === "#kp-tree" ? tree : null };
+}
 function page(owner: string, storage = new Map<string, string>(), options: {
   fetch?: any; blocked?: boolean; fullStorage?: boolean; maths?: any[]; cards?: any[]; observer?: (callback: (entries: any[]) => void) => void; clock?: DateConstructor; studyDay?: string; dialog?: boolean;
+  tree?: ReturnType<typeof kpTree>; session?: Map<string, string>;
 } = {}) {
   const listeners: Record<string, Function> = {};
   const listen = (name: string, fn: Function) => {
@@ -60,7 +81,7 @@ function page(owner: string, storage = new Map<string, string>(), options: {
   const panel = { innerHTML: "" }, notices: any[] = [];
   const document = {
     documentElement: { dataset: {} }, body: { ...element(), dataset: { gradeOwner: owner, studyDay: options.studyDay } }, currentScript: null,
-    querySelector: (s: string) => s.includes("form.qc-grades") ? form : null,
+    querySelector: (s: string) => s.includes("form.qc-grades") ? form : options.tree?.find(s) ?? null,
     querySelectorAll: (s: string) => s === "form.qc-grades" ? [form] : s === ".js-grade-retry" ? [retry] : s === ".qcard" ? options.cards ?? [] : s === ".math.inline, .math.block" ? options.maths ?? [] : [],
     addEventListener: listen,
     getElementById: (id: string) => id === "main" ? { prepend: (node: any) => notices.push(node) } : id === "pending-grades" ? pendingBox : id.startsWith("qh-") ? panel : null,
@@ -78,6 +99,14 @@ function page(owner: string, storage = new Map<string, string>(), options: {
       removeItem: (n: string) => { if (options.blocked) throw Error("blocked"); storage.delete(n); },
     },
     addEventListener: listen,
+    ...(options.tree ? {
+      matchMedia: (query: string) => ({ matches: query.includes("max-width") && options.tree!.narrow, addEventListener() {} }),
+      requestAnimationFrame: () => 0,
+      sessionStorage: {
+        getItem: (n: string) => { if (options.blocked) throw Error("blocked"); return options.session?.get(n) ?? null; },
+        setItem: (n: string, v: string) => { if (options.blocked) throw Error("blocked"); options.session?.set(n, v); },
+      },
+    } : {}),
     ...(options.dialog ? { HTMLDialogElement: class {} } : {}),
     ...(options.observer ? { IntersectionObserver: class {
       constructor(callback: (entries: any[]) => void) { options.observer!(callback); } observe() {} unobserve() {}
@@ -323,5 +352,50 @@ describe("formula scheduling", () => {
     const math = { dataset: {} as Record<string, string>, textContent: "x", classList: classes(), closest: () => null };
     page("local", new Map(), { maths: [math] });
     expect(math.dataset.rendered).toBe("1");
+  });
+});
+
+describe("the 考点 tree's position", () => {
+  const KEY = "dgy-tree-scroll:/bank/A";
+  it("saves it on leaving and goes back to it on the chapter's next page", () => {
+    const session = new Map<string, string>(), first = kpTree();
+    const p = page("1", new Map(), { tree: first, session });
+    first.tree.scrollTop = 480;
+    p.listeners.pagehide({});
+    expect(session.get(KEY)).toBe("480");
+    const next = kpTree({ currentAt: 800 });
+    page("1", new Map(), { tree: next, session });
+    expect(next.tree.scrollTop).toBe(480); // the clicked 考点 is in view, so nothing else moves
+  });
+  it("does not use another chapter's position", () => {
+    const other = kpTree();
+    page("1", new Map(), { tree: other, session: new Map([["dgy-tree-scroll:/bank/B", "480"]]) });
+    expect(other.tree.scrollTop).toBe(0);
+  });
+  it("brings the current 考点 to the middle when it is out of view", () => {
+    const fresh = kpTree({ currentAt: 1050 });
+    page("1", new Map(), { tree: fresh, session: new Map() });
+    expect(fresh.tree.scrollTop).toBe(720); // 1050 - (700 - 40) / 2
+    const below = kpTree({ currentAt: 1500 });
+    page("1", new Map(), { tree: below, session: new Map([[KEY, "480"]]) });
+    expect(below.tree.scrollTop).toBe(1170);
+    const above = kpTree({ currentAt: 500 });
+    page("1", new Map(), { tree: above, session: new Map([[KEY, "900"]]) });
+    expect(above.tree.scrollTop).toBe(170);
+  });
+  it("keeps the saved position while a drawer is closed and uses it when the drawer opens", () => {
+    const session = new Map([[KEY, "480"]]), drawer = kpTree({ currentAt: 800, narrow: true });
+    const p = page("1", new Map(), { tree: drawer, session });
+    p.listeners.pagehide({});
+    expect(session.get(KEY)).toBe("480");
+    drawer.tree.clientHeight = 700;
+    drawer.toggle.events.click();
+    expect(drawer.tree.scrollTop).toBe(480);
+  });
+  it("still shows the current 考点 when storage is blocked", () => {
+    const blocked = kpTree({ currentAt: 1050 });
+    const p = page("1", new Map(), { tree: blocked, blocked: true });
+    expect(blocked.tree.scrollTop).toBe(720);
+    expect(() => p.listeners.pagehide({})).not.toThrow();
   });
 });
