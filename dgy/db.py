@@ -1,4 +1,4 @@
-"""SQLite storage for the user's own data: review log, card states, "不做" overrides, settings, and the practice sets
+"""SQLite storage for the user's own data: review log, card states, "不做" overrides, notes, settings, and the practice sets
 of the one-by-one practice page, which is gone; their rows stay for the backup.
 
 Question content is not stored here; it lives in content/manifest.json and can be rebuilt from the PDFs.
@@ -52,6 +52,12 @@ CREATE TABLE IF NOT EXISTS sessions (
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS notes (
+    num INTEGER PRIMARY KEY,
+    body TEXT NOT NULL,
+    updated_at TEXT NOT NULL
 );
 """
 
@@ -184,6 +190,27 @@ def set_excluded(conn: sqlite3.Connection, nums, excluded: bool) -> None:
 
 def exclusion_overrides(conn: sqlite3.Connection) -> dict[int, bool]:
     return {row["num"]: bool(row["is_excluded"]) for row in conn.execute("SELECT * FROM exclusions")}
+
+
+def notes_for(conn: sqlite3.Connection, nums: list[int]) -> dict[int, str]:
+    """The notes of these questions; a question without a note is left out."""
+    if not nums:
+        return {}
+    rows = conn.execute(f"SELECT num, body FROM notes WHERE num IN ({','.join('?' * len(nums))})", nums)
+    return {row["num"]: row["body"] for row in rows}
+
+
+def set_note(conn: sqlite3.Connection, num: int, body: str, at: datetime) -> None:
+    """Replace a question's note; a blank one removes it."""
+    with conn:
+        if body.strip():
+            conn.execute(
+                "INSERT INTO notes (num, body, updated_at) VALUES (?, ?, ?) "
+                "ON CONFLICT (num) DO UPDATE SET body = excluded.body, updated_at = excluded.updated_at",
+                (num, body, at.isoformat()),
+            )
+        else:
+            conn.execute("DELETE FROM notes WHERE num = ?", (num,))
 
 
 def get_setting(conn: sqlite3.Connection, key: str, default: str | None = None) -> str | None:

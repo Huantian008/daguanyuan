@@ -597,3 +597,56 @@ def test_expired_login_json_is_actionable(tmp_path):
     env = _make_env(tmp_path, password="pw")
     r = env.client.post("/q/1/grade", data={"owner": "local", "grade": "unknown"}, headers={"Accept": "application/json"})
     assert r.status_code == 401 and r.json()["code"] == "login_required"
+
+
+JSON_ACCEPT = {"Accept": "application/json"}
+
+
+def test_a_note_is_saved_without_a_redirect_and_shown_where_the_question_is(env):
+    r = env.client.post("/q/1/note", data={"owner": "local", "note": "令 x-1=t\r\n然后分段"}, headers=JSON_ACCEPT)
+    assert (r.status_code, r.json()) == (200, {"saved": True})
+    page = env.client.get("/bank/A", params={"kp": "1"}).text
+    assert "令 x-1=t\n然后分段</textarea>" in page
+    assert 'js-qc-toggle has-note" aria-expanded="false" aria-controls="qn-1"' in page
+    assert 'js-qc-toggle" aria-expanded="false" aria-controls="qn-2"' in env.client.get("/bank/A", params={"kp": "2"}).text
+    assert "令 x-1=t\n然后分段</textarea>" in env.client.get("/q/1").text
+    env.client.post("/q/1/grade", data={"owner": "local", "grade": "mastered", "mode": "warmup"})
+    assert "令 x-1=t\n然后分段</textarea>" in env.client.get("/review/warmup").text
+
+
+def test_a_note_can_come_as_multipart_as_the_page_script_sends_it(env):
+    r = env.client.post("/q/1/note", files={"owner": (None, "local"), "note": (None, "思路")}, headers=JSON_ACCEPT)
+    assert r.status_code == 200
+    assert "思路</textarea>" in env.client.get("/q/1").text
+
+
+def test_a_note_form_without_the_script_goes_back_to_the_card(env):
+    r = env.client.post("/q/4/note", data={"owner": "local", "note": "思路", "back": "/bank/B?kp=1#q-4"}, follow_redirects=False)
+    assert (r.status_code, r.headers["location"]) == (303, "/bank/B?kp=1#q-4")
+    r = env.client.post("/q/4/note", data={"owner": "local", "note": "思路", "back": "https://example.com"}, follow_redirects=False)
+    assert r.headers["location"] == "/bank/B#q-4"
+
+
+def test_a_blank_note_removes_it_and_its_mark(env):
+    env.client.post("/q/1/note", data={"owner": "local", "note": "思路"})
+    env.client.post("/q/1/note", data={"owner": "local", "note": "  \n"})
+    page = env.client.get("/bank/A", params={"kp": "1"}).text
+    assert "has-note" not in page
+    assert "思路</textarea>" not in page
+
+
+def test_a_note_is_refused_for_a_stale_page_an_unknown_question_or_too_much_text(env):
+    assert env.client.post("/q/1/note", data={"owner": "other", "note": "思路"}).status_code == 409
+    assert env.client.post("/q/1/note", data={"note": "思路"}).status_code == 409
+    assert env.client.post("/q/999/note", data={"owner": "local", "note": "思路"}).status_code == 404
+    r = env.client.post("/q/1/note", data={"owner": "local", "note": "字" * 10001}, headers=JSON_ACCEPT)
+    assert (r.status_code, r.json()["code"]) == (422, "note_too_long")
+    assert "has-note" not in env.client.get("/bank/A", params={"kp": "1"}).text
+    assert env.client.post("/q/1/note", data={"owner": "local", "note": "字" * 10000}, headers=JSON_ACCEPT).status_code == 200
+
+
+def test_a_note_cannot_break_out_of_its_box(env):
+    env.client.post("/q/1/note", data={"owner": "local", "note": "</textarea><script>alert(1)</script>"})
+    for page in (env.client.get("/bank/A", params={"kp": "1"}).text, env.client.get("/q/1").text):
+        assert "<script>alert(1)" not in page
+        assert "&lt;/textarea&gt;&lt;script&gt;alert(1)&lt;/script&gt;</textarea>" in page

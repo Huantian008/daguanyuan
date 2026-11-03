@@ -55,9 +55,18 @@ function kpTree({ currentAt = 200, narrow = false } = {}) {
   const drill = { classList: { add() {}, toggle() {} } };
   return { narrow, tree, toggle, find: (s: string) => s === ".drill" ? drill : s === ".js-tree-toggle" ? toggle : s === "#kp-tree" ? tree : null };
 }
+// A question's note box as the script sees it.
+function noteBox(num = 7, value = "") {
+  const area = { ...element(), value };
+  const status = { textContent: "", classList: classes() };
+  const save = { hidden: false };
+  const toggle = { classList: classes() };
+  const form = { ...element(), elements: { note: area }, getAttribute: () => `/q/${num}/note`, querySelector: (s: string) => s === ".note-status" ? status : save };
+  return { num, form, area, status, save, toggle, type(text: string) { area.value = text; area.events.input(); } };
+}
 function page(owner: string, storage = new Map<string, string>(), options: {
   fetch?: any; blocked?: boolean; fullStorage?: boolean; maths?: any[]; cards?: any[]; observer?: (callback: (entries: any[]) => void) => void; clock?: DateConstructor; studyDay?: string; dialog?: boolean;
-  tree?: ReturnType<typeof kpTree>; session?: Map<string, string>;
+  tree?: ReturnType<typeof kpTree>; session?: Map<string, string>; notes?: ReturnType<typeof noteBox>[];
 } = {}) {
   const listeners: Record<string, Function> = {};
   const listen = (name: string, fn: Function) => {
@@ -81,15 +90,18 @@ function page(owner: string, storage = new Map<string, string>(), options: {
   const panel = { innerHTML: "" }, notices: any[] = [];
   const document = {
     documentElement: { dataset: {} }, body: { ...element(), dataset: { gradeOwner: owner, studyDay: options.studyDay } }, currentScript: null,
-    querySelector: (s: string) => s.includes("form.qc-grades") ? form : options.tree?.find(s) ?? null,
-    querySelectorAll: (s: string) => s === "form.qc-grades" ? [form] : s === ".js-grade-retry" ? [retry] : s === ".qcard" ? options.cards ?? [] : s === ".math.inline, .math.block" ? options.maths ?? [] : [],
+    querySelector: (s: string) => s.includes("form.qc-grades") ? form
+      : s.startsWith("form.note-form") ? options.notes?.find((n) => s.includes(`/q/${n.num}/note`))?.form ?? null
+      : s.startsWith("[aria-controls=\"qn-") ? options.notes?.find((n) => s.includes(`qn-${n.num}`))?.toggle ?? null
+      : options.tree?.find(s) ?? null,
+    querySelectorAll: (s: string) => s === "form.note-form" ? options.notes?.map((n) => n.form) ?? [] : s === "form.qc-grades" ? [form] : s === ".js-grade-retry" ? [retry] : s === ".qcard" ? options.cards ?? [] : s === ".math.inline, .math.block" ? options.maths ?? [] : [],
     addEventListener: listen,
     getElementById: (id: string) => id === "main" ? { prepend: (node: any) => notices.push(node) } : id === "pending-grades" ? pendingBox : id.startsWith("qh-") ? panel : null,
     createElement: (name: string) => name === "dialog" ? viewer.dialog : element(),
   };
   const network = vi.fn(options.fetch ?? (async () => response())), render = vi.fn();
   runInNewContext(script, {
-    document, window: { katex: { render } }, fetch: network, crypto: { randomUUID }, URL, URLSearchParams, Date: options.clock ?? Date, AbortController,
+    document, window: { katex: { render } }, fetch: network, crypto: { randomUUID }, URL, URLSearchParams, FormData, Date: options.clock ?? Date, AbortController,
     setTimeout: (fn: Function, delay: number) => { timers.set(++timerId, { fn, delay }); return timerId; },
     clearTimeout: (id: number) => timers.delete(id),
     location: { href: "https://example.test/bank/A?kp=1#q-1", pathname: "/bank/A", search: "?kp=1", hash: "#q-1" }, performance: { getEntriesByType: () => [] }, innerHeight: 800,
@@ -397,5 +409,148 @@ describe("the 考点 tree's position", () => {
     const p = page("1", new Map(), { tree: blocked, blocked: true });
     expect(blocked.tree.scrollTop).toBe(720);
     expect(() => p.listeners.pagehide({})).not.toThrow();
+  });
+});
+
+describe("notes", () => {
+  const KEY = "dgy-note-drafts:1";
+  const noteCalls = (p: ReturnType<typeof page>) => p.network.mock.calls.filter(([url]: any[]) => /\/note$/.test(url));
+  const sent = (call: any[]) => call[1].body.get("note");
+  const drafts = (storage: Map<string, string>) => JSON.parse(storage.get(KEY) ?? "{}");
+
+  it("keeps a change on this device, sends it after a pause, and marks the note saved", async () => {
+    const storage = new Map<string, string>(), box = noteBox();
+    const p = page("1", storage, { notes: [box] });
+    expect(box.save.hidden).toBe(true);
+    box.type("令 x-1=t");
+    expect(drafts(storage)).toEqual({ 7: "令 x-1=t" });
+    expect(noteCalls(p)).toHaveLength(0);
+    await p.runTimer(800);
+    const [call] = noteCalls(p);
+    expect(call[0]).toBe("/q/7/note");
+    expect(call[1].keepalive).toBe(true);
+    expect([call[1].body.get("owner"), sent(call)]).toEqual(["1", "令 x-1=t"]);
+    expect(storage.has(KEY)).toBe(false);
+    expect(box.status.textContent).toMatch(/^已保存 \d\d:\d\d$/);
+    expect(box.toggle.classList.contains("has-note")).toBe(true);
+  });
+
+  it("sends only the last of a run of changes, such as a voice input arriving in pieces", async () => {
+    const box = noteBox();
+    const p = page("1", new Map(), { notes: [box] });
+    box.type("令");
+    box.type("令 x-1");
+    box.type("令 x-1=t");
+    expect([...p.timers.values()].filter((t) => t.delay === 800)).toHaveLength(1);
+    await p.runTimer(800);
+    expect(noteCalls(p).map(sent)).toEqual(["令 x-1=t"]);
+  });
+
+  it("sends at once when the box loses the focus, and the mark goes when the note is emptied", async () => {
+    const box = noteBox(7, "旧");
+    box.toggle.classList.toggle("has-note", true);
+    const p = page("1", new Map(), { notes: [box] });
+    box.area.events.blur();
+    expect(noteCalls(p)).toHaveLength(0); // nothing changed
+    box.type("");
+    box.area.events.blur();
+    await flush();
+    expect(noteCalls(p).map(sent)).toEqual([""]);
+    expect(box.toggle.classList.contains("has-note")).toBe(false);
+  });
+
+  it("sends what is left when the page goes", async () => {
+    const box = noteBox();
+    const p = page("1", new Map(), { notes: [box] });
+    box.type("翻页前说的");
+    p.listeners.pagehide({});
+    expect(noteCalls(p).map(sent)).toEqual(["翻页前说的"]);
+    await flush();
+    expect([...p.timers.values()].filter((t) => t.delay === 800)).toHaveLength(0);
+  });
+
+  it("sends what changed while a request was out, after it", async () => {
+    let answer!: (r: Response) => void;
+    const responses = [new Promise<Response>((resolve) => { answer = resolve; }), Promise.resolve(response())];
+    const storage = new Map<string, string>(), box = noteBox();
+    const p = page("1", storage, { notes: [box], fetch: () => responses.shift() });
+    box.type("第一句");
+    box.area.events.blur();
+    box.type("第一句，第二句");
+    box.area.events.blur();
+    expect(noteCalls(p).map(sent)).toEqual(["第一句"]);
+    answer(response());
+    await flush();
+    expect(noteCalls(p).map(sent)).toEqual(["第一句", "第一句，第二句"]);
+    expect(storage.has(KEY)).toBe(false);
+  });
+
+  it("keeps the text when saving fails, retries a few times, and offers the button", async () => {
+    let online = false;
+    const storage = new Map<string, string>(), box = noteBox();
+    const p = page("1", storage, { notes: [box], fetch: async () => { if (!online) throw new TypeError("offline"); return response(); } });
+    box.type("断网时说的");
+    await p.runTimer(800);
+    expect(drafts(storage)).toEqual({ 7: "断网时说的" });
+    expect(box.status.textContent).toContain("内容还在");
+    expect(box.status.classList.contains("qc-unsaved")).toBe(true);
+    expect(box.save.hidden).toBe(false);
+    for (const delay of [1500, 4000, 10000]) await p.runTimer(delay);
+    expect(noteCalls(p)).toHaveLength(4);
+    expect([...p.timers.values()].filter((t) => [1500, 4000, 10000].includes(t.delay))).toHaveLength(0);
+    online = true;
+    p.listeners.online({});
+    await flush();
+    expect(storage.has(KEY)).toBe(false);
+    expect(box.save.hidden).toBe(true);
+    expect(box.status.classList.contains("qc-unsaved")).toBe(false);
+  });
+
+  it("does not retry by itself when the login expired or the account changed, and says so", async () => {
+    for (const [status, words] of [[401, "登录已过期"], [409, "账号已改变"]] as const) {
+      const storage = new Map<string, string>(), box = noteBox();
+      const p = page("1", storage, { notes: [box], fetch: async () => new Response("{}", { status, headers: { "content-type": "application/json" } }) });
+      box.type("思路");
+      await p.runTimer(800);
+      expect(box.status.textContent).toContain(words);
+      expect(drafts(storage)).toEqual({ 7: "思路" });
+      expect([...p.timers.values()].filter((t) => t.delay === 1500)).toHaveLength(0);
+    }
+  });
+
+  it("takes a redirect to the login page for an expired login", async () => {
+    const storage = new Map<string, string>(), box = noteBox();
+    const p = page("1", storage, { notes: [box], fetch: async () => new Response("<html>", { headers: { "content-type": "text/html" } }) });
+    box.type("思路");
+    await p.runTimer(800);
+    expect(box.status.textContent).toContain("登录已过期");
+    expect(drafts(storage)).toEqual({ 7: "思路" });
+  });
+
+  it("puts a waiting note back in its box on load, and sends notes of other questions too", async () => {
+    const storage = new Map([[KEY, JSON.stringify({ 7: "没存上的", 9: "别的题" })]]), box = noteBox(7, "旧");
+    const p = page("1", storage, { notes: [box] });
+    expect(box.area.value).toBe("没存上的");
+    await flush();
+    expect(noteCalls(p).map((call: any[]) => [call[0], sent(call)])).toEqual([["/q/7/note", "没存上的"], ["/q/9/note", "别的题"]]);
+    expect(storage.has(KEY)).toBe(false);
+  });
+
+  it("never sends another account's waiting notes", async () => {
+    const storage = new Map([["dgy-note-drafts:2", JSON.stringify({ 7: "朋友的" })]]), box = noteBox(7, "");
+    const p = page("1", storage, { notes: [box] });
+    await flush();
+    expect(box.area.value).toBe("");
+    expect(noteCalls(p)).toHaveLength(0);
+    expect(storage.has("dgy-note-drafts:2")).toBe(true);
+  });
+
+  it("still saves when storage is blocked", async () => {
+    const box = noteBox();
+    const p = page("1", new Map(), { notes: [box], blocked: true });
+    box.type("思路");
+    await p.runTimer(800);
+    expect(noteCalls(p).map(sent)).toEqual(["思路"]);
+    expect(box.status.textContent).toMatch(/^已保存/);
   });
 });

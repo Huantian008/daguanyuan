@@ -12,6 +12,8 @@ from .review import REVIEW_PAGES
 
 router = APIRouter()
 
+NOTE_LIMIT = 10000  # the note box's maxlength in _macros.html
+
 
 @router.get("/bank")
 def chapters(request: Request, conn=Depends(get_conn)):
@@ -83,7 +85,7 @@ def chapter(request: Request, code: str, kp: str = "", status: str = "all", conn
                   texts=content.texts, graded_today=db.graded_on(conn, today(request)),
                   sections={num: content.sections_for(num) for num in nums}, titles=content.knowledge_titles(),
                   knowledge=[content.knowledge_entry(s) for s in content.chapter_links.get(code, [])],
-                  histories=db.histories_for(conn, nums))
+                  histories=db.histories_for(conn, nums), notes=db.notes_for(conn, nums))
 
 
 @router.post("/bank/exclude", dependencies=[Depends(require_owner)])
@@ -120,6 +122,22 @@ def grade(request: Request, num: int, grade: str = Form(""), back: str = Form(""
     return redirect(safe_back(back, f"/bank/{q.chapter}#q-{num}"))
 
 
+@router.post("/q/{num}/note", dependencies=[Depends(require_owner)])
+def save_note(request: Request, num: int, note: str = Form(""), back: str = Form(""), conn=Depends(get_conn)):
+    """Save a question's note, or remove it when blank. The page script gets JSON instead of a redirect, so the page
+    stays where it is."""
+    q = bank(request).questions.get(num)
+    if q is None:
+        raise HTTPException(404, "没有这道题")
+    body = note.replace("\r\n", "\n")
+    if len(body) > NOTE_LIMIT:
+        return JSONResponse({"code": "note_too_long", "error": f"笔记最多 {NOTE_LIMIT} 字。"}, status_code=422)
+    db.set_note(conn, num, body, now(request))
+    if wants_json(request):
+        return {"saved": True}
+    return redirect(safe_back(back, f"/bank/{q.chapter}#q-{num}"))
+
+
 @router.get("/q/{num}")
 def question(request: Request, num: int, conn=Depends(get_conn)):
     content = bank(request)
@@ -138,6 +156,7 @@ def question(request: Request, num: int, conn=Depends(get_conn)):
         card=state.cards.get(num),
         status=state.status(num),
         history=db.history_for(conn, num),
+        note=db.notes_for(conn, [num]).get(num, ""),
         knowledge=[content.knowledge_entry(s) for s in content.chapter_links.get(q.chapter, [])],
         sections=content.sections_for(num),
         titles=content.knowledge_titles(),

@@ -152,6 +152,8 @@
       panel.classList.toggle("is-open", open);
       if (open) renderMath(panel);
       if (panel.dataset.panel === "answer") button.closest(".qcard").classList.toggle("show-answer", open);
+      // an empty note is opened to be written in
+      if (open && panel.dataset.panel === "note" && !panel.querySelector("textarea").value) panel.querySelector("textarea").focus();
     });
   });
 
@@ -639,6 +641,123 @@
     addEventListener("focus", sendAll);
     document.addEventListener("visibilitychange", () => { if (!document.hidden) sendAll(); });
   }
+
+  // ---------- notes on questions: saved in the background while you type or dictate ----------
+  // Every change goes to localStorage first and to the server a moment later, and stays in localStorage until the server
+  // has it: it is sent again when a page loads, the network comes back or the window gets the focus. Only one request per
+  // question is out at a time, and what is left when it comes back goes next, so the text that stays is the latest.
+
+  const NOTES_KEY = `dgy-note-drafts:${gradeOwner}`;
+  let draftsHere = {};
+  let draftStorage = true;
+  const readDrafts = () => {
+    if (!gradeOwner) return {};
+    if (!draftStorage) return draftsHere;
+    try {
+      const stored = JSON.parse(localStorage.getItem(NOTES_KEY)) || {};
+      return Object.fromEntries(Object.entries(stored).filter(([num, text]) => /^\d+$/.test(num) && typeof text === "string"));
+    } catch {
+      draftStorage = false;
+      return draftsHere;
+    }
+  };
+  const writeDrafts = (drafts) => {
+    if (!gradeOwner) return;
+    draftsHere = drafts;
+    try {
+      if (Object.keys(drafts).length) localStorage.setItem(NOTES_KEY, JSON.stringify(drafts));
+      else localStorage.removeItem(NOTES_KEY);
+    } catch {
+      draftStorage = false;
+    }
+  };
+  const noteTimers = new Map();
+  const noteRetries = new Map();
+  const noteSending = new Set();
+  const noteFailure = (code) => ({
+    login_required: "登录已过期，笔记还没存上，内容还在这台设备上。请重新登录。",
+    owner_mismatch: "当前登录账号已改变，笔记没有存。请回到原账号后重试。",
+  })[code] || "没存上，内容还在，稍后会自动再试；也可以点“保存”。";
+  const showNoteStatus = (num, message, failed = false) => {
+    const form = document.querySelector(`form.note-form[action="/q/${num}/note"]`);
+    if (!form) return;
+    const status = form.querySelector(".note-status");
+    status.textContent = message;
+    status.classList.toggle("qc-unsaved", failed);
+    form.querySelector(".js-note-save").hidden = !failed;
+  };
+  const sendNote = async (num) => {
+    clearTimeout(noteTimers.get(num));
+    noteTimers.delete(num);
+    const text = readDrafts()[num];
+    if (text === undefined || noteSending.has(num)) return;
+    noteSending.add(num);
+    showNoteStatus(num, "正在保存…");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      // FormData, not URLSearchParams: percent-encoded Chinese could outgrow what a keepalive request may carry
+      const body = new FormData();
+      body.set("owner", gradeOwner);
+      body.set("note", text);
+      const res = await fetch(`/q/${num}/note`, {
+        method: "POST", headers: { Accept: "application/json" }, body,
+        credentials: "same-origin", keepalive: true, signal: controller.signal,
+      });
+      const json = res.headers.get("content-type")?.includes("json");
+      if (res.status === 401 || (res.ok && !json)) throw "login_required";
+      if (res.status === 409) throw "owner_mismatch";
+      if (!res.ok) throw "network";
+      const drafts = readDrafts();
+      if (drafts[num] === text) {
+        delete drafts[num];
+        writeDrafts(drafts);
+      }
+      noteRetries.delete(num);
+      document.querySelector(`[aria-controls="qn-${num}"]`)?.classList.toggle("has-note", Boolean(text.trim()));
+      showNoteStatus(num, `已保存 ${new Date().toTimeString().slice(0, 5)}`);
+    } catch (error) {
+      const code = typeof error === "string" ? error : "network";
+      showNoteStatus(num, noteFailure(code), true);
+      const count = noteRetries.get(num) ?? 0;
+      if (code === "network" && count < retryDelays.length) {
+        noteRetries.set(num, count + 1);
+        noteTimers.set(num, setTimeout(() => sendNote(num), retryDelays[count]));
+      }
+    } finally {
+      clearTimeout(timeout);
+      noteSending.delete(num);
+      const latest = readDrafts()[num];
+      if (latest !== undefined && latest !== text) sendNote(num);
+    }
+  };
+  const sendNotes = () => {
+    for (const num of Object.keys(readDrafts())) sendNote(num);
+  };
+  document.querySelectorAll("form.note-form").forEach((form) => {
+    const num = form.getAttribute("action").split("/")[2];
+    const area = form.elements.note;
+    form.querySelector(".js-note-save").hidden = true;
+    const draft = readDrafts()[num];
+    if (draft !== undefined) area.value = draft;
+    area.addEventListener("input", () => {
+      writeDrafts({ ...readDrafts(), [num]: area.value });
+      noteRetries.delete(num);
+      showNoteStatus(num, "");
+      clearTimeout(noteTimers.get(num));
+      noteTimers.set(num, setTimeout(() => sendNote(num), 800));
+    });
+    area.addEventListener("blur", () => sendNote(num));
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      noteRetries.delete(num);
+      sendNote(num);
+    });
+  });
+  sendNotes();
+  addEventListener("online", sendNotes);
+  addEventListener("focus", sendNotes);
+  addEventListener("pagehide", sendNotes);
 
   // ---------- enlarged solution images: native scrolling on touch, drag with a mouse ----------
   if (typeof HTMLDialogElement === "function") {

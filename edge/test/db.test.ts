@@ -122,12 +122,41 @@ describe("exclusions and settings", () => {
   });
 });
 
+describe("notes", () => {
+  it("replaces a note, and a blank one removes it", async () => {
+    expect(await db.notesFor(d1, ME, [])).toEqual(new Map());
+    await db.setNote(d1, ME, 5, "令 x-1=t", EVENING);
+    await db.setNote(d1, ME, 5, "令 x-1=t，然后分段", AFTER_MIDNIGHT);
+    await db.setNote(d1, ME, 6, "换元", EVENING);
+    expect(await db.notesFor(d1, ME, [5, 6, 7])).toEqual(new Map([[5, "令 x-1=t，然后分段"], [6, "换元"]]));
+    expect((await db.exportAll(d1, ME)).tables.notes[0]).toEqual({ num: 5, body: "令 x-1=t，然后分段", updated_at: "2026-10-17T01:30:00+08:00" });
+    await db.setNote(d1, ME, 5, " \n ", AFTER_MIDNIGHT);
+    await db.setNote(d1, ME, 7, "", AFTER_MIDNIGHT);
+    expect(await db.notesFor(d1, ME, [5, 6, 7])).toEqual(new Map([[6, "换元"]]));
+  });
+
+  it("reads more questions than D1 allows parameters", async () => {
+    await db.setNote(d1, ME, 150, "最后一题", EVENING);
+    const nums = Array.from({ length: 150 }, (_, i) => i + 1);
+    expect(await db.notesFor(d1, ME, nums)).toEqual(new Map([[150, "最后一题"]]));
+  });
+
+  it("keeps each user's notes apart", async () => {
+    await db.setNote(d1, ME, 5, "我的", EVENING);
+    await db.setNote(d1, PAL, 5, "朋友的", EVENING);
+    await db.setNote(d1, PAL, 6, "朋友的另一题", EVENING);
+    expect(await db.notesFor(d1, ME, [5, 6])).toEqual(new Map([[5, "我的"]]));
+    await db.setNote(d1, ME, 5, "", EVENING);
+    expect((await db.notesFor(d1, PAL, [5])).get(5)).toBe("朋友的");
+  });
+});
+
 describe("exportAll", () => {
   it("dumps every table for backup, without the internal user id", async () => {
     await db.recordReview(d1, ME, { num: 1, grade: "mastered", at: EVENING, mode: "kp" });
     await db.setSetting(d1, ME, "exam_date", "2026-12-19");
     const dump = await db.exportAll(d1, ME);
-    expect(Object.keys(dump.tables)).toEqual(["reviews", "cards", "exclusions", "sessions", "settings"]);
+    expect(Object.keys(dump.tables)).toEqual(["reviews", "cards", "exclusions", "sessions", "settings", "notes"]);
     expect(dump.tables.reviews).toHaveLength(1);
     expect(dump.tables.settings).toEqual([{ key: "exam_date", value: "2026-12-19" }]);
     expect(JSON.stringify(dump)).not.toContain("user_id");

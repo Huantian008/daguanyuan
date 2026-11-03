@@ -1,5 +1,5 @@
 /**
- * D1 storage for each user's own data: review log, card states, "不做" overrides, settings, and the practice sets
+ * D1 storage for each user's own data: review log, card states, "不做" overrides, notes, settings, and the practice sets
  * of the one-by-one practice page, which is gone; their rows stay for the backup.
  * Every table has a user_id and every query below filters or writes by it, so users never see each other's rows.
  */
@@ -131,6 +131,30 @@ export async function exclusionOverrides(db: D1Database, uid: number): Promise<M
   return new Map(results.map((r) => [r.num, r.is_excluded === 1]));
 }
 
+/** The notes of these questions; a question without a note is left out. */
+export async function notesFor(db: D1Database, uid: number, nums: number[]): Promise<Map<number, string>> {
+  const found = new Map<number, string>();
+  // D1 allows 100 bound parameters; reserve one for the account.
+  for (let start = 0; start < nums.length; start += 99) {
+    const batch = nums.slice(start, start + 99);
+    const { results } = await db.prepare(`SELECT num, body FROM notes WHERE user_id = ? AND num IN (${batch.map(() => "?").join(",")})`)
+      .bind(uid, ...batch).all<{ num: number; body: string }>();
+    for (const r of results) found.set(r.num, r.body);
+  }
+  return found;
+}
+
+/** Replace a question's note; a blank one removes it. */
+export async function setNote(db: D1Database, uid: number, num: number, body: string, at = new Date()): Promise<void> {
+  if (!body.trim()) {
+    await db.prepare("DELETE FROM notes WHERE user_id = ? AND num = ?").bind(uid, num).run();
+    return;
+  }
+  await db.prepare("INSERT INTO notes (user_id, num, body, updated_at) VALUES (?, ?, ?, ?) "
+    + "ON CONFLICT (user_id, num) DO UPDATE SET body = excluded.body, updated_at = excluded.updated_at")
+    .bind(uid, num, body, shanghaiIso(at)).run();
+}
+
 export async function getSetting(db: D1Database, uid: number, key: string, fallback: string): Promise<string> {
   return (await db.prepare("SELECT value FROM settings WHERE user_id = ? AND key = ?").bind(uid, key).first<string>("value")) ?? fallback;
 }
@@ -141,7 +165,7 @@ export async function setSetting(db: D1Database, uid: number, key: string, value
     .bind(uid, key, value).run();
 }
 
-const TABLES = ["reviews", "cards", "exclusions", "sessions", "settings"] as const;
+const TABLES = ["reviews", "cards", "exclusions", "sessions", "settings", "notes"] as const;
 
 export async function exportAll(db: D1Database, uid: number, at = new Date()) {
   const tables: Record<string, unknown[]> = {};

@@ -54,7 +54,7 @@ export function createApp(deps: AppDeps) {
     const account = accounts.find((a) => a.id === userId);
     if (account) {
       c.set("user", toUser(account));
-      if (c.req.method === "POST" && (["/bank/exclude", "/settings", "/logout"].includes(url.pathname) || /^\/q\/\d+\/grade$/.test(url.pathname))) {
+      if (c.req.method === "POST" && (["/bank/exclude", "/settings", "/logout"].includes(url.pathname) || /^\/q\/\d+\/(grade|note)$/.test(url.pathname))) {
         const form = await c.req.parseBody();
         if (String(form.owner ?? "") !== String(account.id)) {
           const error = "页面所属账号与当前登录不一致，请刷新页面后重试。";

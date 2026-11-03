@@ -32,4 +32,4 @@ def review(request: Request, mode: str, conn=Depends(get_conn)):
                   titles=content.knowledge_titles(),
                   knowledge={c.code: [content.knowledge_entry(s) for s in content.chapter_links.get(c.code, [])]
                              for c in content.chapters},
-                  histories=db.histories_for(conn, nums))
+                  histories=db.histories_for(conn, nums), notes=db.notes_for(conn, nums))

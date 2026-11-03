@@ -61,6 +61,7 @@ export interface CardExtras {
   card?: CardState;
   /** warmup / due on those pages, so the grade is recorded as part of them */
   mode?: string;
+  note?: string;
 }
 
 export function questionCard(
@@ -82,6 +83,7 @@ export function questionCard(
   ${excluded ? "" : html`${questionBody(meta, q, text, { forceLazy: true, dataCorrect: true })}
   <div class="qc-actions">
     <div class="qc-toggles">
+      <button type="button" class="qc-btn js-qc-toggle${x.note ? " has-note" : ""}" aria-expanded="false" aria-controls="qn-${q.num}" hidden>笔记</button>
       <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qa-${q.num}" data-label="答案" hidden>查看答案</button>
       <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qs-${q.num}" data-label="解析" hidden>查看解析</button>
       <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qk-${q.num}" hidden>相关知识点</button>
@@ -98,6 +100,10 @@ export function questionCard(
       ${gradeButton("mastered", "掌握")}
     </form>
   </div>
+  <section class="qc-panel" id="qn-${q.num}" data-panel="note" aria-label="笔记">
+    <h2 class="panel-label">笔记</h2>
+    ${noteForm(q.num, x.note ?? "", back, meta.grade_owner)}
+  </section>
   <section class="qc-panel" id="qa-${q.num}" data-panel="answer" aria-label="答案">${answerPart(meta, q, text)}</section>
   <section class="qc-panel" id="qs-${q.num}" data-panel="solution" aria-label="解析">${solutionPart(meta, q)}</section>
   <section class="qc-panel" id="qk-${q.num}" data-panel="knowledge" aria-label="相关知识点">
@@ -109,6 +115,17 @@ export function questionCard(
   </section>`}
 </article>`;
 }
+
+/** A question's note: app.js saves it in the background and hides the button; without JavaScript the button saves it. */
+export const noteForm = (num: number, note: string, back: string, owner = ""): Html => html`<form method="post" action="/q/${num}/note" class="note-form">
+  <input type="hidden" name="owner" value="${owner}">
+  <input type="hidden" name="back" value="${back}">
+  <textarea name="note" maxlength="10000" autocomplete="off" aria-label="这道题的笔记" placeholder="记下这道题的思路，复习时看">${note}</textarea>
+  <div class="note-foot">
+    <span class="note-status" role="status" aria-live="polite"></span>
+    <button class="btn btn-small js-note-save">保存</button>
+  </div>
+</form>`;
 
 export const katexCss = (meta: Meta): Html => html`<link rel="stylesheet" href="${staticUrl(meta, "vendor/katex/katex.min.css")}">`;
 export const katexJs = (meta: Meta): Html => html`<script src="${staticUrl(meta, "vendor/katex/katex.min.js")}" defer></script>`;

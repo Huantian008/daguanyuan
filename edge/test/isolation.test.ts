@@ -105,13 +105,25 @@ describe("two users on one site", () => {
     expect(visible(await text(pal, "/"))).toContain("还有 64 天");
   });
 
+  it("keep their own notes and cannot write to each other's", async () => {
+    const { me, pal } = await twoUsers();
+    expect((await me.post("/q/1/note", { owner: "1", note: "我的思路" })).status).toBe(303);
+    expect(await text(pal, "/q/1")).not.toContain("我的思路");
+    expect(await text(pal, "/bank/A?kp=1")).not.toContain("has-note");
+    for (const owner of ["1", ""]) expect((await pal.post("/q/1/note", { owner, note: "改掉" })).status).toBe(409);
+    expect(await text(me, "/q/1")).toContain("我的思路</textarea>");
+    expect(await text(pal, "/q/1")).not.toContain("改掉");
+  });
+
   it("download only their own data", async () => {
     const { me, pal } = await twoUsers();
     await grade(me, 1, "mastered");
+    await me.post("/q/1/note", { owner: "1", note: "我的思路" });
     type Dump = { tables: Record<string, unknown[]> };
     const mine = (await (await me.get("/settings/export")).json()) as Dump;
     const theirs = (await (await pal.get("/settings/export")).json()) as Dump;
     expect(mine.tables.reviews).toHaveLength(1);
+    expect(mine.tables.notes).toHaveLength(1);
     for (const rows of Object.values(theirs.tables)) expect(rows).toEqual([]);
   });
 });

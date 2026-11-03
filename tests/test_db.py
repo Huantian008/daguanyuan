@@ -166,3 +166,17 @@ def test_settings_roundtrip(conn):
     assert db.get_setting(conn, "exam_date", "2026-12-19") == "2026-12-19"
     db.set_setting(conn, "exam_date", "2026-12-20")
     assert db.get_setting(conn, "exam_date", "2026-12-19") == "2026-12-20"
+
+
+def test_a_note_is_replaced_and_a_blank_one_removes_it(conn):
+    assert db.notes_for(conn, [5, 6]) == {}
+    assert db.notes_for(conn, []) == {}
+    db.set_note(conn, 5, "令 x-1=t", EVENING)
+    db.set_note(conn, 5, "令 x-1=t，然后分段", AFTER_MIDNIGHT)
+    db.set_note(conn, 6, "换元", EVENING)
+    assert db.notes_for(conn, [5, 6, 7]) == {5: "令 x-1=t，然后分段", 6: "换元"}
+    [row] = conn.execute("SELECT updated_at FROM notes WHERE num = 5").fetchall()
+    assert row["updated_at"] == AFTER_MIDNIGHT.isoformat()
+    db.set_note(conn, 5, " \n ", AFTER_MIDNIGHT)
+    db.set_note(conn, 7, "", AFTER_MIDNIGHT)
+    assert db.notes_for(conn, [5, 6, 7]) == {6: "换元"}

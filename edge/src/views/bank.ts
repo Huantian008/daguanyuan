@@ -8,7 +8,7 @@ import type { UserState } from "../state";
 import type { ChapterProgress, Distribution, Review } from "../stats";
 import { cnDate } from "../studyday";
 import { layout } from "./layout";
-import { STATUS_LABELS, answerBody, distBar, restoreQuestion, katexCss, katexJs, qmeta, questionBody, questionCard, relatedKnowledge, revealToggle, reviewHistory, type Status } from "./parts";
+import { STATUS_LABELS, answerBody, distBar, noteForm, restoreQuestion, katexCss, katexJs, qmeta, questionBody, questionCard, relatedKnowledge, revealToggle, reviewHistory, type Status } from "./parts";
 
 // Same text as dgy/templates/_tree_scroll.html (test/content.test.ts checks): runs right after the tree, before the first
 // paint, so a new page's tree does not show its top first and then jump; app.js saves the position.
@@ -61,6 +61,7 @@ export interface ChapterPageData {
   knowledge: KnowledgeEntry[];
   titles: Record<string, string>;
   histories: Map<number, Review[]>;
+  notes: Map<number, string>;
 }
 
 const percent = (done: number, total: number) => (total ? Math.round((100 * done) / total) : 0);
@@ -125,7 +126,7 @@ export function chapterPage(meta: Meta, d: ChapterPageData) {
     ${shown.length ? "" : html`<p class="empty">这个考点没有符合筛选的题目。选择“全部”可查看所有题卡。</p>`}
     <div class="qcards">
       ${shown.map(({ q, index }) => questionCard(meta, q, d.texts.get(q.num), d.state.status(q.num), index, d.gradedToday.get(q.num), `${here}#q-${q.num}`, {
-        sections: d.sections.get(q.num) ?? [], knowledge: d.knowledge, titles: d.titles, history: d.histories.get(q.num) ?? [], card: d.state.cards.get(q.num),
+        sections: d.sections.get(q.num) ?? [], knowledge: d.knowledge, titles: d.titles, history: d.histories.get(q.num) ?? [], card: d.state.cards.get(q.num), note: d.notes.get(q.num),
       }))}
     </div>
 
@@ -176,6 +177,7 @@ export interface QuestionData {
   sections: Section[];
   titles: Record<string, string>;
   text: QuestionText | undefined;
+  note: string;
   /** The previous and next question in the same book. */
   prev: number | null;
   next: number | null;
@@ -215,6 +217,11 @@ export function questionPage(meta: Meta, d: QuestionData) {
 </div>
 <section id="answer" class="reveal-panel" aria-label="答案与解析">
   ${answerBody(meta, q, d.text)}
+</section>
+
+<section class="card note-card">
+  <h2 class="card-title">笔记</h2>
+  ${noteForm(q.num, d.note, `/q/${q.num}`, meta.grade_owner)}
 </section>
 
 <div class="grid grid-2">

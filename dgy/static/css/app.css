@@ -694,6 +694,7 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
 .qc-btn { min-height: 40px; padding: 6px 16px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--ink-2); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
 .qc-btn:hover { background: var(--surface-2); color: var(--ink); }
 .qc-btn[aria-expanded="true"] { background: var(--accent-soft); color: var(--accent); }
+.qc-btn.has-note::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
 .qc-grades { display: flex; align-items: center; gap: 8px; margin: 0; }
 .qc-unsaved { color: var(--unknown-ink); font-size: 12px; }
 .qc-grade { min-width: 84px; min-height: 40px; padding: 6px 16px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--ink-2); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: background-color .15s, border-color .15s, color .15s; }
@@ -705,6 +706,19 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
 .qc-grade-shaky.is-picked { background: var(--shaky-soft); border-color: var(--shaky); color: var(--shaky-ink); }
 .qc-grade-unknown.is-picked { background: var(--unknown-soft); border-color: var(--unknown); color: var(--unknown-ink); }
 
+.note-card { margin-top: 16px; }
+.note-form { display: grid; gap: 6px; margin: 0; }
+.note-form textarea {
+  width: 100%; min-height: 96px; max-height: 60dvh; field-sizing: content; resize: vertical; padding: 10px 13px; font: inherit; line-height: 1.7;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink);
+  transition: border-color .15s, box-shadow .15s;
+}
+.note-form textarea:focus { border-color: var(--accent); outline: none; box-shadow: var(--focus); }
+.note-form textarea::placeholder { color: var(--muted); }
+.note-foot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-height: 20px; }
+.note-status { color: var(--muted); font-size: 12px; }
+.note-status.qc-unsaved { color: var(--unknown-ink); }
+
 .qc-panel { margin-top: 16px; }
 .js .qc-panel:not(.is-open) { display: none; }
 .qc-panel.is-open { animation: panel-in .22s ease-out; }
@@ -712,7 +726,7 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
 /* in text view the right option turns green, so the answer line would only repeat it; in image view it stays */
 .js .qcard[data-choice]:has(.qview[data-view="text"]) .qanswer { display: none; }
 .qc-panel[data-panel="solution"] .panel-label { color: var(--accent); font-size: 15px; }
-.qc-panel[data-panel="knowledge"], .qc-panel[data-panel="history"] { padding-top: 14px; border-top: 1px solid var(--line); }
+.qc-panel[data-panel="knowledge"], .qc-panel[data-panel="history"], .qc-panel[data-panel="note"] { padding-top: 14px; border-top: 1px solid var(--line); }
 .qc-panel .panel-label .muted { font-weight: 400; letter-spacing: 0; }
 
 @media (max-width: 960px) {

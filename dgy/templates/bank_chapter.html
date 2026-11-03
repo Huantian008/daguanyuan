@@ -61,7 +61,7 @@
     <div class="qcards">
       {% for index, q in visible_questions %}
       {{ qcard(q, texts.get(q.num), state.status(q.num), index, graded_today.get(q.num), here ~ '#q-' ~ q.num,
-               sections[q.num], knowledge, titles, histories[q.num], state.cards.get(q.num), day=study_day) }}
+               sections[q.num], knowledge, titles, histories[q.num], state.cards.get(q.num), day=study_day, note=notes.get(q.num, '')) }}
       {% endfor %}
     </div>
 

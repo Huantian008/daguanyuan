@@ -25,6 +25,7 @@ export interface ReviewPageData {
   knowledge: (q: Question) => KnowledgeEntry[];
   titles: Record<string, string>;
   histories: Map<number, Review[]>;
+  notes: Map<number, string>;
 }
 
 /** Warm-up or due review as cards like the chapter page: those graded here today stay on it, above the ones left. */
@@ -49,7 +50,7 @@ ${d.questions.length
     ? html`<div class="qcards">
   ${d.questions.map((q, i) => questionCard(meta, q, d.texts.get(q.num), d.state.status(q.num), i + 1, d.gradedToday.get(q.num), `${here}#q-${q.num}`, {
     sections: d.sections.get(q.num) ?? [], knowledge: d.knowledge(q), titles: d.titles, history: d.histories.get(q.num) ?? [],
-    card: d.state.cards.get(q.num), mode: d.mode,
+    card: d.state.cards.get(q.num), mode: d.mode, note: d.notes.get(q.num),
   }))}
 </div>`
     : html`<p class="empty">${page.empty}</p>`}

@@ -18,7 +18,7 @@
 <div class="qcards">
   {% for q in questions %}
   {{ qcard(q, texts.get(q.num), state.status(q.num), loop.index, graded_today.get(q.num), here ~ '#q-' ~ q.num,
-           sections[q.num], knowledge[q.chapter], titles, histories[q.num], state.cards.get(q.num), mode=mode, day=study_day) }}
+           sections[q.num], knowledge[q.chapter], titles, histories[q.num], state.cards.get(q.num), mode=mode, day=study_day, note=notes.get(q.num, '')) }}
   {% endfor %}
 </div>
 {% else %}

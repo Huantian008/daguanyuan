@@ -51,7 +51,7 @@
 
 {# One question on the chapter page: header, the question, a bar of buttons, and the answer and solution folded away. #}
 {# `mode` is warmup / due on those pages, so the grade is recorded as part of them. #}
-{% macro qcard(q, text, status, index, graded, back, sections, knowledge, titles, history, card, mode='', day='') -%}
+{% macro qcard(q, text, status, index, graded, back, sections, knowledge, titles, history, card, mode='', day='', note='') -%}
 <article class="qcard{% if status == 'excluded' %} is-excluded{% endif %}" id="q-{{ q.num }}"{% if text and text.answer_key %} data-choice{% endif %}{% if status == 'new' %} data-new{% endif %}>
   <header class="qc-head">
     <strong class="qc-num" title="{{ q.num|qlabel }}">{{ index }}</strong>
@@ -65,6 +65,7 @@
   {{ question_body(q, text, force_lazy=true, data_correct=true) }}
   <div class="qc-actions">
     <div class="qc-toggles">
+      <button type="button" class="qc-btn js-qc-toggle{% if note %} has-note{% endif %}" aria-expanded="false" aria-controls="qn-{{ q.num }}" hidden>笔记</button>
       <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qa-{{ q.num }}" data-label="答案" hidden>查看答案</button>
       <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qs-{{ q.num }}" data-label="解析" hidden>查看解析</button>
       <button type="button" class="qc-btn js-qc-toggle" aria-expanded="false" aria-controls="qk-{{ q.num }}" hidden>相关知识点</button>
@@ -81,6 +82,10 @@
       <button name="grade" value="mastered" aria-pressed="{{ 'true' if graded == 'mastered' else 'false' }}" class="qc-grade qc-grade-mastered{% if graded == 'mastered' %} is-picked{% endif %}">掌握</button>
     </form>
   </div>
+  <section class="qc-panel" id="qn-{{ q.num }}" data-panel="note" aria-label="笔记">
+    <h2 class="panel-label">笔记</h2>
+    {{ note_form(q.num, note, back) }}
+  </section>
   <section class="qc-panel" id="qa-{{ q.num }}" data-panel="answer" aria-label="答案">{{ answer_part(q, text) }}</section>
   <section class="qc-panel" id="qs-{{ q.num }}" data-panel="solution" aria-label="解析">{{ solution_part(q) }}</section>
   <section class="qc-panel" id="qk-{{ q.num }}" data-panel="knowledge" aria-label="相关知识点">
@@ -92,6 +97,19 @@
   </section>
   {% endif %}
 </article>
+{%- endmacro %}
+
+{# A question's note: app.js saves it in the background and hides the button; without JavaScript the button saves it. #}
+{% macro note_form(num, note, back) -%}
+<form method="post" action="/q/{{ num }}/note" class="note-form">
+  <input type="hidden" name="owner" value="local">
+  <input type="hidden" name="back" value="{{ back }}">
+  <textarea name="note" maxlength="10000" autocomplete="off" aria-label="这道题的笔记" placeholder="记下这道题的思路，复习时看">{{ note }}</textarea>
+  <div class="note-foot">
+    <span class="note-status" role="status" aria-live="polite"></span>
+    <button class="btn btn-small js-note-save">保存</button>
+  </div>
+</form>
 {%- endmacro %}
 
 {% macro katex_head() -%}<link rel="stylesheet" href="/static/vendor/katex/katex.min.css">{%- endmacro %}

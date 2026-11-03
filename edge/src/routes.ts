@@ -20,6 +20,7 @@ import { safeBack } from "./views/util";
 const str = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 const intOrNull = (value: unknown): number | null => (/^\d+$/.test(str(value)) ? Number(str(value)) : null);
 const numList = (value: unknown) => str(value).split(",").map(intOrNull).filter((n): n is number => n !== null && n > 0);
+const NOTE_LIMIT = 10000; // the note box's maxlength in views/parts.ts
 
 export interface PageDeps {
   content: Content;
@@ -76,7 +77,7 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     return c.html(reviewPage(pageMeta(c), {
       mode, questions: nums.map((n) => content.questions.get(n)!), state, texts: content.texts, gradedToday,
       sections: new Map(nums.map((n) => [n, content.sectionsFor(n)])), knowledge: (q) => content.knowledgeFor(q.chapter),
-      titles: content.knowledgeTitles(), histories: await db.historiesFor(DB, uid, nums),
+      titles: content.knowledgeTitles(), histories: await db.historiesFor(DB, uid, nums), notes: await db.notesFor(DB, uid, nums),
     }));
   });
 
@@ -129,7 +130,7 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
       chapter: content.chapter(code), chapters: content.chapters, tree: kpTree(kps), current, prev, following, state, statusFilter,
       texts: content.texts, gradedToday,
       sections: new Map(nums.map((n) => [n, content.sectionsFor(n)])), knowledge: content.knowledgeFor(code), titles: content.knowledgeTitles(),
-      histories: await db.historiesFor(c.env.DB, uid, nums),
+      histories: await db.historiesFor(c.env.DB, uid, nums), notes: await db.notesFor(c.env.DB, uid, nums),
     }));
   });
 
@@ -176,18 +177,31 @@ export function registerPages(app: Hono<AppEnv>, { content, knowledge, meta, now
     return c.redirect(safeBack(str(form.back), `/bank/${q.chapter}#q-${q.num}`), 303);
   });
 
+  // The page's owner is checked before this, in app.ts.
+  app.post("/q/:num/note", async (c) => {
+    const num = intOrNull(c.req.param("num"));
+    const q = num === null ? undefined : content.questions.get(num);
+    if (!q) return c.notFound();
+    const form = await c.req.parseBody();
+    const body = (typeof form.note === "string" ? form.note : "").replace(/\r\n/g, "\n");
+    if (body.length > NOTE_LIMIT) return c.json({ code: "note_too_long", error: `笔记最多 ${NOTE_LIMIT} 字。` }, 422);
+    await db.setNote(c.env.DB, c.get("user").id, q.num, body, now());
+    if (c.req.header("Accept")?.includes("application/json")) return c.json({ saved: true });
+    return c.redirect(safeBack(str(form.back), `/bank/${q.chapter}#q-${q.num}`), 303);
+  });
+
   app.get("/q/:num", async (c) => {
     const DB = c.env.DB;
     const uid = c.get("user").id;
     const num = intOrNull(c.req.param("num"));
     const q = num === null ? undefined : content.questions.get(num);
     if (!q) return c.notFound();
-    const [state, history] = await Promise.all([loadState(DB, uid, content), db.historyFor(DB, uid, q.num)]);
+    const [state, history, notes] = await Promise.all([loadState(DB, uid, content), db.historyFor(DB, uid, q.num), db.notesFor(DB, uid, [q.num])]);
     const [prev, next] = content.neighbors(q.num);
     return c.html(questionPage(pageMeta(c), {
       q, chapter: content.chapter(q.chapter), card: state.cards.get(q.num), status: state.status(q.num), history,
       knowledge: content.knowledgeFor(q.chapter), sections: content.sectionsFor(q.num), titles: content.knowledgeTitles(),
-      text: content.text(q.num),
+      text: content.text(q.num), note: notes.get(q.num) ?? "",
       prev, next,
       kpIndex: drillKps(content, q.chapter, state.status).find((k) => k.questions.includes(q))!.index,
     }));

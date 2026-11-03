@@ -557,3 +557,63 @@ describe("history and settings", () => {
     expect(dump.tables.reviews).toHaveLength(1);
   });
 });
+
+describe("notes", () => {
+  const JSON_ACCEPT = { Accept: "application/json" };
+  const multipart = (fields: Record<string, string>) => {
+    const body = new FormData();
+    for (const [name, value] of Object.entries(fields)) body.set(name, value);
+    return { method: "POST", body, headers: JSON_ACCEPT };
+  };
+
+  it("saves one without a redirect, as the page script sends it, and shows it where the question is", async () => {
+    const { client } = await loggedIn();
+    const res = await client.request("/q/1/note", multipart({ owner: "1", note: "令 x-1=t\r\n然后分段" }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ saved: true });
+    const page = await text(client, "/bank/A?kp=1");
+    expect(page).toContain("令 x-1=t\n然后分段</textarea>");
+    expect(page).toContain('js-qc-toggle has-note" aria-expanded="false" aria-controls="qn-1"');
+    expect(await text(client, "/bank/A?kp=2")).toContain('js-qc-toggle" aria-expanded="false" aria-controls="qn-2"');
+    expect(await text(client, "/q/1")).toContain("令 x-1=t\n然后分段</textarea>");
+    await grade(client, 1, "mastered", { mode: "warmup" });
+    expect(await text(client, "/review/warmup")).toContain("令 x-1=t\n然后分段</textarea>");
+  });
+
+  it("goes back to the card from a form without the script", async () => {
+    const { client } = await loggedIn();
+    let res = await client.post("/q/4/note", { owner: "1", note: "思路", back: "/bank/B?kp=1#q-4" });
+    expect([res.status, res.headers.get("location")]).toEqual([303, "/bank/B?kp=1#q-4"]);
+    res = await client.post("/q/4/note", { owner: "1", note: "思路", back: "https://example.com" });
+    expect(res.headers.get("location")).toBe("/bank/B#q-4");
+  });
+
+  it("removes a blank one and its mark", async () => {
+    const { client } = await loggedIn();
+    await client.post("/q/1/note", { owner: "1", note: "思路" });
+    await client.post("/q/1/note", { owner: "1", note: "  \n" });
+    const page = await text(client, "/bank/A?kp=1");
+    expect(page).not.toContain("has-note");
+    expect(page).not.toContain("思路</textarea>");
+  });
+
+  it("refuses an unknown question or too much text", async () => {
+    const { client } = await loggedIn();
+    expect((await client.post("/q/999/note", { owner: "1", note: "思路" })).status).toBe(404);
+    const long = await client.request("/q/1/note", { method: "POST", body: new URLSearchParams({ owner: "1", note: "字".repeat(10001) }), headers: JSON_ACCEPT });
+    expect(long.status).toBe(422);
+    expect(((await long.json()) as { code: string }).code).toBe("note_too_long");
+    expect(await text(client, "/bank/A?kp=1")).not.toContain("has-note");
+    expect((await client.request("/q/1/note", { method: "POST", body: new URLSearchParams({ owner: "1", note: "字".repeat(10000) }), headers: JSON_ACCEPT })).status).toBe(200);
+  });
+
+  it("cannot break out of its box", async () => {
+    const { client } = await loggedIn();
+    await client.post("/q/1/note", { owner: "1", note: "</textarea><script>alert(1)</script>" });
+    for (const path of ["/bank/A?kp=1", "/q/1"]) {
+      const page = await text(client, path);
+      expect(page).not.toContain("<script>alert(1)");
+      expect(page).toMatch(/&lt;\/textarea&gt;&lt;script&gt;alert\(1\)&lt;\/script&gt;<\/textarea>/);
+    }
+  });
+});

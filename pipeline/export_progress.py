@@ -3,7 +3,7 @@
     .venv\\Scripts\\python -m pipeline.export_progress            # writes data\\progress.sql
     cd edge && npx wrangler d1 execute dgy --remote --file=..\\data\\progress.sql
 
-Card states, 不做 marks and settings replace the online rows for the same question or key; reviews and practice
+Card states, 不做 marks, notes and settings replace the online rows for the same question or key; reviews and practice
 sessions are added with new ids, so importing never clashes with what is already online.
 
 The online database has one set of tables per account; the progress goes to the owner's account (user 1)
@@ -49,6 +49,9 @@ def export_progress_sql(db_path: Path, user_id: int = OWNER_ID) -> str:
                   for r in rows("cards")]
         lines += [_insert("INSERT OR REPLACE", "exclusions", ["num", "is_excluded"], r, user_id) for r in rows("exclusions")]
         lines += [_insert("INSERT OR REPLACE", "settings", ["key", "value"], r, user_id) for r in rows("settings")]
+        # a database the site has not opened since notes were added has no such table yet
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'notes'").fetchone():
+            lines += [_insert("INSERT OR REPLACE", "notes", ["num", "body", "updated_at"], r, user_id) for r in rows("notes")]
     finally:
         conn.close()
     return "\n".join(lines) + "\n"
@@ -59,7 +62,7 @@ def main() -> int:
     target = Path(sys.argv[2]) if len(sys.argv) > 2 else DEFAULT_OUT
     sql = export_progress_sql(source)
     target.write_text(sql, encoding="utf-8")
-    counts = {verb: sql.count(f"INTO {verb} ") for verb in ("reviews", "cards", "exclusions", "sessions", "settings")}
+    counts = {verb: sql.count(f"INTO {verb} ") for verb in ("reviews", "cards", "exclusions", "sessions", "settings", "notes")}
     print(f"已写出 {target}：" + "，".join(f"{name} {n} 行" for name, n in counts.items()))
     return 0
 

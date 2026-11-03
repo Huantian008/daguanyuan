@@ -77,3 +77,21 @@ describe("migration 0002: accounts", () => {
     expect(indexes.map((i) => i.name)).toEqual(["reviews_by_day", "reviews_by_num", "sessions_by_user"]);
   });
 });
+
+describe("migration 0003: notes", () => {
+  it("adds the table and leaves the progress alone", () => {
+    const sqlite = migrated();
+    const before = rows(sqlite, "SELECT * FROM reviews ORDER BY id");
+    sqlite.exec(migration("0003_notes.sql"));
+    expect(rows(sqlite, "SELECT * FROM reviews ORDER BY id")).toEqual(before);
+    expect(rows(sqlite, "SELECT COUNT(*) AS n FROM notes")).toEqual([{ n: 0 }]);
+  });
+
+  it("gives each user one note per question, and no note without a user", () => {
+    const sqlite = migrated();
+    sqlite.exec(migration("0003_notes.sql"));
+    sqlite.exec("INSERT INTO notes (user_id, num, body, updated_at) VALUES (1, 5, 'a', 'x'), (2, 5, 'b', 'x')");
+    expect(() => sqlite.exec("INSERT INTO notes (user_id, num, body, updated_at) VALUES (1, 5, 'c', 'x')")).toThrow();
+    expect(() => sqlite.exec("INSERT INTO notes (num, body, updated_at) VALUES (6, 'd', 'x')")).toThrow();
+  });
+});

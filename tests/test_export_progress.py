@@ -71,3 +71,24 @@ def test_import_does_not_clash_with_rows_already_online(tmp_path):
     target.executescript(sql)  # importing twice must not fail on primary keys
     assert target.execute("SELECT COUNT(*) FROM cards").fetchone() == (1,)
     assert target.execute("SELECT COUNT(*) FROM reviews").fetchone() == (2,)
+
+
+def test_notes_go_online_too(tmp_path):
+    _local_db(tmp_path / "app.db")
+    conn = db.connect(tmp_path / "app.db")
+    db.set_note(conn, 5, "it's 思路", EVENING)
+    conn.close()
+    target = _apply(export_progress_sql(tmp_path / "app.db"))
+    assert target.execute("SELECT user_id, num, body, updated_at FROM notes").fetchall() == [
+        (1, 5, "it's 思路", EVENING.isoformat())]
+
+
+def test_a_database_from_before_notes_still_exports(tmp_path):
+    _local_db(tmp_path / "app.db")
+    conn = db.connect(tmp_path / "app.db")
+    with conn:
+        conn.execute("DROP TABLE notes")
+    conn.close()
+    target = _apply(export_progress_sql(tmp_path / "app.db"))
+    assert target.execute("SELECT COUNT(*) FROM notes").fetchone() == (0,)
+    assert target.execute("SELECT COUNT(*) FROM reviews").fetchone() == (1,)
