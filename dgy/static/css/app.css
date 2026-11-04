@@ -715,6 +715,8 @@ a.chip:hover { text-decoration: none; border-color: var(--accent); color: var(--
 }
 .note-form textarea:focus { border-color: var(--accent); outline: none; box-shadow: var(--focus); }
 .note-form textarea::placeholder { color: var(--muted); }
+.note-preview { padding: 10px 13px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: auto; }
+.note-preview .katex-display { margin: 6px 0; overflow-x: auto; overflow-y: hidden; }
 .note-foot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-height: 20px; }
 .note-status { color: var(--muted); font-size: 12px; }
 .note-status.qc-unsaved { color: var(--unknown-ink); }

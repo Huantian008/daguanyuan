@@ -152,8 +152,11 @@
       panel.classList.toggle("is-open", open);
       if (open) renderMath(panel);
       if (panel.dataset.panel === "answer") button.closest(".qcard").classList.toggle("show-answer", open);
-      // an empty note is opened to be written in
-      if (open && panel.dataset.panel === "note" && !panel.querySelector("textarea").value) panel.querySelector("textarea").focus();
+      if (open && panel.dataset.panel === "note") {
+        renderNote(panel.querySelector("form.note-form"));
+        // an empty note is opened to be written in
+        if (!panel.querySelector("textarea").value) panel.querySelector("textarea").focus();
+      }
     });
   });
 
@@ -747,6 +750,7 @@
       showNoteStatus(num, "");
       clearTimeout(noteTimers.get(num));
       noteTimers.set(num, setTimeout(() => sendNote(num), 800));
+      renderNote(form);
     });
     area.addEventListener("blur", () => sendNote(num));
     form.addEventListener("submit", (event) => {
@@ -858,6 +862,60 @@
     });
     return katexLoading;
   };
+
+  // ---------- formulas in notes: a preview under the box, the note itself stays plain text ----------
+
+  // Between $ $, $$ $$, \( \) or \[ \]; \$ is a dollar sign. As in Pandoc, a single $ opens before a non-space and closes after
+  // one and not before a digit, so "$5 和 $6" stays text. No lookbehind: an older Safari would reject the whole script.
+  const NOTE_MATH = /\\\$|\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)|\$(?!\s)((?:\\.|[^$\\\n])*?(?:\\.|[^\s$\\]))\$(?!\d)/g;
+  const notePieces = (text) => {
+    const pieces = [];
+    let plain = "", at = 0;
+    for (const match of text.matchAll(NOTE_MATH)) {
+      plain += text.slice(at, match.index);
+      at = match.index + match[0].length;
+      if (match[0] === "\\$") {
+        plain += "$";
+        continue;
+      }
+      const display = match[1] ?? match[2];
+      const block = display !== undefined;
+      // a block is on its own line already: the line breaks around it would show as blank lines
+      if (block) {
+        plain = plain.replace(/\n$/, "");
+        if (text[at] === "\n") at++;
+      }
+      if (plain) pieces.push({ text: plain });
+      plain = "";
+      pieces.push({ math: display ?? match[3] ?? match[4], block });
+    }
+    plain += text.slice(at);
+    if (plain) pieces.push({ text: plain });
+    return pieces;
+  };
+  function renderNote(form) {
+    const preview = form.querySelector(".note-preview");
+    const pieces = notePieces(form.elements.note.value);
+    if (!pieces.some((piece) => piece.math)) {
+      preview.hidden = true;
+      preview.replaceChildren();
+      return;
+    }
+    if (!window.katex) {
+      loadKatex().then(() => renderNote(form), () => {});
+      return;
+    }
+    preview.replaceChildren(...pieces.map((piece) => {
+      const part = document.createElement(piece.block ? "div" : "span");
+      if (piece.math) window.katex.render(piece.math, part, { displayMode: piece.block, throwOnError: false, strict: "ignore" });
+      else part.textContent = piece.text;
+      return part;
+    }));
+    preview.hidden = false;
+  }
+  document.querySelectorAll("form.note-form").forEach((form) => {
+    if (!form.closest(".qc-panel:not(.is-open)")) renderNote(form);
+  });
 
   // ---------- knowledge drawer: a tagged section's text, without leaving the page ----------
 

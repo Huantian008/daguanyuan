@@ -120,7 +120,8 @@ export function questionCard(
 export const noteForm = (num: number, note: string, back: string, owner = ""): Html => html`<form method="post" action="/q/${num}/note" class="note-form">
   <input type="hidden" name="owner" value="${owner}">
   <input type="hidden" name="back" value="${back}">
-  <textarea name="note" maxlength="10000" autocomplete="off" aria-label="这道题的笔记" placeholder="记下这道题的思路，复习时看">${note}</textarea>
+  <textarea name="note" maxlength="10000" autocomplete="off" aria-label="这道题的笔记" placeholder="记下这道题的思路，复习时看。公式写在 $ 和 $ 之间">${note}</textarea>
+  <div class="note-preview" hidden></div>
   <div class="note-foot">
     <span class="note-status" role="status" aria-live="polite"></span>
     <button class="btn btn-small js-note-save">保存</button>

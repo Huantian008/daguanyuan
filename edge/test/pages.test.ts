@@ -574,6 +574,7 @@ describe("notes", () => {
     const page = await text(client, "/bank/A?kp=1");
     expect(page).toContain("令 x-1=t\n然后分段</textarea>");
     expect(page).toContain('js-qc-toggle has-note" aria-expanded="false" aria-controls="qn-1"');
+    expect(page).toContain('</textarea>\n  <div class="note-preview" hidden></div>');
     expect(await text(client, "/bank/A?kp=2")).toContain('js-qc-toggle" aria-expanded="false" aria-controls="qn-2"');
     expect(await text(client, "/q/1")).toContain("令 x-1=t\n然后分段</textarea>");
     await grade(client, 1, "mastered", { mode: "warmup" });

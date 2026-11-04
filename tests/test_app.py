@@ -608,6 +608,7 @@ def test_a_note_is_saved_without_a_redirect_and_shown_where_the_question_is(env)
     page = env.client.get("/bank/A", params={"kp": "1"}).text
     assert "令 x-1=t\n然后分段</textarea>" in page
     assert 'js-qc-toggle has-note" aria-expanded="false" aria-controls="qn-1"' in page
+    assert '</textarea>\n  <div class="note-preview" hidden></div>' in page
     assert 'js-qc-toggle" aria-expanded="false" aria-controls="qn-2"' in env.client.get("/bank/A", params={"kp": "2"}).text
     assert "令 x-1=t\n然后分段</textarea>" in env.client.get("/q/1").text
     env.client.post("/q/1/grade", data={"owner": "local", "grade": "mastered", "mode": "warmup"})

@@ -60,9 +60,13 @@ function noteBox(num = 7, value = "") {
   const area = { ...element(), value };
   const status = { textContent: "", classList: classes() };
   const save = { hidden: false };
+  const preview = element();
   const toggle = { classList: classes() };
-  const form = { ...element(), elements: { note: area }, getAttribute: () => `/q/${num}/note`, querySelector: (s: string) => s === ".note-status" ? status : save };
-  return { num, form, area, status, save, toggle, type(text: string) { area.value = text; area.events.input(); } };
+  const form = {
+    ...element(), elements: { note: area }, closest: (_: string): unknown => null, getAttribute: () => `/q/${num}/note`,
+    querySelector: (s: string) => s === ".note-status" ? status : s === ".note-preview" ? preview : save,
+  };
+  return { num, form, area, status, save, preview, toggle, type(text: string) { area.value = text; area.events.input(); } };
 }
 function page(owner: string, storage = new Map<string, string>(), options: {
   fetch?: any; blocked?: boolean; fullStorage?: boolean; maths?: any[]; cards?: any[]; observer?: (callback: (entries: any[]) => void) => void; clock?: DateConstructor; studyDay?: string; dialog?: boolean;
@@ -132,6 +136,55 @@ function page(owner: string, storage = new Map<string, string>(), options: {
     },
     submit: (grade: string) => listeners.submit({ target: form, submitter: buttons.find((b) => b.value === grade), preventDefault() {} }) };
 }
+
+describe("formulas in notes", () => {
+  const formulas = (p: ReturnType<typeof page>) => p.render.mock.calls.map(([source, , options]: any[]) => [source, options.displayMode]);
+  it("shows a preview only while the note has a formula, with the rest as text", () => {
+    const box = noteBox();
+    const p = page("1", new Map(), { notes: [box] });
+    expect(box.preview.hidden).toBe(true);
+    box.type("令 $x-1=t$，再\n$$\\int_0^1 t\\,dt$$\n<b>得解</b>");
+    expect(box.preview.hidden).toBe(false);
+    expect(formulas(p)).toEqual([["x-1=t", false], ["\\int_0^1 t\\,dt", true]]);
+    expect(box.preview.children.map((piece) => piece.textContent)).toEqual(["令 ", "", "，再", "", "<b>得解</b>"]);
+    box.type("没有公式了");
+    expect(box.preview.hidden).toBe(true);
+    expect(box.preview.children).toHaveLength(0);
+  });
+  it.each([
+    ["\\(a\\) 和 \\[b\\]", [["a", false], ["b", true]]],
+    ["$\\{a\\}$", [["\\{a\\}", false]]],
+    ["$$a\n+b$$", [["a\n+b", true]]],
+    ["$a$，$b$", [["a", false], ["b", false]]],
+    ["$x $ 和 $y$", [["y", false]]],
+  ])("reads %j as formulas", (text, expected) => {
+    const box = noteBox();
+    const p = page("1", new Map(), { notes: [box] });
+    box.type(text);
+    expect(formulas(p)).toEqual(expected);
+  });
+  it.each(["$5 和 $6", "a $ b $ c", "$a$5", "\\$a\\$", "只有一个 $", "$跨\n行$", "$$没有收尾"])("leaves %j as text", (text) => {
+    const box = noteBox();
+    const p = page("1", new Map(), { notes: [box] });
+    box.type(text);
+    expect(p.render).not.toHaveBeenCalled();
+    expect(box.preview.hidden).toBe(true);
+  });
+  it("turns an escaped dollar into a dollar sign next to a formula", () => {
+    const box = noteBox();
+    page("1", new Map(), { notes: [box] });
+    box.type("花了 \\$5，$x$");
+    expect(box.preview.children[0].textContent).toBe("花了 $5，");
+  });
+  it("renders a saved note when the page opens, but not one folded away on a card", () => {
+    const open = noteBox(7, "$a$"), folded = noteBox(8, "$b$");
+    folded.form.closest = (selector: string) => selector.includes("qc-panel") ? {} : null;
+    const p = page("1", new Map(), { notes: [open, folded] });
+    expect(formulas(p)).toEqual([["a", false]]);
+    expect(open.preview.hidden).toBe(false);
+    expect(folded.preview.children).toHaveLength(0);
+  });
+});
 
 describe("pending grades", () => {
   it("never replays another account's queue or anonymous legacy entries", async () => {
