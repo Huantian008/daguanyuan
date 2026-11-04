@@ -497,7 +497,8 @@
   const pendingBox = document.getElementById("pending-grades");
   const renderPending = () => {
     if (!pendingBox) return;
-    const entries = Object.entries(readPending());
+    // Every grade is in localStorage from the click on, so only the ones that went wrong are listed, not a save on its way.
+    const entries = Object.entries(readPending()).filter(([num, entry]) => failures.has(num) || entry.day !== studyDay());
     pendingBox.hidden = !entries.length;
     const list = pendingBox.querySelector("ul");
     list.replaceChildren();

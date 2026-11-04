@@ -203,6 +203,42 @@ describe("pending grades", () => {
     expect(p.network).toHaveBeenCalledTimes(1);
     expect(p.status.textContent).toBe("评价已保存");
   });
+  it("never shows the unsaved notice for a save that succeeds, even with a second click while the first is on its way", async () => {
+    const replies: ((res: Response) => void)[] = [];
+    const p = page("1", new Map(), { fetch: () => new Promise<Response>((resolve) => replies.push(resolve)) });
+    const shown = vi.fn();
+    Object.defineProperty(p.pendingBox, "hidden", { set: (hidden: boolean) => { if (!hidden) shown(); } });
+    p.submit("shaky"); await flush();
+    p.submit("mastered"); await flush();
+    replies[0](response()); await flush();
+    replies[1](response()); await flush();
+    expect(p.network).toHaveBeenCalledTimes(2);
+    expect(shown).not.toHaveBeenCalled();
+    expect(p.status.textContent).toBe("评价已保存");
+  });
+  it("sends a grade left over from an earlier page without showing the notice", async () => {
+    const storage = new Map([[key("1"), JSON.stringify({ 1: entry() })]]);
+    const p = page("1", storage, { fetch: () => new Promise<Response>(() => {}) });
+    await flush();
+    expect(p.network).toHaveBeenCalledTimes(1);
+    expect(p.pendingBox.hidden).toBe(true);
+    expect(p.pendingList.children).toHaveLength(0);
+  });
+  it("lists a grade once saving it has failed and keeps it there through the retry", async () => {
+    let online = false, reply!: (res: Response) => void;
+    const p = page("1", new Map(), { fetch: () => online ? new Promise<Response>((resolve) => { reply = resolve; }) : Promise.reject(Error("offline")) });
+    const message = () => p.pendingList.children[0].children[1].textContent;
+    p.submit("unknown"); await flush();
+    expect(p.pendingBox.hidden).toBe(false);
+    expect(message()).toContain("正在等待重试");
+    online = true;
+    await p.runTimer(1500);
+    expect(p.pendingBox.hidden).toBe(false);
+    expect(message()).toContain("正在保存");
+    reply(response()); await flush();
+    expect(p.pendingBox.hidden).toBe(true);
+    expect(p.pendingList.children).toHaveLength(0);
+  });
   it("does not replay an expired grade or a login HTML response", async () => {
     const storage = new Map([[key("1"), JSON.stringify({ 1: { ...entry(), day: "2000-01-01" } })]]);
     const p = page("1", storage, { fetch: async () => new Response("login", { headers: { "content-type": "text/html" } }) });
