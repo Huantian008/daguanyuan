@@ -317,7 +317,12 @@ describe("bank", () => {
     expect(first).toContain("下一节");
     expect(first).not.toContain("上一章");
     expect(first).not.toContain("上一节");
+    // the foot links are what the ← and → keys follow
+    expect(first).toContain('rel="next" title="快捷键 →" href="/bank/A?kp=2"');
+    expect(first).not.toContain('rel="prev"');
     const last = await text(client, "/bank/A?kp=3");
+    expect(last).toContain('rel="next" title="快捷键 →" href="/bank/B?kp=1"');
+    expect(last).toContain('rel="prev" title="快捷键 ←" href="/bank/A?kp=2"');
     expect(last).toContain('href="/bank/B?kp=1"');
     expect(last).toContain("下一章");
     const nextChapter = await text(client, "/bank/B?kp=1");

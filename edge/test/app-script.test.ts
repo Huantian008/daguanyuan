@@ -70,7 +70,7 @@ function noteBox(num = 7, value = "") {
 }
 function page(owner: string, storage = new Map<string, string>(), options: {
   fetch?: any; blocked?: boolean; fullStorage?: boolean; maths?: any[]; cards?: any[]; observer?: (callback: (entries: any[]) => void) => void; clock?: DateConstructor; studyDay?: string; dialog?: boolean;
-  tree?: ReturnType<typeof kpTree>; session?: Map<string, string>; notes?: ReturnType<typeof noteBox>[];
+  tree?: ReturnType<typeof kpTree>; session?: Map<string, string>; notes?: ReturnType<typeof noteBox>[]; pager?: Record<string, { click: () => void }>; openDialog?: boolean;
 } = {}) {
   const listeners: Record<string, Function> = {};
   const listen = (name: string, fn: Function) => {
@@ -97,6 +97,8 @@ function page(owner: string, storage = new Map<string, string>(), options: {
     querySelector: (s: string) => s.includes("form.qc-grades") ? form
       : s.startsWith("form.note-form") ? options.notes?.find((n) => s.includes(`/q/${n.num}/note`))?.form ?? null
       : s.startsWith("[aria-controls=\"qn-") ? options.notes?.find((n) => s.includes(`qn-${n.num}`))?.toggle ?? null
+      : s.startsWith(".drill-foot a[rel=") ? options.pager?.[s.match(/rel="(\w+)"/)![1]] ?? null
+      : s === "dialog[open]" ? (options.openDialog ? {} : null)
       : options.tree?.find(s) ?? null,
     querySelectorAll: (s: string) => s === "form.note-form" ? options.notes?.map((n) => n.form) ?? [] : s === "form.qc-grades" ? [form] : s === ".js-grade-retry" ? [retry] : s === ".qcard" ? options.cards ?? [] : s === ".math.inline, .math.block" ? options.maths ?? [] : [],
     addEventListener: listen,
@@ -641,5 +643,37 @@ describe("notes", () => {
     await p.runTimer(800);
     expect(noteCalls(p).map(sent)).toEqual(["思路"]);
     expect(box.status.textContent).toMatch(/^已保存/);
+  });
+});
+
+describe("arrow keys on a chapter page", () => {
+  const pager = () => ({ prev: { click: vi.fn() }, next: { click: vi.fn() } });
+  const press = (p: ReturnType<typeof page>, key: string, more: Record<string, unknown> = {}) => {
+    const event = { key, target: { closest: () => null }, preventDefault: vi.fn(), ...more };
+    p.listeners.keydown(event);
+    return event;
+  };
+
+  it("turns to the next 考点 with → and the previous one with ←", () => {
+    const links = pager(), p = page("1", new Map(), { pager: links });
+    expect(press(p, "ArrowRight").preventDefault).toHaveBeenCalled();
+    expect(links.next.click).toHaveBeenCalledTimes(1);
+    expect(links.prev.click).not.toHaveBeenCalled();
+    press(p, "ArrowLeft");
+    expect(links.prev.click).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves the key alone where there is no such page", () => {
+    const p = page("1", new Map(), { pager: { next: { click: vi.fn() } } });
+    expect(press(p, "ArrowLeft").preventDefault).not.toHaveBeenCalled();
+    expect(press(page("1"), "ArrowRight").preventDefault).not.toHaveBeenCalled();
+  });
+
+  it("stays put while typing, with a modifier, on a held key, or with a drawer open", () => {
+    const links = pager(), p = page("1", new Map(), { pager: links });
+    press(p, "ArrowRight", { target: { closest: (s: string) => s.includes("textarea") ? {} : null } });
+    for (const more of [{ metaKey: true }, { altKey: true }, { ctrlKey: true }, { shiftKey: true }, { repeat: true }, { isComposing: true }, { defaultPrevented: true }]) press(p, "ArrowRight", more);
+    press(page("1", new Map(), { pager: links, openDialog: true }), "ArrowRight");
+    expect(links.next.click).not.toHaveBeenCalled();
   });
 });

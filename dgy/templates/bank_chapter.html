@@ -66,8 +66,8 @@
     </div>
 
     <nav class="drill-foot" aria-label="翻节">
-      {% if prev %}<a class="btn" href="{{ prev[1] }}">← {{ prev[0] }}</a>{% else %}<span></span>{% endif %}
-      {% if following %}<a class="btn btn-primary" href="{{ following[1] }}">{{ following[0] }} →</a>{% endif %}
+      {% if prev %}<a class="btn" rel="prev" title="快捷键 ←" href="{{ prev[1] }}">← {{ prev[0] }}</a>{% else %}<span></span>{% endif %}
+      {% if following %}<a class="btn btn-primary" rel="next" title="快捷键 →" href="{{ following[1] }}">{{ following[0] }} →</a>{% endif %}
     </nav>
   </div>
 </div>

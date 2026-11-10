@@ -131,8 +131,8 @@ export function chapterPage(meta: Meta, d: ChapterPageData) {
     </div>
 
     <nav class="drill-foot" aria-label="翻节">
-      ${prev ? html`<a class="btn" href="${prev[1]}">← ${prev[0]}</a>` : html`<span></span>`}
-      ${following ? html`<a class="btn btn-primary" href="${following[1]}">${following[0]} →</a>` : ""}
+      ${prev ? html`<a class="btn" rel="prev" title="快捷键 ←" href="${prev[1]}">← ${prev[0]}</a>` : html`<span></span>`}
+      ${following ? html`<a class="btn btn-primary" rel="next" title="快捷键 →" href="${following[1]}">${following[0]} →</a>` : ""}
     </nav>
   </div>
 </div>`,

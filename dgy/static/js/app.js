@@ -101,6 +101,19 @@
     });
   }
 
+  // ---------- chapter page: ← and → turn to the previous and next 考点 ----------
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    if (event.defaultPrevented || event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.isComposing) return;
+    // In a text box the arrows move the caret; with a drawer or the image viewer open they belong to it.
+    if (event.target.closest?.("input, textarea, select, [contenteditable], dialog") || document.querySelector("dialog[open]")) return;
+    const link = document.querySelector(`.drill-foot a[rel="${event.key === "ArrowLeft" ? "prev" : "next"}"]`);
+    if (!link) return;
+    event.preventDefault();
+    link.click();
+  });
+
   // ---------- question as text or as the original image ----------
 
   const QVIEW_KEY = "dgy-qview";
