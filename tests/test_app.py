@@ -348,10 +348,10 @@ def test_chapter_page_steps_between_kps_and_chapters(env):
     first = env.client.get("/bank/A", params={"kp": "1"}).text
     assert 'href="/bank/A?kp=2"' in first and "下一节" in first and "上一章" not in first and "上一节" not in first
     # the foot links are what the ← and → keys follow
-    assert 'rel="next" title="快捷键 →" href="/bank/A?kp=2"' in first and 'rel="prev"' not in first
+    assert 'rel="next" href="/bank/A?kp=2"' in first and 'rel="prev"' not in first
     last = env.client.get("/bank/A", params={"kp": "3"}).text
     assert 'href="/bank/B?kp=1"' in last and "下一章" in last
-    assert 'rel="next" title="快捷键 →" href="/bank/B?kp=1"' in last and 'rel="prev" title="快捷键 ←" href="/bank/A?kp=2"' in last
+    assert 'rel="next" href="/bank/B?kp=1"' in last and 'rel="prev" href="/bank/A?kp=2"' in last
     assert 'href="/bank/A?kp=3"' in env.client.get("/bank/B", params={"kp": "1"}).text
     assert "上一章" in env.client.get("/bank/B", params={"kp": "1"}).text
 
