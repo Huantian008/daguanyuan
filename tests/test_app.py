@@ -347,7 +347,7 @@ def test_chapter_page_opens_on_the_first_kp_with_work_left(env):
 def test_chapter_page_steps_between_kps_and_chapters(env):
     first = env.client.get("/bank/A", params={"kp": "1"}).text
     assert 'href="/bank/A?kp=2"' in first and "下一节" in first and "上一章" not in first and "上一节" not in first
-    # the foot links are what the ← and → keys follow
+    # the foot links are what the left and right arrow keys follow
     assert 'rel="next" href="/bank/A?kp=2"' in first and 'rel="prev"' not in first
     last = env.client.get("/bank/A", params={"kp": "3"}).text
     assert 'href="/bank/B?kp=1"' in last and "下一章" in last

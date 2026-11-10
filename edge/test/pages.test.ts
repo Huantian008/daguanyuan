@@ -317,7 +317,7 @@ describe("bank", () => {
     expect(first).toContain("下一节");
     expect(first).not.toContain("上一章");
     expect(first).not.toContain("上一节");
-    // the foot links are what the ← and → keys follow
+    // the foot links are what the left and right arrow keys follow
     expect(first).toContain('rel="next" href="/bank/A?kp=2"');
     expect(first).not.toContain('rel="prev"');
     const last = await text(client, "/bank/A?kp=3");

@@ -81,8 +81,8 @@ export function chapterPage(meta: Meta, d: ChapterPageData) {
     barStart: html`<button type="button" class="drill-tree-toggle js-tree-toggle" aria-controls="kp-tree" aria-expanded="true" aria-label="收起目录" title="收起目录"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path class="tree-icon-pane" d="M3.5 7A2.5 2.5 0 0 1 6 4.5h3.5v15H6A2.5 2.5 0 0 1 3.5 17z" stroke="none"/><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></svg></button>`,
     barContext: html`<div class="bar-context">
         <span class="bar-title" aria-hidden="true">${current.kp}</span>
-        ${prev ? html`<a class="btn btn-small" href="${prev[1]}">← ${prev[0]}</a>` : ""}
-        ${following ? html`<a class="btn btn-small btn-primary" href="${following[1]}">${following[0]} →</a>` : ""}
+        ${prev ? html`<a class="btn btn-small" href="${prev[1]}">${prev[0]}</a>` : ""}
+        ${following ? html`<a class="btn btn-small btn-primary" href="${following[1]}">${following[0]}</a>` : ""}
         <button type="button" class="pin-btn js-top-pin" aria-label="固定顶部" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="pin-head" d="M9 3.5h6M10 3.5v5.5l-3 4h10l-3-4V3.5z"/><path d="M12 13v7.5"/></svg></button>
       </div>
       <div class="drill-track js-done-bar" data-total="${current.total}" aria-hidden="true"><span style="width: ${percent(current.done, current.total)}%"></span></div>`,
@@ -119,8 +119,8 @@ export function chapterPage(meta: Meta, d: ChapterPageData) {
         <span class="muted">显示 ${shown.length} 题</span>
       </form>
       <div class="drill-actions">
-        ${prev ? html`<a class="btn btn-small" href="${prev[1]}">← ${prev[0]}</a>` : ""}
-        ${following ? html`<a class="btn btn-small btn-primary" href="${following[1]}">${following[0]} →</a>` : ""}
+        ${prev ? html`<a class="btn btn-small" href="${prev[1]}">${prev[0]}</a>` : ""}
+        ${following ? html`<a class="btn btn-small btn-primary" href="${following[1]}">${following[0]}</a>` : ""}
       </div>
     </header>
     ${shown.length ? "" : html`<p class="empty">这个考点没有符合筛选的题目。选择“全部”可查看所有题卡。</p>`}
@@ -131,8 +131,8 @@ export function chapterPage(meta: Meta, d: ChapterPageData) {
     </div>
 
     <nav class="drill-foot" aria-label="翻节">
-      ${prev ? html`<a class="btn" rel="prev" href="${prev[1]}">← ${prev[0]}</a>` : html`<span></span>`}
-      ${following ? html`<a class="btn btn-primary" rel="next" href="${following[1]}">${following[0]} →</a>` : ""}
+      ${prev ? html`<a class="btn" rel="prev" href="${prev[1]}">${prev[0]}</a>` : html`<span></span>`}
+      ${following ? html`<a class="btn btn-primary" rel="next" href="${following[1]}">${following[0]}</a>` : ""}
     </nav>
   </div>
 </div>`,

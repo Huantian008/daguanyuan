@@ -8,8 +8,8 @@
 {% block topbar_context %}
       <div class="bar-context">
         <span class="bar-title" aria-hidden="true">{{ current.kp }}</span>
-        {% if prev %}<a class="btn btn-small" href="{{ prev[1] }}">← {{ prev[0] }}</a>{% endif %}
-        {% if following %}<a class="btn btn-small btn-primary" href="{{ following[1] }}">{{ following[0] }} →</a>{% endif %}
+        {% if prev %}<a class="btn btn-small" href="{{ prev[1] }}">{{ prev[0] }}</a>{% endif %}
+        {% if following %}<a class="btn btn-small btn-primary" href="{{ following[1] }}">{{ following[0] }}</a>{% endif %}
         <button type="button" class="pin-btn js-top-pin" aria-label="固定顶部" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="pin-head" d="M9 3.5h6M10 3.5v5.5l-3 4h10l-3-4V3.5z"/><path d="M12 13v7.5"/></svg></button>
       </div>
       <div class="drill-track js-done-bar" data-total="{{ current.total }}" aria-hidden="true"><span style="width: {{ (100 * current.done / current.total)|round|int if current.total else 0 }}%"></span></div>
@@ -53,8 +53,8 @@
         <span class="muted">显示 {{ visible_questions|length }} 题</span>
       </form>
       <div class="drill-actions">
-        {% if prev %}<a class="btn btn-small" href="{{ prev[1] }}">← {{ prev[0] }}</a>{% endif %}
-        {% if following %}<a class="btn btn-small btn-primary" href="{{ following[1] }}">{{ following[0] }} →</a>{% endif %}
+        {% if prev %}<a class="btn btn-small" href="{{ prev[1] }}">{{ prev[0] }}</a>{% endif %}
+        {% if following %}<a class="btn btn-small btn-primary" href="{{ following[1] }}">{{ following[0] }}</a>{% endif %}
       </div>
     </header>
     {% if not visible_questions %}<p class="empty">这个考点没有符合筛选的题目。选择“全部”可查看所有题卡。</p>{% endif %}
@@ -66,8 +66,8 @@
     </div>
 
     <nav class="drill-foot" aria-label="翻节">
-      {% if prev %}<a class="btn" rel="prev" href="{{ prev[1] }}">← {{ prev[0] }}</a>{% else %}<span></span>{% endif %}
-      {% if following %}<a class="btn btn-primary" rel="next" href="{{ following[1] }}">{{ following[0] }} →</a>{% endif %}
+      {% if prev %}<a class="btn" rel="prev" href="{{ prev[1] }}">{{ prev[0] }}</a>{% else %}<span></span>{% endif %}
+      {% if following %}<a class="btn btn-primary" rel="next" href="{{ following[1] }}">{{ following[0] }}</a>{% endif %}
     </nav>
   </div>
 </div>
